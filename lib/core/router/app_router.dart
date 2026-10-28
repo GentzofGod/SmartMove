@@ -11,6 +11,7 @@ import '../../features/community/presentation/community_screen.dart';
 import '../../features/itinerary/presentation/itinerary_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/auth/presentation/auth_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -69,6 +70,11 @@ final appRouter = GoRouter(
       path: '/notifications',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/auth',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AuthScreen(),
     ),
   ],
 );

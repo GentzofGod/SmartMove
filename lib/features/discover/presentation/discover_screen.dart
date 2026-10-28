@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/errand.dart';
+import '../../../core/models/price_observation.dart';
+import '../../../core/services/location_service.dart';
+import '../../home/presentation/widgets/location_picker_sheet.dart';
 import 'product_detail_sheet.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
@@ -14,6 +17,7 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   String _selectedCategory = 'Groceries';
+  String _selectedSourceFilter = 'All'; // 'All', 'Trader', 'Community', 'Demo'
   final TextEditingController _searchController = TextEditingController();
 
   final List<Map<String, dynamic>> _categories = [
@@ -32,6 +36,24 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   @override
   Widget build(BuildContext context) {
     final products = ref.watch(productsProvider);
+    final currentLocation = ref.watch(locationProvider);
+
+    var displayedProducts = products;
+    if (_selectedSourceFilter == 'Trader') {
+      displayedProducts = displayedProducts
+          .where((p) =>
+              p.sourceType == ObservationSource.traderConfirmed ||
+              p.sourceType == ObservationSource.traderProvided)
+          .toList();
+    } else if (_selectedSourceFilter == 'Community') {
+      displayedProducts = displayedProducts
+          .where((p) => p.sourceType == ObservationSource.communityReported)
+          .toList();
+    } else if (_selectedSourceFilter == 'Demo') {
+      displayedProducts = displayedProducts
+          .where((p) => p.sourceType == ObservationSource.simulatedDemo)
+          .toList();
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -159,55 +181,84 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.cardBorder),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.near_me_outlined, size: 14, color: AppColors.textSecondary),
-                          SizedBox(width: 4),
-                          Text(
-                            'Nearby (≤ 5 km)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                    InkWell(
+                      onTap: () => LocationPickerSheet.show(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.near_me_outlined, size: 14, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Near ${currentLocation.city} (≤ 5 km)',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
-                        ],
+                            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.cardBorder),
-                      ),
-                      child: Row(
-                        children: const [
-                          Text(
-                            'Sort by: Cheapest',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
+                    InkWell(
+                      onTap: () {
+                        // Cycle through sources: All -> Trader -> Community -> Demo -> All
+                        setState(() {
+                          if (_selectedSourceFilter == 'All') {
+                            _selectedSourceFilter = 'Trader';
+                          } else if (_selectedSourceFilter == 'Trader') {
+                            _selectedSourceFilter = 'Community';
+                          } else if (_selectedSourceFilter == 'Community') {
+                            _selectedSourceFilter = 'Demo';
+                          } else {
+                            _selectedSourceFilter = 'All';
+                          }
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _selectedSourceFilter != 'All'
+                              ? AppColors.primaryTint
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _selectedSourceFilter != 'All'
+                                ? AppColors.primary
+                                : AppColors.cardBorder,
                           ),
-                          Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
-                        ],
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Source: ${_selectedSourceFilter == 'All' ? 'All Sources' : _selectedSourceFilter}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _selectedSourceFilter != 'All'
+                                    ? AppColors.primaryDark
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                            const Icon(Icons.tune_rounded, size: 14, color: AppColors.textSecondary),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
                 Text(
-                  '${products.length} items',
+                  '${displayedProducts.length} items',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -221,12 +272,35 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
           // Product List Cards
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-              itemCount: products.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final p = products[index];
+            child: displayedProducts.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No matching products found',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Try adjusting your search or source filter.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                    itemCount: displayedProducts.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                final p = displayedProducts[index];
                 return InkWell(
                   onTap: () {
                     showModalBottomSheet(
@@ -325,20 +399,69 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   color: AppColors.textSecondary,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  '${p.bestSeller} • ${p.distanceKm} km',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
+                                Builder(
+                                  builder: (context) {
+                                    final marketCoord = LocationService
+                                        .knownMarketCoordinates[p.bestSeller];
+                                    final dynamicDistance = marketCoord != null
+                                        ? LocationService.calculateDistanceKm(
+                                            lat1: currentLocation.latitude,
+                                            lon1: currentLocation.longitude,
+                                            lat2: marketCoord.latitude,
+                                            lon2: marketCoord.longitude,
+                                          )
+                                        : p.distanceKm;
+
+                                    return Text(
+                                      '${p.bestSeller} • $dynamicDistance km',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(width: 8),
                                 const Text('•', style: TextStyle(color: AppColors.textTertiary)),
                                 const SizedBox(width: 8),
                                 Text(
-                                  p.updateTime,
+                                  'per ${p.standardUnit}',
                                   style: const TextStyle(
                                     fontSize: 11,
+                                    color: AppColors.textTertiary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            // Explicit Data Source Badge (Section 5.2)
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: p.sourceType == ObservationSource.simulatedDemo
+                                        ? AppColors.cardBorder
+                                        : AppColors.badgeSuccessBg,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    p.sourceType.displayLabel,
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.sourceType == ObservationSource.simulatedDemo
+                                          ? AppColors.textSecondary
+                                          : AppColors.badgeSuccessText,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  p.updateTime,
+                                  style: const TextStyle(
+                                    fontSize: 10,
                                     color: AppColors.textTertiary,
                                   ),
                                 ),

@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/errand.dart';
+import '../../../core/models/plan_candidate.dart';
 import '../../../core/services/meta_ai_service.dart';
+import '../../home/presentation/widgets/ai_proposal_review_sheet.dart';
+import '../../home/presentation/widgets/muse_voice_input_sheet.dart';
 
 class ErrandsScreen extends ConsumerStatefulWidget {
   const ErrandsScreen({super.key});
@@ -41,54 +44,88 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
 
     try {
       const aiService = MetaAiService();
-      final result = await aiService.parseRequest(prompt);
+      final proposal = await aiService.parseToProposal(prompt);
 
-      // Add parsed grocery errand
-      final groceryErrand = Errand(
-        id: 'e-ai-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Buy groceries (Meta AI Parsed)',
-        locationName: 'Local Markets',
-        scheduledTime: '9:00 AM',
-        priority: ErrandPriority.high,
-        category: 'groceries',
-        shoppingItems: result.shoppingItems,
-      );
-      ref.read(errandsProvider.notifier).addErrand(groceryErrand);
+      if (!mounted) return;
+      setState(() {
+        _isAiParsing = false;
+      });
 
-      if (result.errand != null) {
-        ref.read(errandsProvider.notifier).addErrand(result.errand!);
-      }
+      // AI Safeguard: Require user review and confirmation before mutating state
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => AiProposalReviewSheet(
+          proposal: proposal,
+          onConfirm: (confirmedBudget, confirmedItems, confirmedErrand) {
+            final groceryErrand = Errand(
+              id: 'e-ai-${DateTime.now().millisecondsSinceEpoch}',
+              title: 'Buy groceries (Meta Muse Spark)',
+              locationName: 'Local Markets',
+              scheduledTime: '9:00 AM',
+              priority: ErrandPriority.high,
+              category: 'groceries',
+              shoppingItems: confirmedItems,
+            );
+            ref.read(errandsProvider.notifier).addErrand(groceryErrand);
 
-      // Update Decision Lab budget
-      ref.read(decisionLabProvider.notifier).updateBudget(result.budget);
+            if (confirmedErrand != null) {
+              ref.read(errandsProvider.notifier).addErrand(confirmedErrand);
+            }
 
-      _aiPromptController.clear();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.primary,
-            content: Row(
-              children: const [
-                Icon(Icons.auto_awesome, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Meta AI parsed shopping list, deadline & budget!',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+            ref.read(decisionLabProvider.notifier).updateBudget(confirmedBudget);
+            _aiPromptController.clear();
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: AppColors.primary,
+                  content: Row(
+                    children: const [
+                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Confirmed! Items and errands added to itinerary.',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        );
-      }
-    } finally {
+              );
+            }
+          },
+        ),
+      );
+    } catch (_) {
       if (mounted) {
         setState(() {
           _isAiParsing = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not extract AI proposal.'),
+            backgroundColor: AppColors.errorText,
+          ),
+        );
       }
     }
+  }
+
+  void _openVoiceInput() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => MuseVoiceInputSheet(
+        onTranscriptConfirmed: (text) {
+          _aiPromptController.text = text;
+          _handleMetaAiParse(text);
+        },
+      ),
+    );
   }
 
   void _showAddErrandDialog(BuildContext context) {
@@ -423,10 +460,10 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
                   children: [
                     Row(
                       children: const [
-                        Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Meta AI Smart Input',
+                        const Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Meta Muse Spark & Voice',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -467,7 +504,17 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.mic_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      tooltip: 'Muse Voice Transcribe',
+                      onPressed: _openVoiceInput,
+                    ),
+                    const SizedBox(width: 4),
                     _isAiParsing
                         ? const SizedBox(
                             width: 24,

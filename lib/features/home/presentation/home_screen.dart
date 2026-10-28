@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
+import '../../../core/models/price_observation.dart';
+import '../../../core/models/errand.dart';
+import '../../discover/presentation/product_detail_sheet.dart';
+import 'widgets/location_picker_sheet.dart';
+import 'widgets/meta_ai_scenario_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -11,6 +16,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final products = ref.watch(productsProvider);
     final decisionState = ref.watch(decisionLabProvider);
+    final currentLocation = ref.watch(locationProvider);
+    final userSession = ref.watch(authProvider);
     final recentProducts = products.take(3).toList();
 
     return Scaffold(
@@ -25,28 +32,46 @@ class HomeScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.location_on_rounded, size: 14, color: AppColors.primary),
-                        SizedBox(width: 4),
-                        Text(
-                          'Lagos Mainland',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
+                  InkWell(
+                    onTap: () => LocationPickerSheet.show(context),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: currentLocation.isDeviceLocation
+                              ? AppColors.primary
+                              : AppColors.cardBorder,
                         ),
-                        Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            currentLocation.isDeviceLocation
+                                ? Icons.my_location_rounded
+                                : Icons.location_on_rounded,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 150),
+                            child: Text(
+                              currentLocation.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
+                        ],
+                      ),
                     ),
                   ),
                   Row(
@@ -74,9 +99,11 @@ class HomeScreen extends ConsumerWidget {
                         child: CircleAvatar(
                           radius: 18,
                           backgroundColor: AppColors.primary,
-                          child: const Text(
-                            'G',
-                            style: TextStyle(
+                          child: Text(
+                            userSession.displayName.isNotEmpty
+                                ? userSession.displayName[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
@@ -93,26 +120,32 @@ class HomeScreen extends ConsumerWidget {
               // Greeting
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
-                    'Good morning, Gent',
-                    style: TextStyle(
+                    'Good morning, ${userSession.displayName}',
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 3),
+                  const SizedBox(height: 3),
                   Text(
-                    "Here's your plan for today",
-                    style: TextStyle(
+                    userSession.isGuest
+                        ? "Guest Mode • Exploring near ${currentLocation.city}"
+                        : "Role: ${userSession.role} • ${currentLocation.label}",
+                    style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
+
+              // Meta AI Scenario Rehearsal Card (1-Tap Simulation)
+              const MetaAiScenarioCard(),
+              const SizedBox(height: 18),
 
               // Today's Plan Active Banner Card
               InkWell(
@@ -218,48 +251,53 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Stat Metrics Row: Budget, Saved, Est. Time
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      label: 'Budget',
-                      value: '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
-                      icon: Icons.account_balance_wallet_outlined,
-                      iconBg: const Color(0xFFFFF0B3),
-                      iconColor: const Color(0xFFB78103),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildMetricCard(
-                      label: 'Saved',
-                      value: '₦2,350',
-                      icon: Icons.savings_outlined,
-                      iconBg: AppColors.primaryTint,
-                      iconColor: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildMetricCard(
-                      label: 'Est. Time',
-                      value: '2.5 hrs',
-                      icon: Icons.schedule_outlined,
-                      iconBg: const Color(0xFFDEEBFF),
-                      iconColor: const Color(0xFF0052CC),
-                    ),
-                  ),
-                ],
+              // Stat Metrics Row: Budget, Remaining Budget, Est. Time (Non-decorative, actual calculated constraints)
+              Builder(
+                builder: (context) {
+                  final remainingBudget = (decisionState.budget - decisionState.selectedPlan.totalCost).clamp(0.0, double.infinity);
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _buildMetricCard(
+                          label: 'Budget',
+                          value: '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
+                          icon: Icons.account_balance_wallet_outlined,
+                          iconBg: const Color(0xFFFFF0B3),
+                          iconColor: const Color(0xFFB78103),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildMetricCard(
+                          label: 'Remaining',
+                          value: '₦${remainingBudget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
+                          icon: Icons.savings_outlined,
+                          iconBg: AppColors.primaryTint,
+                          iconColor: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildMetricCard(
+                          label: 'Est. Time',
+                          value: '${decisionState.selectedPlan.estimatedHours} hrs',
+                          icon: Icons.schedule_outlined,
+                          iconBg: const Color(0xFFDEEBFF),
+                          iconColor: const Color(0xFF0052CC),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Recent Price Changes Section
+              // Saved Shopping Lists (Section 5.1)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Recent Price Changes',
+                    'Saved Shopping Lists',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -267,7 +305,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                   InkWell(
-                    onTap: () => context.go('/discover'),
+                    onTap: () => context.go('/errands'),
                     child: const Text(
                       'View all',
                       style: TextStyle(
@@ -279,86 +317,302 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // Product Cards List
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: recentProducts.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final p = recentProducts[index];
-                  final isPositive = p.percentageChange > 0;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.shopping_basket_outlined,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        // Quick load weekly essentials list
+                        final listErrand = Errand(
+                          id: 'e-saved-weekly-${DateTime.now().millisecondsSinceEpoch}',
+                          title: 'Weekly Provisions',
+                          locationName: 'Local Market',
+                          scheduledTime: '10:00 AM',
+                          priority: ErrandPriority.medium,
+                          category: 'groceries',
+                          shoppingItems: [
+                            ShoppingItem(
+                              id: 'si-w1',
+                              productName: 'Rice (1kg)',
+                              quantity: 2,
+                              unit: '1kg',
+                              estimatedUnitPrice: 1650,
                             ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            ShoppingItem(
+                              id: 'si-w2',
+                              productName: 'Eggs (crate)',
+                              quantity: 1,
+                              unit: 'crate of 30',
+                              estimatedUnitPrice: 5200,
+                            ),
+                          ],
+                        );
+                        ref.read(errandsProvider.notifier).addErrand(listErrand);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Loaded "Weekly Provisions" list into your errands!'),
+                            backgroundColor: AppColors.primary,
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Text(
-                                  p.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${p.formattedPrice} • ${p.bestSeller}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
+                                const Icon(Icons.bookmark_outline_rounded, size: 16, color: AppColors.primary),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    'Weekly Basket',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 4),
+                            const Text('Rice & Eggs • ₦8,500', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isPositive ? AppColors.successBg : AppColors.errorBg,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${isPositive ? "+" : ""}${p.percentageChange.toStringAsFixed(0)}%',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isPositive ? AppColors.successText : AppColors.errorText,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        final breakfastErrand = Errand(
+                          id: 'e-saved-bfast-${DateTime.now().millisecondsSinceEpoch}',
+                          title: 'Family Breakfast Restock',
+                          locationName: 'Local Market',
+                          scheduledTime: '9:30 AM',
+                          priority: ErrandPriority.medium,
+                          category: 'groceries',
+                          shoppingItems: [
+                            ShoppingItem(
+                              id: 'si-b1',
+                              productName: 'Eggs (crate)',
+                              quantity: 1,
+                              unit: 'crate of 30',
+                              estimatedUnitPrice: 5200,
+                            ),
+                            ShoppingItem(
+                              id: 'si-b2',
+                              productName: 'Cooking Oil (1L)',
+                              quantity: 1,
+                              unit: '1L',
+                              estimatedUnitPrice: 2850,
+                            ),
+                          ],
+                        );
+                        ref.read(errandsProvider.notifier).addErrand(breakfastErrand);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Loaded "Family Breakfast" list into your errands!'),
+                            backgroundColor: AppColors.primary,
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.bookmark_outline_rounded, size: 16, color: AppColors.primary),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    'Breakfast List',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            const Text('Eggs & Oil • ₦8,050', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 20),
+
+              // Recent Price Changes Section (Section 5.1: Only when data exists)
+              if (recentProducts.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Recent Price Changes for Products',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => context.go('/discover'),
+                      child: const Text(
+                        'View all',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Product Cards List
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: recentProducts.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final p = recentProducts[index];
+                    final isPositive = p.percentageChange > 0;
+                    return InkWell(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => ProductDetailSheet(product: p),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.background,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.shopping_basket_outlined,
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${p.formattedPrice} • ${p.bestSeller}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: p.sourceType == ObservationSource.simulatedDemo
+                                                ? AppColors.cardBorder
+                                                : AppColors.badgeSuccessBg,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            p.sourceType.displayLabel,
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: p.sourceType == ObservationSource.simulatedDemo
+                                                  ? AppColors.textSecondary
+                                                  : AppColors.badgeSuccessText,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          p.updateTime,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: AppColors.textTertiary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isPositive ? AppColors.successBg : AppColors.errorBg,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${isPositive ? "+" : ""}${p.percentageChange.toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isPositive ? AppColors.successText : AppColors.errorText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
               const SizedBox(height: 24),
 
               // "Plan your next trip" CTA Card

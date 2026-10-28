@@ -3,6 +3,7 @@ enum ObservationSource {
   communityReported,
   traderProvided,
   traderConfirmed,
+  independentlyVerified,
 }
 
 extension ObservationSourceX on ObservationSource {
@@ -15,7 +16,9 @@ extension ObservationSourceX on ObservationSource {
       case ObservationSource.traderProvided:
         return 'Trader provided';
       case ObservationSource.traderConfirmed:
-        return 'Verified by Trader';
+        return 'Trader confirmed';
+      case ObservationSource.independentlyVerified:
+        return 'Independently verified';
     }
   }
 

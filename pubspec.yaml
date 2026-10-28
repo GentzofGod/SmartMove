@@ -41,6 +41,7 @@ dependencies:
   intl: ^0.20.3
   supabase_flutter: ^2.18.3
   http: ^1.2.2
+  geolocator: ^13.0.2
 
 dev_dependencies:
   flutter_test:

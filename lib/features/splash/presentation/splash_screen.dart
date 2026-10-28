@@ -172,7 +172,7 @@ class SplashScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () => context.go('/home'),
+                      onPressed: () => context.push('/auth'),
                       child: const Text(
                         'Already have an account? Log In',
                         style: TextStyle(

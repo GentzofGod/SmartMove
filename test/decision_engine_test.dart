@@ -4,14 +4,15 @@ import 'package:smartmove/core/services/meta_ai_service.dart';
 
 void main() {
   group('SmartMove DecisionEngine Tests (Hackathon Deterministic Calculations)', () {
-    test('Calculates primary candidate plans correctly under ₦15,000 budget', () {
+    test('Calculates 4 primary candidate plans correctly under ₦15,000 budget', () {
       final plans = DecisionEngine.calculateCandidatePlans(
         userBudget: 15000,
         baseTransportFare: 1200,
         maxTimeHours: 3.0,
       );
 
-      expect(plans.length, 3);
+      // Plans A, B, C, D
+      expect(plans.length, 4);
 
       final planA = plans.firstWhere((p) => p.name == 'Plan A');
       expect(planA.itemCost, 11600.0);
@@ -27,27 +28,35 @@ void main() {
       expect(planB.totalCost, 13800.0);
       expect(planB.estimatedHours, 1.8);
       expect(planB.stopCount, 2);
+
+      final planC = plans.firstWhere((p) => p.name == 'Plan C');
+      expect(planC.estimatedHours, 1.2);
+      expect(planC.stopCount, 2);
+
+      final planD = plans.firstWhere((p) => p.name == 'Plan D');
+      expect(planD.tag, 'Delay Non-Urgent');
+      expect(planD.totalCost <= 15000, true);
     });
 
     test('Identifies budget constraint violations when budget is reduced', () {
       final plans = DecisionEngine.calculateCandidatePlans(
-        userBudget: 12000,
+        userBudget: 11000,
         baseTransportFare: 1200,
         maxTimeHours: 3.0,
       );
 
       final planA = plans.firstWhere((p) => p.name == 'Plan A');
       expect(planA.totalCost, 13400.0);
-      expect(planA.isFeasibleBudget, false); // 13400 > 12000
+      expect(planA.isFeasibleBudget, false); // 13400 > 11000
 
       final insight = DecisionEngine.generateRecommendationInsight(
-        budget: 12000,
+        budget: 11000,
         transportCost: 1200,
         timeAvailable: 3.0,
         candidates: plans,
       );
-      expect(insight.contains('Budget constraint'), true);
-      expect(insight.contains('removing tomatoes'), true);
+      expect(insight.contains('Strict budget safety'), true);
+      expect(insight.contains('Plan D'), true);
     });
 
     test('Meta AI Service parses prompt into structured items and package errand', () async {

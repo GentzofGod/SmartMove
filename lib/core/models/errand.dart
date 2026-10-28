@@ -47,6 +47,10 @@ class Errand {
   final ErrandPriority priority;
   final String category; // 'groceries', 'pickup', 'pharmacy', 'utility', 'general'
   final List<ShoppingItem> shoppingItems;
+  final int durationMinutes;
+  final String? openingHours; // e.g. "8:00 AM - 6:00 PM"
+  final String? constraintsNote;
+  final int? maxStops;
   bool isCompleted;
 
   Errand({
@@ -58,6 +62,10 @@ class Errand {
     required this.priority,
     required this.category,
     this.shoppingItems = const [],
+    this.durationMinutes = 25,
+    this.openingHours,
+    this.constraintsNote,
+    this.maxStops,
     this.isCompleted = false,
   });
 
@@ -75,6 +83,10 @@ class Errand {
     ErrandPriority? priority,
     String? category,
     List<ShoppingItem>? shoppingItems,
+    int? durationMinutes,
+    String? openingHours,
+    String? constraintsNote,
+    int? maxStops,
     bool? isCompleted,
   }) {
     return Errand(
@@ -86,6 +98,10 @@ class Errand {
       priority: priority ?? this.priority,
       category: category ?? this.category,
       shoppingItems: shoppingItems ?? this.shoppingItems,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      openingHours: openingHours ?? this.openingHours,
+      constraintsNote: constraintsNote ?? this.constraintsNote,
+      maxStops: maxStops ?? this.maxStops,
       isCompleted: isCompleted ?? this.isCompleted,
     );
   }

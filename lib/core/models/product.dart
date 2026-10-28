@@ -1,3 +1,5 @@
+import 'price_observation.dart';
+
 class Product {
   final String id;
   final String name;
@@ -9,6 +11,8 @@ class Product {
   final String updateTime;
   final double percentageChange; // e.g. +8.0, -5.0
   final bool isCheapest;
+  final ObservationSource sourceType;
+  final int observationCount;
 
   const Product({
     required this.id,
@@ -21,6 +25,8 @@ class Product {
     required this.updateTime,
     this.percentageChange = 0.0,
     this.isCheapest = false,
+    this.sourceType = ObservationSource.traderConfirmed,
+    this.observationCount = 3,
   });
 
   String get formattedPrice => '₦${lowestPrice.toStringAsFixed(0).replaceAllMapped(

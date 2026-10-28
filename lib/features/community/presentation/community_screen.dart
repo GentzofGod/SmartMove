@@ -32,7 +32,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     final sellerController = TextEditingController();
     final priceController = TextEditingController();
     final unitController = TextEditingController(text: '1kg');
-    String submitterRole = 'Customer';
+    final userSession = ref.read(authProvider);
+    String submitterRole = userSession.role;
 
     showModalBottomSheet(
       context: context,
@@ -166,7 +167,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                                     : 'Local Market',
                                 price: price,
                                 unit: unitController.text.trim(),
-                                submitterName: 'You',
+                                submitterName: userSession.displayName,
                                 submitterRole: submitterRole,
                               );
                           Navigator.pop(context);

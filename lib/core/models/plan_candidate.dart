@@ -12,6 +12,10 @@ class PlanCandidate {
   final bool isRecommended;
   final bool isFeasibleBudget;
   final bool isFeasibleDeadline;
+  final bool isFeasibleStops;
+  final List<String> satisfiedConstraints;
+  final List<String> violatedConstraints;
+  final List<String> dataDisclaimers;
   final String tradeOffExplanation;
   final List<ItineraryStop> stops;
 
@@ -27,6 +31,10 @@ class PlanCandidate {
     this.isRecommended = false,
     this.isFeasibleBudget = true,
     this.isFeasibleDeadline = true,
+    this.isFeasibleStops = true,
+    this.satisfiedConstraints = const [],
+    this.violatedConstraints = const [],
+    this.dataDisclaimers = const [],
     required this.tradeOffExplanation,
     required this.stops,
   });
@@ -47,6 +55,12 @@ class PlanCandidate {
 
   String get formattedTransportCost =>
       '₦${transportCost.toStringAsFixed(0).replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]},',
+          )}';
+
+  String get formattedOtherCost =>
+      '₦${otherCost.toStringAsFixed(0).replaceAllMapped(
             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
             (Match m) => '${m[1]},',
           )}';

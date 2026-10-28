@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
+import '../../home/presentation/widgets/location_picker_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -16,6 +18,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final decisionState = ref.watch(decisionLabProvider);
+    final userSession = ref.watch(authProvider);
+    final currentLocation = ref.watch(locationProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -40,42 +44,156 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.cardBorder),
             ),
-            child: Row(
+            child: Column(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: AppColors.primary,
-                  child: const Text(
-                    'G',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Gent',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: AppColors.primary,
+                      child: Text(
+                        userSession.displayName.isNotEmpty
+                            ? userSession.displayName[0].toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    SizedBox(height: 3),
-                    Text(
-                      'gent@example.com',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  userSession.displayName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: userSession.isGuest
+                                      ? AppColors.badgeWarningBg
+                                      : AppColors.badgeSuccessBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  userSession.isGuest ? 'Guest' : userSession.role,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: userSession.isGuest
+                                        ? AppColors.badgeWarningText
+                                        : AppColors.badgeSuccessText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            userSession.email,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
+                if (userSession.isGuest) ...[
+                  const Divider(height: 24, color: AppColors.divider),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/auth'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.login_rounded, size: 18),
+                      label: const Text(
+                        'Sign In or Create Account',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  const Divider(height: 20, color: AppColors.divider),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Active Role Mode:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Customer'),
+                            selected: userSession.role == 'Customer',
+                            selectedColor: AppColors.badgeSuccessBg,
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: userSession.role == 'Customer'
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                ref
+                                    .read(authProvider.notifier)
+                                    .updateRole('Customer');
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Trader'),
+                            selected: userSession.role == 'Trader',
+                            selectedColor: AppColors.badgeSuccessBg,
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: userSession.role == 'Trader'
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                ref
+                                    .read(authProvider.notifier)
+                                    .updateRole('Trader');
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -107,9 +225,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
                 _buildMenuItem(
                   icon: Icons.location_on_outlined,
-                  title: 'Saved Locations',
-                  trailingText: '5',
-                  onTap: () {},
+                  title: 'Market Hub & Location',
+                  trailingText: currentLocation.label,
+                  onTap: () => LocationPickerSheet.show(context),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
                 SwitchListTile(
@@ -171,6 +289,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 24),
 
           // Log Out / Reset Demo Data Button
+          if (!userSession.isGuest) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  await ref.read(authProvider.notifier).logout();
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Logged out successfully.'),
+                        backgroundColor: AppColors.primary,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.badgeErrorBg,
+                  foregroundColor: AppColors.badgeErrorText,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text(
+                  'Log Out of Account',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -178,13 +331,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Session active.'),
+                    content: Text('Demo session and cache synchronized.'),
                     duration: Duration(seconds: 1),
                   ),
                 );
               },
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Reset Demo Data State'),
+              label: const Text('Sync Offline Cache & Demo Data'),
             ),
           ),
           const SizedBox(height: 20),
@@ -221,12 +374,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (trailingText != null)
-            Text(
-              trailingText,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: Text(
+                trailingText,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           const SizedBox(width: 4),

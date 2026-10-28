@@ -34,6 +34,16 @@ class AppColors {
   static const Color errorBg = Color(0xFFFFEBE6);
   static const Color errorText = Color(0xFFDE350B);
 
+  // Semantic Badge Aliases
+  static const Color badgeSuccessBg = successBg;
+  static const Color badgeSuccessText = successText;
+  static const Color badgeWarningBg = warningBg;
+  static const Color badgeWarningText = warningText;
+  static const Color badgeInfoBg = infoBg;
+  static const Color badgeInfoText = infoText;
+  static const Color badgeErrorBg = errorBg;
+  static const Color badgeErrorText = errorText;
+
   // Accent Tints
   static const Color amber = Color(0xFFFFAB00);
   static const Color blue = Color(0xFF0052CC);
