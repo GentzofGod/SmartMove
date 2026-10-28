@@ -13,6 +13,8 @@ class Product {
   final bool isCheapest;
   final ObservationSource sourceType;
   final int observationCount;
+  final String? description;
+  final String? imageUrl;
 
   const Product({
     required this.id,
@@ -27,6 +29,8 @@ class Product {
     this.isCheapest = false,
     this.sourceType = ObservationSource.traderConfirmed,
     this.observationCount = 3,
+    this.description,
+    this.imageUrl,
   });
 
   String get formattedPrice => '₦${lowestPrice.toStringAsFixed(0).replaceAllMapped(

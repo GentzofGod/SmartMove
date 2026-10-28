@@ -2,18 +2,24 @@ enum ErrandPriority { high, medium, low }
 
 class ShoppingItem {
   final String id;
+  final String? productId;
   final String productName;
   final double quantity;
   final String unit;
   final double estimatedUnitPrice;
+  final ErrandPriority priority;
+  final List<String> acceptableAlternatives;
   bool isChecked;
 
   ShoppingItem({
     required this.id,
+    this.productId,
     required this.productName,
     required this.quantity,
     required this.unit,
     required this.estimatedUnitPrice,
+    this.priority = ErrandPriority.medium,
+    this.acceptableAlternatives = const [],
     this.isChecked = false,
   });
 
@@ -21,18 +27,24 @@ class ShoppingItem {
 
   ShoppingItem copyWith({
     String? id,
+    String? productId,
     String? productName,
     double? quantity,
     String? unit,
     double? estimatedUnitPrice,
+    ErrandPriority? priority,
+    List<String>? acceptableAlternatives,
     bool? isChecked,
   }) {
     return ShoppingItem(
       id: id ?? this.id,
+      productId: productId ?? this.productId,
       productName: productName ?? this.productName,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
       estimatedUnitPrice: estimatedUnitPrice ?? this.estimatedUnitPrice,
+      priority: priority ?? this.priority,
+      acceptableAlternatives: acceptableAlternatives ?? this.acceptableAlternatives,
       isChecked: isChecked ?? this.isChecked,
     );
   }
