@@ -177,86 +177,91 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    InkWell(
-                      onTap: () => LocationPickerSheet.show(context),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        InkWell(
+                          onTap: () => LocationPickerSheet.show(context),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.near_me_outlined, size: 14, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Near ${currentLocation.city} (≤ 5 km)',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.cardBorder),
                             ),
-                            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () {
-                        // Cycle through sources: All -> Trader -> Community -> Demo -> All
-                        setState(() {
-                          if (_selectedSourceFilter == 'All') {
-                            _selectedSourceFilter = 'Trader';
-                          } else if (_selectedSourceFilter == 'Trader') {
-                            _selectedSourceFilter = 'Community';
-                          } else if (_selectedSourceFilter == 'Community') {
-                            _selectedSourceFilter = 'Demo';
-                          } else {
-                            _selectedSourceFilter = 'All';
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _selectedSourceFilter != 'All'
-                              ? AppColors.primaryTint
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: _selectedSourceFilter != 'All'
-                                ? AppColors.primary
-                                : AppColors.cardBorder,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.near_me_outlined, size: 14, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Near ${currentLocation.city} (≤ 5 km)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
+                              ],
+                            ),
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Source: ${_selectedSourceFilter == 'All' ? 'All Sources' : _selectedSourceFilter}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () {
+                            // Cycle through sources: All -> Trader -> Community -> Demo -> All
+                            setState(() {
+                              if (_selectedSourceFilter == 'All') {
+                                _selectedSourceFilter = 'Trader';
+                              } else if (_selectedSourceFilter == 'Trader') {
+                                _selectedSourceFilter = 'Community';
+                              } else if (_selectedSourceFilter == 'Community') {
+                                _selectedSourceFilter = 'Demo';
+                              } else {
+                                _selectedSourceFilter = 'All';
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: _selectedSourceFilter != 'All'
+                                  ? AppColors.primaryTint
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
                                 color: _selectedSourceFilter != 'All'
-                                    ? AppColors.primaryDark
-                                    : AppColors.textPrimary,
+                                    ? AppColors.primary
+                                    : AppColors.cardBorder,
                               ),
                             ),
-                            const Icon(Icons.tune_rounded, size: 14, color: AppColors.textSecondary),
-                          ],
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Source: ${_selectedSourceFilter == 'All' ? 'All Sources' : _selectedSourceFilter}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _selectedSourceFilter != 'All'
+                                        ? AppColors.primaryDark
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                const Icon(Icons.tune_rounded, size: 14, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '${displayedProducts.length} items',
                   style: const TextStyle(
@@ -352,15 +357,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  p.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15,
-                                    color: AppColors.textPrimary,
+                                Expanded(
+                                  child: Text(
+                                    p.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
                                 ),
-                                if (p.isCheapest)
+                                if (p.isCheapest) ...[
+                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -379,6 +388,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                       ),
                                     ),
                                   ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -399,31 +409,34 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   color: AppColors.textSecondary,
                                 ),
                                 const SizedBox(width: 4),
-                                Builder(
-                                  builder: (context) {
-                                    final marketCoord = LocationService
-                                        .knownMarketCoordinates[p.bestSeller];
-                                    final dynamicDistance = marketCoord != null
-                                        ? LocationService.calculateDistanceKm(
-                                            lat1: currentLocation.latitude,
-                                            lon1: currentLocation.longitude,
-                                            lat2: marketCoord.latitude,
-                                            lon2: marketCoord.longitude,
-                                          )
-                                        : p.distanceKm;
+                                Expanded(
+                                  child: Builder(
+                                    builder: (context) {
+                                      final marketCoord = LocationService
+                                          .knownMarketCoordinates[p.bestSeller];
+                                      final dynamicDistance = marketCoord != null
+                                          ? LocationService.calculateDistanceKm(
+                                              lat1: currentLocation.latitude,
+                                              lon1: currentLocation.longitude,
+                                              lat2: marketCoord.latitude,
+                                              lon2: marketCoord.longitude,
+                                            )
+                                          : p.distanceKm;
 
-                                    return Text(
-                                      '${p.bestSeller} • $dynamicDistance km',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    );
-                                  },
+                                      return Text(
+                                        '${p.bestSeller} • $dynamicDistance km',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 const Text('•', style: TextStyle(color: AppColors.textTertiary)),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Text(
                                   'per ${p.standardUnit}',
                                   style: const TextStyle(

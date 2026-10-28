@@ -131,20 +131,24 @@ class ItineraryScreen extends ConsumerWidget {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        stop.title,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: stop.isCompleted
-                                              ? AppColors.textTertiary
-                                              : AppColors.textPrimary,
-                                          decoration: stop.isCompleted
-                                              ? TextDecoration.lineThrough
-                                              : null,
+                                      Expanded(
+                                        child: Text(
+                                          stop.title,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: stop.isCompleted
+                                                ? AppColors.textTertiary
+                                                : AppColors.textPrimary,
+                                            decoration: stop.isCompleted
+                                                ? TextDecoration.lineThrough
+                                                : null,
+                                          ),
                                         ),
                                       ),
-                                      if (stop.badgeText != null)
+                                      if (stop.badgeText != null) ...[
+                                        const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 6,
@@ -164,6 +168,7 @@ class ItineraryScreen extends ConsumerWidget {
                                             ),
                                           ),
                                         ),
+                                      ],
                                     ],
                                   ),
                                   const SizedBox(height: 4),
@@ -221,12 +226,15 @@ class ItineraryScreen extends ConsumerWidget {
                                               color: AppColors.primary,
                                             ),
                                             const SizedBox(width: 6),
-                                            Text(
-                                              item,
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w500,
-                                                color: AppColors.textPrimary,
+                                            Expanded(
+                                              child: Text(
+                                                item,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppColors.textPrimary,
+                                                ),
                                               ),
                                             ),
                                           ],

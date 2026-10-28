@@ -125,7 +125,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       const Text(
                         'Reporting as: ',
@@ -141,7 +144,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                           if (val) setModalState(() => submitterRole = 'Customer');
                         },
                       ),
-                      const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('Trader'),
                         selected: submitterRole == 'Trader',
@@ -301,47 +303,54 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: obs.submitterRole == 'Trader'
-                            ? const Color(0xFFFFF0B3)
-                            : AppColors.primaryTint,
-                        child: Text(
-                          obs.submitterName.isNotEmpty ? obs.submitterName[0] : 'U',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: obs.submitterRole == 'Trader'
-                                ? const Color(0xFFB78103)
-                                : AppColors.primary,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: obs.submitterRole == 'Trader'
+                              ? const Color(0xFFFFF0B3)
+                              : AppColors.primaryTint,
+                          child: Text(
+                            obs.submitterName.isNotEmpty ? obs.submitterName[0] : 'U',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: obs.submitterRole == 'Trader'
+                                  ? const Color(0xFFB78103)
+                                  : AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${obs.submitterName} (${obs.submitterRole})',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: AppColors.textPrimary,
-                            ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${obs.submitterName} (${obs.submitterRole})',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                '${obs.sellerName}  •  ${obs.timeAgo}',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            '${obs.sellerName}  •  ${obs.timeAgo}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -369,14 +378,18 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${obs.productName} (${obs.unit})',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      '${obs.productName} (${obs.unit})',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     obs.formattedPrice,
                     style: const TextStyle(

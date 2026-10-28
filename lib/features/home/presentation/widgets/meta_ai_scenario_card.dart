@@ -259,31 +259,37 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: 16,
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Meta AI Trip Rehearsal',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Meta AI Trip Rehearsal',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primaryDark,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -343,7 +349,6 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
             children: [
               // 1-Tap Scenario Button
               Expanded(
-                flex: 3,
                 child: SizedBox(
                   height: 42,
                   child: ElevatedButton.icon(
@@ -355,7 +360,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
                     ),
                     icon: _isProcessing
                         ? const SizedBox(
@@ -367,28 +372,32 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                             ),
                           )
                         : const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 20),
-                    label: Text(
-                      _isProcessing ? 'Analyzing...' : '1-Tap Plan Scenario',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                            color: Colors.white, size: 18),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _isProcessing ? 'Analyzing...' : '1-Tap Plan',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Voice Transcribe Button (Microphone)
               SizedBox(
                 height: 42,
-                width: 44,
+                width: 42,
                 child: IconButton(
                   onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                       side: BorderSide(
@@ -404,11 +413,10 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                   tooltip: 'Spoken Request (Muse Voice Transcribe)',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Custom Text Prompt
               Expanded(
-                flex: 2,
                 child: SizedBox(
                   height: 42,
                   child: OutlinedButton(
@@ -421,14 +429,17 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                     ),
-                    child: const Text(
-                      'Custom Prompt',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryDark,
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Custom Prompt',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryDark,
+                        ),
                       ),
                     ),
                   ),

@@ -366,34 +366,38 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Optimized Route',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Optimized Route',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            '3 stops  •  2.5 hrs  •  ₦1,200 transport',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
+                            SizedBox(height: 2),
+                            Text(
+                              '3 stops  •  2.5 hrs  •  ₦1,200 transport',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: () => context.push('/itinerary'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
+                            horizontal: 14,
                             vertical: 10,
                           ),
                         ),
@@ -458,20 +462,26 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: const [
-                        const Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Meta Muse Spark & Voice',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                    Expanded(
+                      child: Row(
+                        children: const [
+                          Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Meta Muse Spark & Voice',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     InkWell(
                       onTap: () {
                         _aiPromptController.text =
@@ -588,48 +598,55 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Checkbox(
-                    value: errand.isCompleted,
-                    activeColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
+              Expanded(
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: errand.isCompleted,
+                      activeColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      onChanged: (val) {
+                        ref
+                            .read(errandsProvider.notifier)
+                            .toggleErrandCompletion(errand.id);
+                      },
                     ),
-                    onChanged: (val) {
-                      ref
-                          .read(errandsProvider.notifier)
-                          .toggleErrandCompletion(errand.id);
-                    },
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        errand.title,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: errand.isCompleted
-                              ? AppColors.textTertiary
-                              : AppColors.textPrimary,
-                          decoration: errand.isCompleted
-                              ? TextDecoration.lineThrough
-                              : null,
-                        ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            errand.title,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: errand.isCompleted
+                                  ? AppColors.textTertiary
+                                  : AppColors.textPrimary,
+                              decoration: errand.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${errand.locationName}  •  ${errand.scheduledTime}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${errand.locationName}  •  ${errand.scheduledTime}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(

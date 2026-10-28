@@ -137,8 +137,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ] else ...[
                   const Divider(height: 20, color: AppColors.divider),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       const Text(
                         'Active Role Mode:',
@@ -149,6 +152,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           ChoiceChip(
                             label: const Text('Customer'),

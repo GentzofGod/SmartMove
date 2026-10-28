@@ -425,15 +425,19 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${selectedPlan.name} (${selectedPlan.tag})',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      '${selectedPlan.name} (${selectedPlan.tag})',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
-                  if (selectedPlan.isRecommended)
+                  if (selectedPlan.isRecommended) ...[
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -449,6 +453,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
               const SizedBox(height: 12),
@@ -465,7 +470,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Product Items Cost:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        const Expanded(child: Text('Product Items Cost:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                        const SizedBox(width: 8),
                         Text(selectedPlan.formattedItemCost, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                       ],
                     ),
@@ -473,7 +479,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Transport Fares:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        const Expanded(child: Text('Transport Fares:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                        const SizedBox(width: 8),
                         Text(selectedPlan.formattedTransportCost, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                       ],
                     ),
@@ -482,7 +489,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Other Expenses (Cost of Time):', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          const Expanded(child: Text('Other Expenses (Cost of Time):', style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                          const SizedBox(width: 8),
                           Text(selectedPlan.formattedOtherCost, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                         ],
                       ),
@@ -491,7 +499,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total Estimated Cost:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                        const Expanded(child: Text('Total Estimated Cost:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary))),
+                        const SizedBox(width: 8),
                         Text(selectedPlan.formattedTotalCost, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary)),
                       ],
                     ),
@@ -499,7 +508,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Trip Duration & Stops:', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        const Expanded(child: Text('Trip Duration & Stops:', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                        const SizedBox(width: 8),
                         Text('${selectedPlan.estimatedHours} hrs  •  ${selectedPlan.stopCount} stops', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                       ],
                     ),
@@ -620,20 +630,26 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
-                      SizedBox(width: 6),
-                      Text(
-                        'Meta Muse Spark Trade-Off Insight',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                  Expanded(
+                    child: Row(
+                      children: const [
+                        Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Meta Muse Spark Trade-Off Insight',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -815,20 +831,26 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.auto_awesome, color: AppColors.primary, size: 15),
-                              SizedBox(width: 6),
-                              Text(
-                                'Muse Spark Interpretation Proposal',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryDark,
+                          Expanded(
+                            child: Row(
+                              children: const [
+                                Icon(Icons.auto_awesome, color: AppColors.primary, size: 15),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Muse Spark Interpretation Proposal',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primaryDark,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 6),
                           IconButton(
                             icon: const Icon(Icons.close, size: 16),
                             padding: EdgeInsets.zero,
@@ -1149,26 +1171,29 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Optional Cost of Time',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Optional Cost of Time',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Weights faster routes higher',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textTertiary,
+                        Text(
+                          'Weights faster routes higher',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textTertiary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     state.timeCostPerHour > 0
                         ? '₦${state.timeCostPerHour.toStringAsFixed(0)} / hr'
@@ -1261,37 +1286,42 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Best Candidate Plan',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Best Candidate Plan',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${state.selectedPlan.name} (${state.selectedPlan.tag})',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                    const SizedBox(height: 4),
+                    Text(
+                      '${state.selectedPlan.name} (${state.selectedPlan.tag})',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${state.selectedPlan.formattedTotalCost}  •  ${state.selectedPlan.estimatedHours} hrs  •  ${state.selectedPlan.stopCount} stops',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
+                    const SizedBox(height: 2),
+                    Text(
+                      '${state.selectedPlan.formattedTotalCost}  •  ${state.selectedPlan.estimatedHours} hrs  •  ${state.selectedPlan.stopCount} stops',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
                   _tabController.animateTo(0);
