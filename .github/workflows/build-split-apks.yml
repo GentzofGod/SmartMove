@@ -1,0 +1,122 @@
+name: Build Split Android APKs
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type (release or debug)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Split APKs (arm64-v8a, armeabi-v7a, x86_64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: actions/setup-flutter@v3
+        with:
+          flutter-version: '3.29.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Print Flutter & Dart Environment
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Configure Environment File (.env)
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            echo "SUPABASE_URL=${{ secrets.SUPABASE_URL || 'https://ljhkptuvbtysuhddicsj.supabase.co' }}" > .env
+            echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_demo_key' }}" >> .env
+            echo "META_APP_ID=${{ secrets.META_APP_ID || '4820239824866512' }}" >> .env
+            echo "META_CLIENT_TOKEN=${{ secrets.META_CLIENT_TOKEN || '431b591db92df606f6e695c8be332d4d' }}" >> .env
+          fi
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Verify Code & Run Tests
+        run: flutter test
+
+      - name: Build Split APKs (${{ inputs.build_type || 'release' }})
+        run: |
+          BUILD_MODE="${{ inputs.build_type || 'release' }}"
+          if [ "$BUILD_MODE" = "debug" ]; then
+            flutter build apk --debug --split-per-abi
+          else
+            flutter build apk --release --split-per-abi
+          fi
+
+      - name: Inspect Generated APKs
+        run: |
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Upload arm64-v8a APK (Modern Phones e.g. TECNO, Samsung, Infinix)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartmove-arm64-v8a
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload armeabi-v7a APK (Older 32-bit Phones)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartmove-armeabi-v7a
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86_64 APK (Android Emulators / Tablets)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartmove-x86_64
+          path: build/app/outputs/flutter-apk/app-x86_64-*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload All Split APKs (Combined Archive)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartmove-all-split-apks
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release (On Tag Push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/*.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
