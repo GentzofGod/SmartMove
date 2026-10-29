@@ -77,22 +77,34 @@ class _SplashScreenState extends State<SplashScreen> {
         child: SafeArea(
           child: _isChecking
               ? _buildLoadingSplash()
-              : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const SizedBox(height: 12),
-                      // Logo & Header
-                      _buildLogoAndHeader(),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: IntrinsicHeight(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Logo & Header
+                                _buildLogoAndHeader(),
+                                const SizedBox(height: 12),
 
-                      // Core Capabilities Cards
-                      _buildCapabilitiesCard(),
+                                // Core Capabilities Cards
+                                _buildCapabilitiesCard(),
+                                const SizedBox(height: 12),
 
-                      // Footer CTA Buttons
-                      _buildFooterButtons(),
-                    ],
-                  ),
+                                // Footer CTA Buttons
+                                _buildFooterButtons(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
         ),
       ),
@@ -105,11 +117,11 @@ class _SplashScreenState extends State<SplashScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 90,
-            height: 90,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.2),
@@ -122,23 +134,23 @@ class _SplashScreenState extends State<SplashScreen> {
               alignment: Alignment.center,
               children: [
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.shopping_bag_outlined,
                     color: Colors.white,
-                    size: 32,
+                    size: 28,
                   ),
                 ),
                 Positioned(
-                  right: 14,
-                  bottom: 14,
+                  right: 12,
+                  bottom: 12,
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -146,24 +158,24 @@ class _SplashScreenState extends State<SplashScreen> {
                     child: const Icon(
                       Icons.location_on,
                       color: AppColors.primary,
-                      size: 16,
+                      size: 14,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           const Text(
             'SmartMove',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 32,
+              fontSize: 30,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           const SizedBox(
             width: 24,
             height: 24,
@@ -181,11 +193,11 @@ class _SplashScreenState extends State<SplashScreen> {
     return Column(
       children: [
         Container(
-          width: 90,
-          height: 90,
+          width: 76,
+          height: 76,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.2),
@@ -198,23 +210,23 @@ class _SplashScreenState extends State<SplashScreen> {
             alignment: Alignment.center,
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Icon(
                   Icons.shopping_bag_outlined,
                   color: Colors.white,
-                  size: 32,
+                  size: 28,
                 ),
               ),
               Positioned(
-                right: 14,
-                bottom: 14,
+                right: 10,
+                bottom: 10,
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(3),
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
@@ -222,32 +234,32 @@ class _SplashScreenState extends State<SplashScreen> {
                   child: const Icon(
                     Icons.location_on,
                     color: AppColors.primary,
-                    size: 16,
+                    size: 14,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         const Text(
           'SmartMove',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 32,
+            fontSize: 28,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         const Text(
           'Know the Prices. Plan the Trip.\nMake the Better Decision.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0xFFC0D5CB),
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w500,
-            height: 1.4,
+            height: 1.3,
           ),
         ),
       ],
@@ -256,10 +268,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Widget _buildCapabilitiesCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Column(
@@ -269,13 +281,13 @@ class _SplashScreenState extends State<SplashScreen> {
             title: 'Market Price Intelligence',
             subtitle: 'Get local price updates from traders and community.',
           ),
-          const Divider(color: Colors.white12, height: 24),
+          const Divider(color: Colors.white12, height: 16),
           _buildFeatureRow(
             icon: Icons.alt_route_rounded,
             title: 'Errand Coordinator',
             subtitle: 'Group your errands, find the best routes, save transit time.',
           ),
-          const Divider(color: Colors.white12, height: 24),
+          const Divider(color: Colors.white12, height: 16),
           _buildFeatureRow(
             icon: Icons.science_outlined,
             title: 'Decision Rehearsal Engine',
@@ -294,33 +306,33 @@ class _SplashScreenState extends State<SplashScreen> {
           style: TextStyle(
             color: Color(0xFF90BBA8),
             fontStyle: FontStyle.italic,
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
-          height: 52,
+          height: 48,
           child: ElevatedButton(
             onPressed: _proceedToOnboarding,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             child: const Text(
               'Get Started',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -361,14 +373,14 @@ class _SplashScreenState extends State<SplashScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: const Color(0xFF57D9A3), size: 20),
+          child: Icon(icon, color: const Color(0xFF57D9A3), size: 18),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,7 +390,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
               const SizedBox(height: 2),
@@ -386,7 +398,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 subtitle,
                 style: const TextStyle(
                   color: Color(0xFFB3CFC3),
-                  fontSize: 12,
+                  fontSize: 11.5,
                 ),
               ),
             ],
