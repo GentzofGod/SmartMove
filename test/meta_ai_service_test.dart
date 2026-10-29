@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smartmove/core/services/meta_ai_service.dart';
 import 'package:smartmove/core/services/decision_engine.dart';
-import 'package:smartmove/core/models/ai_proposal.dart';
 
 void main() {
   group('Meta AI Integration Tests (Section 6: Muse Spark & Voice Transcribe)', () {

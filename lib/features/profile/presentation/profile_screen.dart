@@ -282,6 +282,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
                 _buildMenuItem(
+                  icon: Icons.school_outlined,
+                  title: 'App Guide & Tour',
+                  trailingText: 'Replay',
+                  onTap: () => context.push('/onboarding'),
+                ),
+                const Divider(height: 1, indent: 56, color: AppColors.divider),
+                _buildMenuItem(
                   icon: Icons.info_outline_rounded,
                   title: 'About SmartMove',
                   trailingText: 'v1.0.0',

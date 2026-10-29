@@ -5,7 +5,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/app_state.dart';
 import '../../../../core/services/meta_ai_service.dart';
 import '../../../../core/models/errand.dart';
-import '../../../../core/models/plan_candidate.dart';
 import 'ai_proposal_review_sheet.dart';
 import 'muse_voice_input_sheet.dart';
 

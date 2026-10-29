@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GeoPoint {
   final double latitude;
@@ -16,6 +19,22 @@ class GeoPoint {
     this.isDeviceLocation = false,
   });
 
+  Map<String, dynamic> toJson() => {
+        'latitude': latitude,
+        'longitude': longitude,
+        'label': label,
+        'city': city,
+        'isDeviceLocation': isDeviceLocation,
+      };
+
+  factory GeoPoint.fromJson(Map<String, dynamic> json) => GeoPoint(
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        label: json['label'] as String? ?? 'Custom Location',
+        city: json['city'] as String? ?? 'Local Area',
+        isDeviceLocation: json['isDeviceLocation'] as bool? ?? false,
+      );
+
   GeoPoint copyWith({
     double? latitude,
     double? longitude,
@@ -31,14 +50,35 @@ class GeoPoint {
       isDeviceLocation: isDeviceLocation ?? this.isDeviceLocation,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GeoPoint &&
+          runtimeType == other.runtimeType &&
+          latitude == other.latitude &&
+          longitude == other.longitude &&
+          label == other.label &&
+          city == other.city &&
+          isDeviceLocation == other.isDeviceLocation;
+
+  @override
+  int get hashCode =>
+      latitude.hashCode ^
+      longitude.hashCode ^
+      label.hashCode ^
+      city.hashCode ^
+      isDeviceLocation.hashCode;
 }
 
 class LocationService {
+  static const String _storageKey = 'smartmove_saved_location_v1';
+
   // Common predefined commercial hubs in Nigeria for fast switching & fallbacks
   static const GeoPoint defaultHub = GeoPoint(
     latitude: 6.5244,
     longitude: 3.3792,
-    label: 'Lagos Mainland',
+    label: 'Lagos Mainland (Yaba/Surulere)',
     city: 'Lagos',
   );
 
@@ -113,47 +153,227 @@ class LocationService {
       label: 'GIG Logistics Hub',
       city: 'Lagos',
     ),
+    'Pharmacy Plus': GeoPoint(
+      latitude: 6.5180,
+      longitude: 3.3720,
+      label: 'Pharmacy Plus',
+      city: 'Lagos',
+    ),
+    'TechHub Dugbe': GeoPoint(
+      latitude: 7.3876,
+      longitude: 3.8767,
+      label: 'TechHub Dugbe',
+      city: 'Ibadan',
+    ),
   };
 
-  /// Obtain the live device GPS position via Geolocator
-  static Future<GeoPoint?> getCurrentDeviceLocation() async {
+  /// Persist the selected or live location to SharedPreferences
+  static Future<void> persistLocation(GeoPoint point) async {
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return null;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_storageKey, jsonEncode(point.toJson()));
+    } catch (_) {}
+  }
+
+  /// Restore saved location from disk on app launch
+  static Future<GeoPoint?> restorePersistedLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw != null) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        return GeoPoint.fromJson(decoded);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Obtain the live device GPS position via Geolocator or IP fallback,
+  /// resolved to the user's actual location rather than collapsing to default hubs.
+  static Future<GeoPoint?> getCurrentDeviceLocation() async {
+    // 1. Try Hardware GPS via Geolocator
+    try {
+      try {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          // If location service is disabled on device, proceed to IP-based location
+          return await _getIpBasedLocation();
+        }
+      } catch (_) {
+        // Some web/desktop environments throw or don't support isLocationServiceEnabled
       }
 
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      LocationPermission permission = LocationPermission.denied;
+      try {
+        permission = await Geolocator.checkPermission();
         if (permission == LocationPermission.denied) {
-          return null;
+          permission = await Geolocator.requestPermission();
+        }
+      } catch (_) {}
+
+      if (permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever) {
+        Position? position;
+
+        // Try getting fresh position with 12s timeout
+        try {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 12),
+            ),
+          );
+        } catch (_) {
+          // If timeout or failure, check last known position
+          try {
+            position = await Geolocator.getLastKnownPosition();
+          } catch (_) {}
+        }
+
+        if (position != null) {
+          return await _resolveLiveGeoPoint(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
         }
       }
-
-      if (permission == LocationPermission.deniedForever) {
-        return null;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 8),
-        ),
-      );
-
-      final closestHub = findClosestHub(position.latitude, position.longitude);
-
-      return GeoPoint(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        label: 'Current Location (${closestHub.city})',
-        city: closestHub.city,
-        isDeviceLocation: true,
-      );
     } catch (_) {
-      return null;
+      // Hardware GPS failed, proceed to IP fallback
     }
+
+    // 2. Network / IP Geolocation fallback (useful for web, simulators, or GPS off)
+    try {
+      final ipPoint = await _getIpBasedLocation();
+      if (ipPoint != null) {
+        return ipPoint;
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  /// Fallback: Geolocation via IP address
+  static Future<GeoPoint?> _getIpBasedLocation() async {
+    try {
+      final url = Uri.parse('http://ip-api.com/json/');
+      final response = await http.get(url).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['status'] == 'success') {
+          final lat = (data['lat'] as num).toDouble();
+          final lon = (data['lon'] as num).toDouble();
+          final city = (data['city'] as String?)?.trim() ?? 'Local Area';
+          final region = (data['regionName'] as String?)?.trim() ?? '';
+          final label = region.isNotEmpty && region != city
+              ? 'Live: $city, $region'
+              : 'Live: $city';
+
+          return GeoPoint(
+            latitude: lat,
+            longitude: lon,
+            label: label,
+            city: city,
+            isDeviceLocation: true,
+          );
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Resolve coordinates into human-readable real place name,
+  /// avoiding collapsing live locations back to default hubs.
+  static Future<GeoPoint> _resolveLiveGeoPoint({
+    required double latitude,
+    required double longitude,
+  }) async {
+    // Attempt reverse geocoding via OpenStreetMap Nominatim
+    try {
+      final reverse = await reverseGeocode(latitude, longitude);
+      if (reverse != null) {
+        return GeoPoint(
+          latitude: latitude,
+          longitude: longitude,
+          label: reverse['label']!,
+          city: reverse['city']!,
+          isDeviceLocation: true,
+        );
+      }
+    } catch (_) {}
+
+    // Fallback: Check proximity to known Nigerian commercial hubs or keep coordinates
+    final closestHub = findClosestHub(latitude, longitude);
+    final distanceToHub = calculateDistanceKm(
+      lat1: latitude,
+      lon1: longitude,
+      lat2: closestHub.latitude,
+      lon2: closestHub.longitude,
+    );
+
+    String label;
+    String city;
+
+    if (distanceToHub <= 30.0) {
+      final hubName = closestHub.label.split('(').first.trim();
+      label = 'Live: Near $hubName';
+      city = closestHub.city;
+    } else {
+      label = 'Live: (${latitude.toStringAsFixed(2)}, ${longitude.toStringAsFixed(2)})';
+      city = closestHub.city;
+    }
+
+    return GeoPoint(
+      latitude: latitude,
+      longitude: longitude,
+      label: label,
+      city: city,
+      isDeviceLocation: true,
+    );
+  }
+
+  /// Reverse geocode coordinates to human-readable neighborhood/city
+  static Future<Map<String, String>?> reverseGeocode(
+    double lat,
+    double lon,
+  ) async {
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&zoom=14&addressdetails=1',
+      );
+      final response = await http
+          .get(url, headers: {'User-Agent': 'SmartMoveApp/1.0'})
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final address = data['address'] as Map<String, dynamic>? ?? {};
+
+        final suburb = address['suburb']?.toString() ??
+            address['neighbourhood']?.toString() ??
+            address['residential']?.toString() ??
+            address['quarter']?.toString();
+
+        final city = address['city']?.toString() ??
+            address['town']?.toString() ??
+            address['village']?.toString() ??
+            address['county']?.toString() ??
+            address['state']?.toString() ??
+            'Local Area';
+
+        String label;
+        if (suburb != null && suburb.isNotEmpty && suburb != city) {
+          label = 'Live: $suburb, $city';
+        } else {
+          label = 'Live: $city';
+        }
+
+        return {
+          'label': label,
+          'city': city,
+        };
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Finds the closest Nigerian commercial hub from given coordinates

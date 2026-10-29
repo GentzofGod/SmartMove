@@ -58,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
                           ),
                           const SizedBox(width: 4),
                           ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 150),
+                            constraints: const BoxConstraints(maxWidth: 175),
                             child: Text(
                               currentLocation.label,
                               overflow: TextOverflow.ellipsis,

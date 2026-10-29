@@ -1265,7 +1265,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               ),
               Switch(
                 value: state.delayNonUrgent,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (val) {
                   ref.read(decisionLabProvider.notifier).toggleDelayNonUrgent(val);
                 },

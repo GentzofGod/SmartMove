@@ -35,18 +35,19 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
     if (mounted) {
       setState(() => _isDetecting = false);
       if (success) {
+        final loc = ref.read(locationProvider);
         navigator.pop();
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Updated to live device location!'),
+          SnackBar(
+            content: Text('Updated to live location: ${loc.label}!'),
             backgroundColor: AppColors.primary,
           ),
         );
       } else {
         messenger.showSnackBar(
-          SnackBar(
-            content: const Text(
-                'Could not acquire live GPS. Please ensure location services are enabled or pick a hub below.'),
+          const SnackBar(
+            content: Text(
+                'Could not acquire live location. Please ensure location services or network connection are enabled.'),
             backgroundColor: AppColors.badgeWarningText,
           ),
         );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/guide_service.dart';
 import '../../../core/state/app_state.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -55,6 +56,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
 
       ref.read(authProvider.notifier).setSession(session);
+      await GuideService.markGuideSeen();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -85,6 +87,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     setState(() => _isLoading = true);
     final session = await AuthService.signInAsGuest();
     ref.read(authProvider.notifier).setSession(session);
+    await GuideService.markGuideSeen();
     if (mounted) {
       setState(() => _isLoading = false);
       context.go('/home');

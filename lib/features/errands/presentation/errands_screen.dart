@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/errand.dart';
-import '../../../core/models/plan_candidate.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../home/presentation/widgets/ai_proposal_review_sheet.dart';
 import '../../home/presentation/widgets/muse_voice_input_sheet.dart';

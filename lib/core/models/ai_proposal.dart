@@ -1,5 +1,4 @@
 import 'errand.dart';
-import 'plan_candidate.dart';
 
 /// Represents a detected user intent or planning preference
 enum PlanningPreference {

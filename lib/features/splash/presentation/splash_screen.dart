@@ -1,9 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/guide_service.dart';
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  bool _isChecking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialRoute();
+  }
+
+  Future<void> _checkInitialRoute() async {
+    // Check if the user has already seen/dismissed the guide
+    final hasSeenGuide = await GuideService.hasSeenGuide();
+
+    if (!mounted) return;
+
+    if (hasSeenGuide) {
+      // Guide was already completed or dismissed; proceed directly to home
+      context.go('/home');
+    } else {
+      // First-time user: display the start screen guide
+      setState(() {
+        _isChecking = false;
+      });
+    }
+  }
+
+  Future<void> _proceedToOnboarding() async {
+    await GuideService.markGuideSeen();
+    if (mounted) {
+      context.go('/onboarding');
+    }
+  }
+
+  Future<void> _skipToHome() async {
+    await GuideService.markGuideSeen();
+    if (mounted) {
+      context.go('/home');
+    }
+  }
+
+  Future<void> _proceedToAuth() async {
+    await GuideService.markGuideSeen();
+    if (mounted) {
+      context.push('/auth');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,172 +75,280 @@ class SplashScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const SizedBox(height: 12),
-                // Logo & Header
-                Column(
-                  children: [
-                    Container(
-                      width: 90,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Icon(
-                              Icons.shopping_bag_outlined,
-                              color: Colors.white,
-                              size: 32,
-                            ),
-                          ),
-                          Positioned(
-                            right: 14,
-                            bottom: 14,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.location_on,
-                                color: AppColors.primary,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'SmartMove',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Know the Prices. Plan the Trip.\nMake the Better Decision.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFFC0D5CB),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Core Capabilities Cards
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                  ),
+          child: _isChecking
+              ? _buildLoadingSplash()
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildFeatureRow(
-                        icon: Icons.price_check,
-                        title: 'Market Price Intelligence',
-                        subtitle: 'Get local price updates from traders and community.',
-                      ),
-                      const Divider(color: Colors.white12, height: 24),
-                      _buildFeatureRow(
-                        icon: Icons.alt_route_rounded,
-                        title: 'Errand Coordinator',
-                        subtitle: 'Group your errands, find the best routes, save transit time.',
-                      ),
-                      const Divider(color: Colors.white12, height: 24),
-                      _buildFeatureRow(
-                        icon: Icons.science_outlined,
-                        title: 'Decision Rehearsal Engine',
-                        subtitle: 'Compare scenarios, adjust budget, see real cost & time.',
-                      ),
+                      const SizedBox(height: 12),
+                      // Logo & Header
+                      _buildLogoAndHeader(),
+
+                      // Core Capabilities Cards
+                      _buildCapabilitiesCard(),
+
+                      // Footer CTA Buttons
+                      _buildFooterButtons(),
                     ],
                   ),
                 ),
+        ),
+      ),
+    );
+  }
 
-                // Footer CTA Buttons
-                Column(
-                  children: [
-                    const Text(
-                      'Smarter choices, closer to home.',
-                      style: TextStyle(
-                        color: Color(0xFF90BBA8),
-                        fontStyle: FontStyle.italic,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
+  Widget _buildLoadingSplash() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                Positioned(
+                  right: 14,
+                  bottom: 14,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () => context.go('/onboarding'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Get Started',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: AppColors.primary,
+                      size: 16,
                     ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => context.push('/auth'),
-                      child: const Text(
-                        'Already have an account? Log In',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 20),
+          const Text(
+            'SmartMove',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF57D9A3)),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildLogoAndHeader() {
+    return Column(
+      children: [
+        Container(
+          width: 90,
+          height: 90,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.shopping_bag_outlined,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              Positioned(
+                right: 14,
+                bottom: 14,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'SmartMove',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Know the Prices. Plan the Trip.\nMake the Better Decision.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFFC0D5CB),
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCapabilitiesCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        children: [
+          _buildFeatureRow(
+            icon: Icons.price_check,
+            title: 'Market Price Intelligence',
+            subtitle: 'Get local price updates from traders and community.',
+          ),
+          const Divider(color: Colors.white12, height: 24),
+          _buildFeatureRow(
+            icon: Icons.alt_route_rounded,
+            title: 'Errand Coordinator',
+            subtitle: 'Group your errands, find the best routes, save transit time.',
+          ),
+          const Divider(color: Colors.white12, height: 24),
+          _buildFeatureRow(
+            icon: Icons.science_outlined,
+            title: 'Decision Rehearsal Engine',
+            subtitle: 'Compare scenarios, adjust budget, see real cost & time.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterButtons() {
+    return Column(
+      children: [
+        const Text(
+          'Smarter choices, closer to home.',
+          style: TextStyle(
+            color: Color(0xFF90BBA8),
+            fontStyle: FontStyle.italic,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _proceedToOnboarding,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text(
+              'Get Started',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed: _skipToHome,
+              child: const Text(
+                'Skip to Home',
+                style: TextStyle(
+                  color: Color(0xFFC0D5CB),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _proceedToAuth,
+              child: const Text(
+                'Log In',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

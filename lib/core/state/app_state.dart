@@ -398,16 +398,27 @@ final authProvider = NotifierProvider<AuthNotifier, UserSession>(
 // --- Location State ---
 class LocationNotifier extends Notifier<GeoPoint> {
   @override
-  GeoPoint build() => LocationService.defaultHub;
+  GeoPoint build() {
+    _restoreLocation();
+    return LocationService.defaultHub;
+  }
+
+  Future<void> _restoreLocation() async {
+    final persisted = await LocationService.restorePersistedLocation();
+    if (persisted != null) {
+      state = persisted;
+    }
+  }
 
   void setLocation(GeoPoint newPoint) {
     state = newPoint;
+    LocationService.persistLocation(newPoint);
   }
 
   Future<bool> detectDeviceLocation() async {
     final deviceLocation = await LocationService.getCurrentDeviceLocation();
     if (deviceLocation != null) {
-      state = deviceLocation;
+      setLocation(deviceLocation);
       return true;
     }
     return false;

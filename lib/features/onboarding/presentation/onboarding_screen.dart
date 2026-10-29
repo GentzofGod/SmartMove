@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/guide_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -37,6 +38,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
   ];
 
+  Future<void> _completeOnboarding() async {
+    await GuideService.markGuideSeen();
+    if (mounted) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,7 +54,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         elevation: 0,
         actions: [
           TextButton(
-            onPressed: () => context.go('/home'),
+            onPressed: _completeOnboarding,
             child: const Text(
               'Skip',
               style: TextStyle(
@@ -167,7 +175,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         curve: Curves.easeInOut,
                       );
                     } else {
-                      context.go('/home');
+                      _completeOnboarding();
                     }
                   },
                   child: Text(

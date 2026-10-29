@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/models/product.dart';
 import '../../../core/models/price_observation.dart';
 import '../../../core/models/errand.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/state/app_state.dart';
 
 class ProductDetailSheet extends ConsumerWidget {
@@ -253,19 +254,34 @@ class ProductDetailSheet extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          const Icon(Icons.store_outlined, size: 14, color: AppColors.textSecondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${product.bestSeller} • ${product.distanceKm} km away',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
+                      Builder(
+                        builder: (context) {
+                          final currentLocation = ref.watch(locationProvider);
+                          final marketCoord = LocationService.knownMarketCoordinates[product.bestSeller];
+                          final dynamicDistance = marketCoord != null
+                              ? LocationService.calculateDistanceKm(
+                                  lat1: currentLocation.latitude,
+                                  lon1: currentLocation.longitude,
+                                  lat2: marketCoord.latitude,
+                                  lon2: marketCoord.longitude,
+                                )
+                              : product.distanceKm;
+
+                          return Row(
+                            children: [
+                              const Icon(Icons.store_outlined, size: 14, color: AppColors.textSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${product.bestSeller} • $dynamicDistance km away',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),

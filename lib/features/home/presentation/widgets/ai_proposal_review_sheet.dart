@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/ai_proposal.dart';
 import '../../../../core/models/errand.dart';
-import '../../../../core/models/plan_candidate.dart';
 
 /// Modal bottom sheet for reviewing, adjusting, and confirming an AI Plan Proposal
 ///
