@@ -104,14 +104,15 @@ void main() {
       expect(restored.isDeviceLocation, true);
     });
 
-    test('7. LocationNotifier loads persisted location and updates correctly', () async {
+    test('7. LocationNotifier falls to nothing on initial start when unset and updates correctly', () async {
       SharedPreferences.setMockInitialValues({});
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      // Initial state is defaultHub
+      // Initial state falls to nothing (not set)
       final initial = container.read(locationProvider);
-      expect(initial.label, LocationService.defaultHub.label);
+      expect(initial.isSet, false);
+      expect(initial, GeoPoint.none);
 
       // Set new location
       const newLoc = GeoPoint(
@@ -119,12 +120,14 @@ void main() {
         longitude: 7.3986,
         label: 'Live: Wuse 2, Abuja',
         city: 'Abuja',
+        town: 'Wuse 2',
         isDeviceLocation: true,
       );
 
       container.read(locationProvider.notifier).setLocation(newLoc);
       expect(container.read(locationProvider).label, 'Live: Wuse 2, Abuja');
       expect(container.read(locationProvider).isDeviceLocation, true);
+      expect(container.read(locationProvider).isSet, true);
 
       // Verify it was persisted to storage
       final stored = await LocationService.restorePersistedLocation();
@@ -199,6 +202,28 @@ void main() {
       expect(resolved.displayLocation.contains('('), false);
       expect(resolved.label.contains('('), false);
       expect(resolved.isDeviceLocation, true);
+    });
+
+    test('11. Compulsory scan falls to nothing when device location cannot be acquired', () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Ensure that when location is cleared, it falls to nothing
+      container.read(locationProvider.notifier).clearLocation();
+      expect(container.read(locationProvider), GeoPoint.none);
+      expect(container.read(locationProvider).isSet, false);
+      expect(container.read(locationProvider).displayLocation, 'Location Not Set');
+    });
+
+    test('12. calculateDistanceKm safely returns 0.0 for GeoPoint.none', () {
+      final dist = LocationService.calculateDistanceKm(
+        lat1: 0.0,
+        lon1: 0.0,
+        lat2: 7.3876,
+        lon2: 3.8767,
+      );
+      expect(dist, 0.0);
     });
   });
 }

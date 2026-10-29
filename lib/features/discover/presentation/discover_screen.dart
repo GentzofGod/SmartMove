@@ -366,7 +366,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                 const Icon(Icons.near_me_outlined, size: 14, color: AppColors.primary),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Near ${currentLocation.displayTown} (≤ 5 km)',
+                                  currentLocation.isSet
+                                      ? 'Near ${currentLocation.displayTown} (≤ 5 km)'
+                                      : 'All Locations (Tap to set town)',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,

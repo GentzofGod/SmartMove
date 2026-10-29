@@ -41,31 +41,35 @@ class HomeScreen extends ConsumerWidget {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: currentLocation.isDeviceLocation
-                              ? AppColors.primary
-                              : AppColors.cardBorder,
+                          color: currentLocation.isSet
+                              ? (currentLocation.isDeviceLocation
+                                  ? AppColors.primary
+                                  : AppColors.cardBorder)
+                              : AppColors.badgeWarningText,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            currentLocation.isDeviceLocation
-                                ? Icons.my_location_rounded
-                                : Icons.location_on_rounded,
+                            currentLocation.isSet
+                                ? (currentLocation.isDeviceLocation
+                                    ? Icons.my_location_rounded
+                                    : Icons.location_on_rounded)
+                                : Icons.add_location_alt_outlined,
                             size: 14,
-                            color: AppColors.primary,
+                            color: currentLocation.isSet ? AppColors.primary : AppColors.badgeWarningText,
                           ),
                           const SizedBox(width: 4),
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 175),
                             child: Text(
-                              currentLocation.displayLocation,
+                              currentLocation.isSet ? currentLocation.displayLocation : 'Set Your Town',
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
+                                color: currentLocation.isSet ? AppColors.textPrimary : AppColors.badgeWarningText,
                               ),
                             ),
                           ),
@@ -132,8 +136,12 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 3),
                   Text(
                     userSession.isGuest
-                        ? "Guest Mode • Exploring near ${currentLocation.displayTown}"
-                        : "Role: ${userSession.role} • ${currentLocation.displayLocation}",
+                        ? (currentLocation.isSet
+                            ? "Guest Mode • Exploring near ${currentLocation.displayTown}"
+                            : "Guest Mode • Tap location above to set your town")
+                        : (currentLocation.isSet
+                            ? "Role: ${userSession.role} • ${currentLocation.displayLocation}"
+                            : "Role: ${userSession.role} • Location Not Set"),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -141,7 +149,39 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+
+              if (!currentLocation.isSet) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFFD54F)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.near_me_outlined, color: AppColors.badgeWarningText, size: 20),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'No location set. Scan GPS or pick your town for verified local commodity prices.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => LocationPickerSheet.show(context),
+                        child: const Text('Scan / Set', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Meta AI Scenario Rehearsal Card (1-Tap Simulation)
               const MetaAiScenarioCard(),

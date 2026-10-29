@@ -364,21 +364,23 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         builder: (context) {
                           final currentLocation = ref.watch(locationProvider);
                           final marketCoord = LocationService.knownMarketCoordinates[widget.product.bestSeller];
-                          final dynamicDistance = marketCoord != null
+                          final dynamicDistance = (currentLocation.isSet && marketCoord != null)
                               ? LocationService.calculateDistanceKm(
                                   lat1: currentLocation.latitude,
                                   lon1: currentLocation.longitude,
                                   lat2: marketCoord.latitude,
                                   lon2: marketCoord.longitude,
                                 )
-                              : widget.product.distanceKm;
+                              : (currentLocation.isSet ? widget.product.distanceKm : null);
 
                           return Row(
                             children: [
                               const Icon(Icons.store_outlined, size: 14, color: AppColors.textSecondary),
                               const SizedBox(width: 4),
                               Text(
-                                '${widget.product.bestSeller} • $dynamicDistance km away',
+                                dynamicDistance != null
+                                    ? '${widget.product.bestSeller} • $dynamicDistance km away'
+                                    : '${widget.product.bestSeller} • Open Market',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

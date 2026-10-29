@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
 import '../models/errand.dart';
@@ -573,27 +574,61 @@ final authProvider = NotifierProvider<AuthNotifier, UserSession>(
 
 // --- Location State ---
 class LocationNotifier extends Notifier<GeoPoint> {
+  static const String _firstScanDoneKey = 'smartmove_first_location_scan_attempted_v1';
+
   @override
   GeoPoint build() {
-    _restoreLocation();
-    return LocationService.defaultHub;
+    _initializeLocation();
+    return GeoPoint.none; // Compulsory scan or fall to nothing
   }
 
-  Future<void> _restoreLocation() async {
+  Future<void> _initializeLocation() async {
+    // 1. Check if user already has a saved/chosen location
     final persisted = await LocationService.restorePersistedLocation();
-    if (persisted != null) {
+    if (!ref.mounted) return;
+    if (persisted != null && persisted.isSet) {
       state = persisted;
+      return;
+    }
+
+    // 2. Perform compulsory location scan on first run
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!ref.mounted) return;
+      final alreadyScanned = prefs.getBool(_firstScanDoneKey) ?? false;
+
+      if (!alreadyScanned) {
+        await prefs.setBool(_firstScanDoneKey, true);
+        final scanned = await LocationService.getCurrentDeviceLocation();
+        if (!ref.mounted) return;
+        if (scanned != null && scanned.isSet) {
+          setLocation(scanned);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // 3. Fall to nothing (GeoPoint.none) when location scan is unavailable or rejected
+    if (ref.mounted) {
+      state = GeoPoint.none;
     }
   }
 
   void setLocation(GeoPoint newPoint) {
     state = newPoint;
-    LocationService.persistLocation(newPoint);
+    if (newPoint.isSet) {
+      LocationService.persistLocation(newPoint);
+    }
+  }
+
+  void clearLocation() {
+    state = GeoPoint.none;
+    LocationService.clearPersistedLocation();
   }
 
   Future<bool> detectDeviceLocation() async {
     final deviceLocation = await LocationService.getCurrentDeviceLocation();
-    if (deviceLocation != null) {
+    if (deviceLocation != null && deviceLocation.isSet) {
       setLocation(deviceLocation);
       return true;
     }

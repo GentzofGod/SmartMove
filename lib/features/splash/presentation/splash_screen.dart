@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/guide_service.dart';
+import '../../../core/services/location_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -22,6 +23,17 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkInitialRoute() async {
     // Check if the user has already seen/dismissed the guide
     final hasSeenGuide = await GuideService.hasSeenGuide();
+
+    // Compulsory scan of location on first launch or fallback to nothing
+    try {
+      final persisted = await LocationService.restorePersistedLocation();
+      if (persisted == null || !persisted.isSet) {
+        final scanned = await LocationService.getCurrentDeviceLocation();
+        if (scanned != null && scanned.isSet) {
+          await LocationService.persistLocation(scanned);
+        }
+      }
+    } catch (_) {}
 
     if (!mounted) return;
 
