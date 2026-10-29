@@ -131,5 +131,74 @@ void main() {
       expect(stored?.label, 'Live: Wuse 2, Abuja');
       expect(stored?.isDeviceLocation, true);
     });
+
+    test('8. GeoPoint displayTown and displayLocation never expose raw coordinates', () {
+      // Clean point with town and city
+      const pointA = GeoPoint(
+        latitude: 7.3876,
+        longitude: 3.8767,
+        label: 'Live: Dugbe, Ibadan',
+        city: 'Ibadan',
+        town: 'Dugbe',
+        isDeviceLocation: true,
+      );
+      expect(pointA.displayTown, 'Dugbe');
+      expect(pointA.displayLocation, 'Dugbe, Ibadan');
+
+      // Point where town == city
+      const pointB = GeoPoint(
+        latitude: 7.1557,
+        longitude: 3.3451,
+        label: 'Live: Abeokuta',
+        city: 'Abeokuta',
+        town: 'Abeokuta',
+      );
+      expect(pointB.displayTown, 'Abeokuta');
+      expect(pointB.displayLocation, 'Abeokuta');
+
+      // Point with coordinate string legacy label: should fallback to city, never show coords
+      const pointC = GeoPoint(
+        latitude: 7.3775,
+        longitude: 3.9470,
+        label: 'Live: (7.38, 3.95)',
+        city: 'Ibadan',
+      );
+      expect(pointC.displayTown, 'Ibadan');
+      expect(pointC.displayLocation, 'Ibadan');
+      expect(pointC.displayTown.contains('('), false);
+      expect(pointC.displayLocation.contains('('), false);
+    });
+
+    test('9. findClosestTown accurately resolves coordinates across Nigeria to towns', () {
+      // Ibadan (Dugbe)
+      final townIbadan = LocationService.findClosestTown(7.3870, 3.8760);
+      expect(townIbadan.town, 'Dugbe');
+      expect(townIbadan.city, 'Ibadan');
+
+      // Abeokuta (Ogun)
+      final townAbeokuta = LocationService.findClosestTown(7.1550, 3.3450);
+      expect(townAbeokuta.town, 'Abeokuta');
+      expect(townAbeokuta.city, 'Ogun');
+
+      // Kano (North)
+      final townKano = LocationService.findClosestTown(12.0020, 8.5910);
+      expect(townKano.town, 'Kano');
+      expect(townKano.city, 'Kano');
+
+      // Port Harcourt (South)
+      final townPH = LocationService.findClosestTown(4.8150, 7.0490);
+      expect(townPH.town, 'Port Harcourt');
+      expect(townPH.city, 'Rivers');
+    });
+
+    test('10. resolveLocation always yields human-readable town and city without raw coordinates', () async {
+      // Coordinates outside central hubs (e.g. Abeokuta or outskirts of Ibadan)
+      final resolved = await LocationService.resolveLocation(7.1557, 3.3451);
+      expect(resolved.displayTown, isNotEmpty);
+      expect(resolved.displayTown.contains('('), false);
+      expect(resolved.displayLocation.contains('('), false);
+      expect(resolved.label.contains('('), false);
+      expect(resolved.isDeviceLocation, true);
+    });
   });
 }

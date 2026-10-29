@@ -230,7 +230,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.location_on_outlined,
                   title: 'Market Hub & Location',
-                  trailingText: currentLocation.label,
+                  trailingText: currentLocation.displayLocation,
                   onTap: () => LocationPickerSheet.show(context),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
@@ -342,13 +342,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Demo session and cache synchronized.'),
+                    content: Text('Offline price cache and local state synchronized.'),
                     duration: Duration(seconds: 1),
                   ),
                 );
               },
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Sync Offline Cache & Demo Data'),
+              label: const Text('Sync Offline Price Cache'),
             ),
           ),
           const SizedBox(height: 20),

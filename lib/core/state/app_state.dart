@@ -4,8 +4,10 @@ import '../models/price_observation.dart';
 import '../models/errand.dart';
 import '../models/itinerary_stop.dart';
 import '../models/plan_candidate.dart';
+import '../models/ai_proposal.dart';
 import '../data/demo_seed_data.dart';
 import '../services/decision_engine.dart';
+import '../services/meta_ai_service.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import '../services/supabase_data_service.dart';
@@ -126,6 +128,9 @@ class DecisionLabState {
   final List<PlanCandidate> candidates;
   final String selectedPlanId;
   final String recommendationInsight;
+  final List<ShoppingItem> activeItems;
+  final List<Errand> activeErrands;
+  final List<AiOptimizationTip> optimizationTips;
 
   const DecisionLabState({
     required this.budget,
@@ -137,6 +142,9 @@ class DecisionLabState {
     required this.candidates,
     required this.selectedPlanId,
     required this.recommendationInsight,
+    this.activeItems = const [],
+    this.activeErrands = const [],
+    this.optimizationTips = const [],
   });
 
   PlanCandidate get selectedPlan =>
@@ -153,6 +161,9 @@ class DecisionLabState {
     List<PlanCandidate>? candidates,
     String? selectedPlanId,
     String? recommendationInsight,
+    List<ShoppingItem>? activeItems,
+    List<Errand>? activeErrands,
+    List<AiOptimizationTip>? optimizationTips,
   }) {
     return DecisionLabState(
       budget: budget ?? this.budget,
@@ -165,6 +176,9 @@ class DecisionLabState {
       selectedPlanId: selectedPlanId ?? this.selectedPlanId,
       recommendationInsight:
           recommendationInsight ?? this.recommendationInsight,
+      activeItems: activeItems ?? this.activeItems,
+      activeErrands: activeErrands ?? this.activeErrands,
+      optimizationTips: optimizationTips ?? this.optimizationTips,
     );
   }
 }
@@ -191,21 +205,36 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     required double timeCost,
     required bool delayNonUrgent,
     required String selectedId,
+    List<ShoppingItem>? items,
+    List<Errand>? errands,
   }) {
-    final candidates = DecisionEngine.calculateCandidatePlans(
+    final candidatePlans = DecisionEngine.calculateCandidatePlans(
       userBudget: budget,
       baseTransportFare: transportCost,
       maxTimeHours: timeHours,
       maxStops: maxStops,
       timeCostPerHour: timeCost,
       delayNonUrgent: delayNonUrgent,
+      items: items,
+      errands: errands,
     );
 
     final insight = DecisionEngine.generateRecommendationInsight(
       budget: budget,
       transportCost: transportCost,
       timeAvailable: timeHours,
-      candidates: candidates,
+      candidates: candidatePlans,
+      errands: errands,
+    );
+
+    // Meta AI generates proactive optimization tips to ease user planning
+    const aiService = MetaAiService();
+    final tips = aiService.generateOptimizationTips(
+      currentPlans: candidatePlans,
+      currentBudget: budget,
+      currentTransport: transportCost,
+      items: items ?? [],
+      errands: errands ?? [],
     );
 
     return DecisionLabState(
@@ -215,9 +244,93 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       maxStops: maxStops,
       timeCostPerHour: timeCost,
       delayNonUrgent: delayNonUrgent,
-      candidates: candidates,
+      candidates: candidatePlans,
       selectedPlanId: selectedId,
       recommendationInsight: insight,
+      activeItems: items ?? [],
+      activeErrands: errands ?? [],
+      optimizationTips: tips,
+    );
+  }
+
+  void setPlanContext({
+    required List<ShoppingItem> items,
+    List<Errand>? errands,
+    double? budget,
+  }) {
+    state = _calculateState(
+      budget: budget ?? state.budget,
+      transportCost: state.transportCost,
+      timeHours: state.timeAvailableHours,
+      maxStops: state.maxStops,
+      timeCost: state.timeCostPerHour,
+      delayNonUrgent: state.delayNonUrgent,
+      selectedId: state.selectedPlanId,
+      items: items,
+      errands: errands ?? state.activeErrands,
+    );
+  }
+
+  void addShoppingItem(ShoppingItem item) {
+    final updated = [...state.activeItems, item];
+    state = _calculateState(
+      budget: state.budget,
+      transportCost: state.transportCost,
+      timeHours: state.timeAvailableHours,
+      maxStops: state.maxStops,
+      timeCost: state.timeCostPerHour,
+      delayNonUrgent: state.delayNonUrgent,
+      selectedId: state.selectedPlanId,
+      items: updated,
+      errands: state.activeErrands,
+    );
+  }
+
+  void removeShoppingItem(String itemId) {
+    final updated = state.activeItems.where((i) => i.id != itemId).toList();
+    state = _calculateState(
+      budget: state.budget,
+      transportCost: state.transportCost,
+      timeHours: state.timeAvailableHours,
+      maxStops: state.maxStops,
+      timeCost: state.timeCostPerHour,
+      delayNonUrgent: state.delayNonUrgent,
+      selectedId: state.selectedPlanId,
+      items: updated,
+      errands: state.activeErrands,
+    );
+  }
+
+  void applyAiCommand(AiCommandExecutionResult result) {
+    var newBudget = result.updatedBudget ?? state.budget;
+    var newTransport = result.updatedTransport ?? state.transportCost;
+    var newHours = result.updatedTimeHours ?? state.timeAvailableHours;
+    var newStops = result.updatedMaxStops ?? state.maxStops;
+    var newDelay = result.updatedDelayNonUrgent ?? state.delayNonUrgent;
+    var newSelectedId = result.selectedPlanId ?? state.selectedPlanId;
+    var items = List<ShoppingItem>.from(state.activeItems);
+    var errands = List<Errand>.from(state.activeErrands);
+
+    if (result.addedItem != null) {
+      items.add(result.addedItem!);
+    }
+    if (result.removedItemId != null) {
+      items.removeWhere((i) => i.id == result.removedItemId);
+    }
+    if (result.addedErrand != null) {
+      errands.add(result.addedErrand!);
+    }
+
+    state = _calculateState(
+      budget: newBudget,
+      transportCost: newTransport,
+      timeHours: newHours,
+      maxStops: newStops,
+      timeCost: state.timeCostPerHour,
+      delayNonUrgent: newDelay,
+      selectedId: newSelectedId,
+      items: items,
+      errands: errands,
     );
   }
 
@@ -230,6 +343,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: state.timeCostPerHour,
       delayNonUrgent: state.delayNonUrgent,
       selectedId: state.selectedPlanId,
+      items: state.activeItems,
+      errands: state.activeErrands,
     );
   }
 
@@ -242,6 +357,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: state.timeCostPerHour,
       delayNonUrgent: state.delayNonUrgent,
       selectedId: state.selectedPlanId,
+      items: state.activeItems,
+      errands: state.activeErrands,
     );
   }
 
@@ -254,6 +371,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: state.timeCostPerHour,
       delayNonUrgent: state.delayNonUrgent,
       selectedId: state.selectedPlanId,
+      items: state.activeItems,
+      errands: state.activeErrands,
     );
   }
 
@@ -266,6 +385,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: state.timeCostPerHour,
       delayNonUrgent: state.delayNonUrgent,
       selectedId: state.selectedPlanId,
+      items: state.activeItems,
+      errands: state.activeErrands,
     );
   }
 
@@ -278,6 +399,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: newCost,
       delayNonUrgent: state.delayNonUrgent,
       selectedId: state.selectedPlanId,
+      items: state.activeItems,
+      errands: state.activeErrands,
     );
   }
 
@@ -290,6 +413,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: state.timeCostPerHour,
       delayNonUrgent: delay,
       selectedId: state.selectedPlanId,
+      items: state.activeItems,
+      errands: state.activeErrands,
     );
   }
 

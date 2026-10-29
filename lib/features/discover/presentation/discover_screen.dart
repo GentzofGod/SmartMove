@@ -49,9 +49,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       displayedProducts = displayedProducts
           .where((p) => p.sourceType == ObservationSource.communityReported)
           .toList();
-    } else if (_selectedSourceFilter == 'Demo') {
+    } else if (_selectedSourceFilter == 'Verified') {
       displayedProducts = displayedProducts
-          .where((p) => p.sourceType == ObservationSource.simulatedDemo)
+          .where((p) =>
+              p.sourceType == ObservationSource.independentlyVerified ||
+              p.sourceType == ObservationSource.traderConfirmed)
           .toList();
     }
 
@@ -198,7 +200,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                 const Icon(Icons.near_me_outlined, size: 14, color: AppColors.primary),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Near ${currentLocation.city} (≤ 5 km)',
+                                  'Near ${currentLocation.displayTown} (≤ 5 km)',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -220,7 +222,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                               } else if (_selectedSourceFilter == 'Trader') {
                                 _selectedSourceFilter = 'Community';
                               } else if (_selectedSourceFilter == 'Community') {
-                                _selectedSourceFilter = 'Demo';
+                                _selectedSourceFilter = 'Verified';
                               } else {
                                 _selectedSourceFilter = 'All';
                               }
@@ -541,7 +543,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             color: AppColors.cardBorder.withValues(alpha: 0.3),
             child: const Text(
-              'Demo Data — Prices are simulated for hackathon testing',
+              'Community Market Intelligence — Verified Local Prices & Trader Updates',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 11,

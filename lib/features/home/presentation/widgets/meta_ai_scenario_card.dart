@@ -33,6 +33,24 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
       if (!mounted) return;
       setState(() => _isProcessing = false);
 
+      if (proposal.isLiveCloud) {
+        messenger.showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF2E7D32),
+            content: Text('✓ Meta AI Live Cloud: Proposal generated successfully!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFE65100),
+            content: Text('⚡ Meta AI Fallback Active: ${proposal.fallbackReason ?? "Local deterministic engine used"}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
       // Open AI Proposal Review Sheet (User Confirmation Safeguard)
       showModalBottomSheet(
         context: context,
@@ -82,8 +100,12 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
       ref.read(errandsProvider.notifier).addErrand(errand);
     }
 
-    // Update Decision Lab budget
-    ref.read(decisionLabProvider.notifier).updateBudget(budget);
+    // Update Decision Lab with confirmed items, errands, and budget
+    ref.read(decisionLabProvider.notifier).setPlanContext(
+      items: items,
+      errands: errand != null ? [errand] : [],
+      budget: budget,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -186,12 +208,40 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 controller: controller,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'e.g. I have ₦20,000 for rice, cooking oil, and dry cleaning...',
+                  hintText: 'e.g. I have ₦20,000 for yam, beans, bread, and dry cleaning...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
                 ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.flash_on, size: 14, color: AppColors.primary),
+                    label: const Text('₦20k: Yam, Beans & Laundry', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      controller.text = 'I have ₦20,000. I need 2 tubers of yam, 2kg beans, and 1 loaf of bread. Pick up dry cleaning by 1 PM.';
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.shopping_basket, size: 14, color: AppColors.primary),
+                    label: const Text('₦15k: Rice, Eggs & Package', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      controller.text = 'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. I also need to collect a package before 2 PM.';
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.local_pharmacy, size: 14, color: AppColors.primary),
+                    label: const Text('₦10k: Milk, Bread & Pharmacy', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      controller.text = 'I have ₦10,000 for bread, milk, and visit pharmacy before 12 PM.';
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               SizedBox(

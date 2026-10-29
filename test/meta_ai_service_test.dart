@@ -112,6 +112,47 @@ void main() {
       expect(proposal!.budget, 15000.0);
       expect(proposal.shoppingItems.isNotEmpty, true);
     });
+
+    test('8. Transparently reports when Live Cloud Meta AI succeeds vs when Fallback is used', () async {
+      // 1. Without API key, service transparently reports fallback active
+      const localService = MetaAiService();
+      final fallbackProposal = await localService.parseToProposal('I have ₦15,000 for rice and eggs.');
+      expect(fallbackProposal.isFallback, isTrue);
+      expect(fallbackProposal.isLiveCloud, isFalse);
+      expect(fallbackProposal.executionStatus.contains('Fallback Active'), isTrue);
+      expect(fallbackProposal.fallbackReason, isNotNull);
+
+      // Voice fallback reporting
+      final voiceResult = await localService.transcribeAudio();
+      expect(voiceResult.isFallback, isTrue);
+      expect(voiceResult.note?.contains('Fallback Active'), isTrue);
+
+      // 2. Simulated Live Cloud API response validates as live success
+      final mockLiveJson = {
+        'budget': 20000.0,
+        'shopping_items': [
+          {'name': 'Yam', 'quantity': 2, 'unit': 'tuber', 'estimated_unit_price': 2200.0},
+        ],
+        'deadline_errand': {
+          'title': 'Collect parcel',
+          'deadline': '3:00 PM',
+          'location': 'Hub',
+        },
+      };
+
+      final liveProposal = localService.validateProposal(
+        mockLiveJson,
+        'Live request',
+        isFallback: false,
+        executionStatus: 'Meta AI Live Cloud: Success',
+      );
+
+      expect(liveProposal, isNotNull);
+      expect(liveProposal!.isFallback, isFalse);
+      expect(liveProposal.isLiveCloud, isTrue);
+      expect(liveProposal.executionStatus, 'Meta AI Live Cloud: Success');
+      expect(liveProposal.fallbackReason, isNull);
+    });
   });
 }
 

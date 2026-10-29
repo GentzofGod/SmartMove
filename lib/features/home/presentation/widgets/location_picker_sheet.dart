@@ -39,7 +39,7 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
         navigator.pop();
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Updated to live location: ${loc.label}!'),
+            content: Text('Updated to live location: ${loc.displayLocation}!'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -155,7 +155,7 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
                           const SizedBox(height: 2),
                           Text(
                             currentLocation.isDeviceLocation
-                                ? 'Active: ${currentLocation.label}'
+                                ? 'Active: ${currentLocation.displayLocation}'
                                 : 'Auto-detect coordinates via hardware sensor',
                             style: const TextStyle(
                               fontSize: 12,
@@ -227,7 +227,7 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
                       ),
                     ),
                     subtitle: Text(
-                      '${hub.city} • Lat: ${hub.latitude}, Lon: ${hub.longitude}',
+                      '${hub.town.isNotEmpty && hub.town != hub.city ? "${hub.town}, " : ""}${hub.city} • Commercial Hub',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -242,7 +242,7 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Switched hub to ${hub.label}!'),
+                          content: Text('Switched hub to ${hub.displayLocation}!'),
                           backgroundColor: AppColors.primary,
                         ),
                       );

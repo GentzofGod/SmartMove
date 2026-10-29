@@ -427,7 +427,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     icon: const Icon(Icons.explore_outlined,
                         size: 18, color: AppColors.textSecondary),
                     label: const Text(
-                      'Continue as Guest (Instant Demo)',
+                      'Continue as Guest',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,

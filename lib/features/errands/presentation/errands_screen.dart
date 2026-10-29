@@ -50,6 +50,24 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
         _isAiParsing = false;
       });
 
+      if (proposal.isLiveCloud) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF2E7D32),
+            content: Text('✓ Meta AI Live Cloud: Proposal generated successfully!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFE65100),
+            content: Text('⚡ Meta AI Fallback Active: ${proposal.fallbackReason ?? "Local deterministic engine used"}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
       // AI Safeguard: Require user review and confirmation before mutating state
       showModalBottomSheet(
         context: context,
@@ -73,7 +91,11 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
               ref.read(errandsProvider.notifier).addErrand(confirmedErrand);
             }
 
-            ref.read(decisionLabProvider.notifier).updateBudget(confirmedBudget);
+            ref.read(decisionLabProvider.notifier).setPlanContext(
+              items: confirmedItems,
+              errands: confirmedErrand != null ? [confirmedErrand] : [],
+              budget: confirmedBudget,
+            );
             _aiPromptController.clear();
 
             if (mounted) {
@@ -487,7 +509,7 @@ class _ErrandsScreenState extends ConsumerState<ErrandsScreen>
                             'I have ₦15,000. I need rice, eggs, tomatoes, oil and collect package before 2 PM';
                       },
                       child: const Text(
-                        'Paste demo scenario',
+                        'Paste sample scenario',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

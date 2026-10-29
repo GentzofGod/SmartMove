@@ -26,6 +26,8 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     with SingleTickerProviderStateMixin {
   bool _isRecording = false;
   bool _isTranscribing = false;
+  bool _isFallback = false;
+  String? _transcriptionStatus;
   late TextEditingController _transcriptController;
   late AnimationController _pulseController;
   Timer? _recordingTimer;
@@ -88,6 +90,10 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       setState(() {
         _isTranscribing = false;
         _transcriptController.text = result.text;
+        _isFallback = result.isFallback;
+        _transcriptionStatus = result.isFallback
+            ? 'Meta AI Fallback Engine Active (Offline Speech Synthesis)'
+            : 'Meta AI Live Cloud: Muse Voice Transcribe (Success)';
       });
     }
   }
@@ -283,6 +289,39 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
             ],
           ),
           const SizedBox(height: 6),
+          if (_transcriptionStatus != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: _isFallback ? const Color(0xFFFFF8E1) : const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _isFallback ? const Color(0xFFFFE082) : const Color(0xFFA5D6A7),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isFallback ? Icons.offline_bolt_rounded : Icons.cloud_done_rounded,
+                    size: 14,
+                    color: _isFallback ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _transcriptionStatus!,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: _isFallback ? const Color(0xFFBF360C) : const Color(0xFF1B5E20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           TextField(
             controller: _transcriptController,
             maxLines: 3,

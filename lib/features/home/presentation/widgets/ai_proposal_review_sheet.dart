@@ -253,6 +253,68 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+
+          // Meta AI Live Cloud vs Fallback Status Indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: widget.proposal.isLiveCloud
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: widget.proposal.isLiveCloud
+                    ? const Color(0xFFA5D6A7)
+                    : const Color(0xFFFFE082),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.proposal.isLiveCloud
+                      ? Icons.cloud_done_rounded
+                      : Icons.offline_bolt_rounded,
+                  size: 16,
+                  color: widget.proposal.isLiveCloud
+                      ? const Color(0xFF2E7D32)
+                      : const Color(0xFFE65100),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.proposal.isLiveCloud
+                            ? 'Meta AI Live Cloud: Success'
+                            : 'Meta AI: Resilient Fallback Engine Active',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: widget.proposal.isLiveCloud
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFE65100),
+                        ),
+                      ),
+                      Text(
+                        widget.proposal.isLiveCloud
+                            ? 'Processed directly via Meta Muse Spark remote model.'
+                            : (widget.proposal.fallbackReason ??
+                                'Offline / Local deterministic NLP extractor used.'),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: widget.proposal.isLiveCloud
+                              ? const Color(0xFF1B5E20)
+                              : const Color(0xFFBF360C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
 
           // Scrollable Content

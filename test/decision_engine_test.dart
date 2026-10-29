@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:smartmove/core/models/errand.dart';
 import 'package:smartmove/core/services/decision_engine.dart';
 import 'package:smartmove/core/services/meta_ai_service.dart';
 
@@ -75,6 +76,139 @@ void main() {
       expect(result.errand, isNotNull);
       expect(result.errand!.title, 'Collect package');
       expect(result.errand!.deadline, '2:00 PM');
+    });
+
+    test('Dynamically calculates candidate plans with arbitrary custom items and custom errands', () {
+      final customItems = [
+        ShoppingItem(
+          id: 'si-yam',
+          productName: 'Yam',
+          quantity: 2,
+          unit: 'tuber',
+          estimatedUnitPrice: 2200, // 4400
+        ),
+        ShoppingItem(
+          id: 'si-beans',
+          productName: 'Beans',
+          quantity: 3,
+          unit: 'kg',
+          estimatedUnitPrice: 2400, // 7200
+        ),
+        ShoppingItem(
+          id: 'si-bread',
+          productName: 'Bread',
+          quantity: 1,
+          unit: 'loaf',
+          estimatedUnitPrice: 1400, // 1400
+          priority: ErrandPriority.low,
+        ),
+      ]; // Total = 13,000
+
+      final customErrand = Errand(
+        id: 'e-cleaners',
+        title: 'Drop off Dry Cleaning',
+        locationName: 'Local Cleaners Hub',
+        scheduledTime: '11:00 AM',
+        deadline: '1:00 PM',
+        priority: ErrandPriority.high,
+        category: 'service',
+      );
+
+      final plans = DecisionEngine.calculateCandidatePlans(
+        userBudget: 20000,
+        baseTransportFare: 1500,
+        maxTimeHours: 2.5,
+        items: customItems,
+        errands: [customErrand],
+      );
+
+      expect(plans.length, 4);
+
+      // Plan A (Multi-market competitive pricing)
+      final planA = plans.firstWhere((p) => p.name == 'Plan A');
+      expect(planA.itemCost, 12350.0); // 13000 * 0.95
+      expect(planA.transportCost, 2250.0); // 1500 * 1.5
+      expect(planA.totalCost, 14600.0);
+      expect(planA.isFeasibleBudget, true);
+
+      // Verify dynamic itinerary stops contain user's custom items and errand
+      expect(planA.stops.any((s) => s.title.contains('Market')), true);
+      expect(planA.stops.any((s) => s.title == 'Drop off Dry Cleaning'), true);
+
+      // Plan D (Postpones non-urgent low priority bread)
+      final planD = plans.firstWhere((p) => p.name == 'Plan D');
+      expect(planD.itemCost, 11600.0); // 4400 (yam) + 7200 (beans), excluding bread
+      expect(planD.isFeasibleBudget, true);
+    });
+
+    test('Meta AI parses arbitrary commodities and non-shopping errands with deadlines', () async {
+      const aiService = MetaAiService();
+      final proposal = await aiService.parseToProposal(
+        'I have ₦25,000. I need 2 tubers of yam, 3kg beans, and 1 loaf of bread. Drop off dry cleaning before 1 PM.',
+      );
+
+      expect(proposal.budget, 25000);
+      expect(proposal.shoppingItems.length, 3);
+      expect(proposal.shoppingItems.any((i) => i.productName == 'Yam'), true);
+      expect(proposal.shoppingItems.any((i) => i.productName == 'Beans'), true);
+      expect(proposal.shoppingItems.any((i) => i.productName == 'Sliced Bread'), true);
+
+      expect(proposal.deadlineErrand, isNotNull);
+      expect(proposal.deadlineErrand!.title, 'Drop off Dry Cleaning');
+      expect(proposal.deadlineErrand!.deadline, '1:00 PM');
+    });
+
+    test('Meta AI generates proactive optimization tips and processes conversational commands', () {
+      const aiService = MetaAiService();
+
+      final plans = DecisionEngine.calculateCandidatePlans(
+        userBudget: 12000,
+        baseTransportFare: 1200,
+        maxTimeHours: 3.0,
+      );
+
+      final tips = aiService.generateOptimizationTips(
+        currentPlans: plans,
+        currentBudget: 12000,
+        currentTransport: 1200,
+        items: [],
+        errands: [],
+      );
+
+      expect(tips.isNotEmpty, true);
+      expect(tips.any((t) => t.id == 'tip-budget-safety'), true);
+
+      // Conversational commands: Add item, Change budget, Fastest plan
+      final addResult = aiService.processConversationalCommand(
+        command: 'Add 2 tubers of yam',
+        currentPlans: plans,
+        currentBudget: 12000,
+        currentTransport: 1200,
+        currentHours: 3.0,
+        currentItems: [],
+      );
+      expect(addResult.addedItem, isNotNull);
+      expect(addResult.addedItem!.productName, 'Yam');
+
+      final budgetResult = aiService.processConversationalCommand(
+        command: 'Set budget to 25k',
+        currentPlans: plans,
+        currentBudget: 12000,
+        currentTransport: 1200,
+        currentHours: 3.0,
+        currentItems: [],
+      );
+      expect(budgetResult.updatedBudget, 25000.0);
+
+      final fastResult = aiService.processConversationalCommand(
+        command: 'I am in a hurry, give me the fastest route',
+        currentPlans: plans,
+        currentBudget: 12000,
+        currentTransport: 1200,
+        currentHours: 3.0,
+        currentItems: [],
+      );
+      expect(fastResult.selectedPlanId, 'plan-c');
     });
   });
 }

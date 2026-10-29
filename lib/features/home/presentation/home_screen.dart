@@ -60,7 +60,7 @@ class HomeScreen extends ConsumerWidget {
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 175),
                             child: Text(
-                              currentLocation.label,
+                              currentLocation.displayLocation,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 12,
@@ -132,8 +132,8 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 3),
                   Text(
                     userSession.isGuest
-                        ? "Guest Mode • Exploring near ${currentLocation.city}"
-                        : "Role: ${userSession.role} • ${currentLocation.label}",
+                        ? "Guest Mode • Exploring near ${currentLocation.displayTown}"
+                        : "Role: ${userSession.role} • ${currentLocation.displayLocation}",
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -709,7 +709,7 @@ class HomeScreen extends ConsumerWidget {
                       SizedBox(width: 5),
                       Flexible(
                         child: Text(
-                          'Demo Data — Prices & routes simulated for hackathon testing',
+                          'SmartMove — Powered by Meta AI & Community Price Intelligence',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 10,
