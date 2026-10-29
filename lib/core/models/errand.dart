@@ -1,66 +1,19 @@
-enum ErrandPriority { high, medium, low }
+export 'commodity_item.dart';
+import 'commodity_item.dart';
 
-class ShoppingItem {
-  final String id;
-  final String? productId;
-  final String productName;
-  final double quantity;
-  final String unit;
-  final double estimatedUnitPrice;
-  final ErrandPriority priority;
-  final List<String> acceptableAlternatives;
-  bool isChecked;
-
-  ShoppingItem({
-    required this.id,
-    this.productId,
-    required this.productName,
-    required this.quantity,
-    required this.unit,
-    required this.estimatedUnitPrice,
-    this.priority = ErrandPriority.medium,
-    this.acceptableAlternatives = const [],
-    this.isChecked = false,
-  });
-
-  double get totalEstimatedCost => quantity * estimatedUnitPrice;
-
-  ShoppingItem copyWith({
-    String? id,
-    String? productId,
-    String? productName,
-    double? quantity,
-    String? unit,
-    double? estimatedUnitPrice,
-    ErrandPriority? priority,
-    List<String>? acceptableAlternatives,
-    bool? isChecked,
-  }) {
-    return ShoppingItem(
-      id: id ?? this.id,
-      productId: productId ?? this.productId,
-      productName: productName ?? this.productName,
-      quantity: quantity ?? this.quantity,
-      unit: unit ?? this.unit,
-      estimatedUnitPrice: estimatedUnitPrice ?? this.estimatedUnitPrice,
-      priority: priority ?? this.priority,
-      acceptableAlternatives: acceptableAlternatives ?? this.acceptableAlternatives,
-      isChecked: isChecked ?? this.isChecked,
-    );
-  }
-}
-
+/// Legacy errand container preserved temporarily for backward compatibility.
+/// All core workflows now use ShoppingItem / CommodityItem directly.
 class Errand {
   final String id;
   final String title;
   final String locationName;
   final String scheduledTime;
-  final String? deadline; // e.g. "2:00 PM"
-  final ErrandPriority priority;
-  final String category; // 'groceries', 'pickup', 'pharmacy', 'utility', 'general'
+  final String? deadline;
+  final CommodityPriority priority;
+  final String category;
   final List<ShoppingItem> shoppingItems;
   final int durationMinutes;
-  final String? openingHours; // e.g. "8:00 AM - 6:00 PM"
+  final String? openingHours;
   final String? constraintsNote;
   final int? maxStops;
   bool isCompleted;
@@ -71,7 +24,7 @@ class Errand {
     required this.locationName,
     required this.scheduledTime,
     this.deadline,
-    required this.priority,
+    this.priority = CommodityPriority.flexible,
     required this.category,
     this.shoppingItems = const [],
     this.durationMinutes = 25,
@@ -92,7 +45,7 @@ class Errand {
     String? locationName,
     String? scheduledTime,
     String? deadline,
-    ErrandPriority? priority,
+    CommodityPriority? priority,
     String? category,
     List<ShoppingItem>? shoppingItems,
     int? durationMinutes,

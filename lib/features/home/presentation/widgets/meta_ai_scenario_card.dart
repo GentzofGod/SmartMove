@@ -19,7 +19,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
   bool _isProcessing = false;
 
   static const String hackathonPrimaryPrompt =
-      'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. I also need to collect a package before 2 PM. Help me plan everything.';
+      'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. Compare prices across online stores and local markets to find the best deal.';
 
   /// AI Safeguard: Parses prompt into proposal and opens Review Sheet for user approval
   Future<void> _processAiPlan(String prompt) async {
@@ -62,7 +62,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
             _applyConfirmedProposal(confirmedBudget, confirmedItems, confirmedErrand);
           },
           onManualFallback: () {
-            context.push('/errands');
+            context.push('/decision-lab');
           },
         ),
       );
@@ -84,52 +84,22 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
     List<ShoppingItem> items,
     Errand? errand,
   ) {
-    // Create grocery errand with confirmed items
-    final groceryErrand = Errand(
-      id: 'e-ai-${DateTime.now().millisecondsSinceEpoch}',
-      title: 'Buy Groceries (Meta Muse Spark)',
-      locationName: 'Local Commercial Markets',
-      scheduledTime: '9:00 AM',
-      priority: ErrandPriority.high,
-      category: 'groceries',
-      shoppingItems: items,
-    );
-    ref.read(errandsProvider.notifier).addErrand(groceryErrand);
-
-    if (errand != null) {
-      ref.read(errandsProvider.notifier).addErrand(errand);
-    }
-
-    // Update Decision Lab with confirmed items, errands, and budget
+    // Update Decision Lab with confirmed commodity items and budget
     ref.read(decisionLabProvider.notifier).setPlanContext(
       items: items,
-      errands: errand != null ? [errand] : [],
       budget: budget,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: AppColors.primary,
-        duration: const Duration(seconds: 4),
-        content: Row(
-          children: const [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Proposal confirmed! Decision Lab calculated candidate plans.',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        action: SnackBarAction(
-          label: 'View Lab',
-          textColor: Colors.white,
-          onPressed: () => context.go('/decision-lab'),
+        content: Text(
+          'Confirmed: ${items.length} commodities loaded into Price Lab (Budget: ₦${budget.toStringAsFixed(0)})',
         ),
       ),
     );
+
+    context.push('/decision-lab');
   }
 
   void _openVoiceTranscribeSheet() {
@@ -200,7 +170,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Enter what you want to buy, budget, deadlines, and errands:',
+                'Enter commodities to compare, quantities, target location, and budget:',
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
@@ -208,7 +178,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 controller: controller,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'e.g. I have ₦20,000 for yam, beans, bread, and dry cleaning...',
+                  hintText: 'e.g. I have ₦25,000 for 50kg rice, 5L vegetable oil, and tomatoes in Bodija...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.cardBorder),
@@ -222,23 +192,23 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 children: [
                   ActionChip(
                     avatar: const Icon(Icons.flash_on, size: 14, color: AppColors.primary),
-                    label: const Text('₦20k: Yam, Beans & Laundry', style: TextStyle(fontSize: 11)),
+                    label: const Text('₦25k: Yam, Beans & Garri', style: TextStyle(fontSize: 11)),
                     onPressed: () {
-                      controller.text = 'I have ₦20,000. I need 2 tubers of yam, 2kg beans, and 1 loaf of bread. Pick up dry cleaning by 1 PM.';
+                      controller.text = 'I have ₦25,000. I need 3 tubers of Abuja yam, 5kg brown beans, and 1 paint bucket of yellow garri in Dugbe.';
                     },
                   ),
                   ActionChip(
                     avatar: const Icon(Icons.shopping_basket, size: 14, color: AppColors.primary),
-                    label: const Text('₦15k: Rice, Eggs & Package', style: TextStyle(fontSize: 11)),
+                    label: const Text('₦18k: Rice, Eggs & Cooking Oil', style: TextStyle(fontSize: 11)),
                     onPressed: () {
-                      controller.text = 'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. I also need to collect a package before 2 PM.';
+                      controller.text = 'I have ₦18,000. I need 5kg Mama Gold rice, 1 crate of eggs, and 2L Kings vegetable oil in Bodija.';
                     },
                   ),
                   ActionChip(
-                    avatar: const Icon(Icons.local_pharmacy, size: 14, color: AppColors.primary),
-                    label: const Text('₦10k: Milk, Bread & Pharmacy', style: TextStyle(fontSize: 11)),
+                    avatar: const Icon(Icons.storefront_outlined, size: 14, color: AppColors.primary),
+                    label: const Text('₦12k: Provisions & Milk', style: TextStyle(fontSize: 11)),
                     onPressed: () {
-                      controller.text = 'I have ₦10,000 for bread, milk, and visit pharmacy before 12 PM.';
+                      controller.text = 'I have ₦12,000 for 1 tin Peak milk powder, 2 loaves of sliced bread, and 1kg sugar.';
                     },
                   ),
                 ],

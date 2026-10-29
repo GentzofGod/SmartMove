@@ -147,9 +147,9 @@ class HomeScreen extends ConsumerWidget {
               const MetaAiScenarioCard(),
               const SizedBox(height: 18),
 
-              // Today's Plan Active Banner Card
+              // Commodity Price Optimizer Banner Card
               InkWell(
-                onTap: () => context.push('/itinerary'),
+                onTap: () => context.push('/decision-lab'),
                 borderRadius: BorderRadius.circular(18),
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -179,14 +179,14 @@ class HomeScreen extends ConsumerWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
-                                  Icons.calendar_today_rounded,
+                                  Icons.insights_rounded,
                                   color: AppColors.primary,
                                   size: 16,
                                 ),
                               ),
                               const SizedBox(width: 10),
                               const Text(
-                                "Today's Plan",
+                                "Commodity Price Optimizer",
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
@@ -205,11 +205,11 @@ class HomeScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       Row(
                         children: const [
-                          Icon(Icons.directions_walk_rounded,
+                          Icon(Icons.shopping_bag_outlined,
                               size: 16, color: AppColors.textSecondary),
                           SizedBox(width: 6),
                           Text(
-                            '3 errands  •  2.5 hrs  •  ₦13,400',
+                            'Active Basket: 4 items  •  ₦11,600 est.',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -224,20 +224,20 @@ class HomeScreen extends ConsumerWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.warningBg,
+                              color: AppColors.badgeSuccessBg,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
                               children: const [
-                                Icon(Icons.access_time_rounded,
-                                    size: 12, color: AppColors.warningText),
+                                Icon(Icons.check_circle_outline_rounded,
+                                    size: 12, color: AppColors.primary),
                                 SizedBox(width: 4),
                                 Text(
-                                  'Package pickup before 2:00 PM',
+                                  'Saves ~₦1,800 across verified local sellers',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.warningText,
+                                    color: AppColors.primaryDark,
                                   ),
                                 ),
                               ],
@@ -305,7 +305,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                   InkWell(
-                    onTap: () => context.go('/errands'),
+                    onTap: () => context.go('/discover'),
                     child: const Text(
                       'View all',
                       style: TextStyle(
@@ -324,15 +324,9 @@ class HomeScreen extends ConsumerWidget {
                   Expanded(
                     child: InkWell(
                       onTap: () {
-                        // Quick load weekly essentials list
-                        final listErrand = Errand(
-                          id: 'e-saved-weekly-${DateTime.now().millisecondsSinceEpoch}',
-                          title: 'Weekly Provisions',
-                          locationName: 'Local Market',
-                          scheduledTime: '10:00 AM',
-                          priority: ErrandPriority.medium,
-                          category: 'groceries',
-                          shoppingItems: [
+                        // Quick load weekly essentials list into Decision Lab
+                        ref.read(decisionLabProvider.notifier).setPlanContext(
+                          items: [
                             ShoppingItem(
                               id: 'si-w1',
                               productName: 'Rice (1kg)',
@@ -348,11 +342,12 @@ class HomeScreen extends ConsumerWidget {
                               estimatedUnitPrice: 5200,
                             ),
                           ],
+                          budget: 15000,
                         );
-                        ref.read(errandsProvider.notifier).addErrand(listErrand);
+                        context.go('/decision-lab');
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Loaded "Weekly Provisions" list into your errands!'),
+                            content: Text('Loaded "Weekly Provisions" basket into Price Lab!'),
                             backgroundColor: AppColors.primary,
                           ),
                         );
@@ -392,14 +387,8 @@ class HomeScreen extends ConsumerWidget {
                   Expanded(
                     child: InkWell(
                       onTap: () {
-                        final breakfastErrand = Errand(
-                          id: 'e-saved-bfast-${DateTime.now().millisecondsSinceEpoch}',
-                          title: 'Family Breakfast Restock',
-                          locationName: 'Local Market',
-                          scheduledTime: '9:30 AM',
-                          priority: ErrandPriority.medium,
-                          category: 'groceries',
-                          shoppingItems: [
+                        ref.read(decisionLabProvider.notifier).setPlanContext(
+                          items: [
                             ShoppingItem(
                               id: 'si-b1',
                               productName: 'Eggs (crate)',
@@ -415,11 +404,12 @@ class HomeScreen extends ConsumerWidget {
                               estimatedUnitPrice: 2850,
                             ),
                           ],
+                          budget: 10000,
                         );
-                        ref.read(errandsProvider.notifier).addErrand(breakfastErrand);
+                        context.go('/decision-lab');
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Loaded "Family Breakfast" list into your errands!'),
+                            content: Text('Loaded "Family Breakfast" basket into Price Lab!'),
                             backgroundColor: AppColors.primary,
                           ),
                         );
@@ -650,7 +640,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 10),
                         const Text(
-                          'Plan your next trip',
+                          'Compare Commodity Prices',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -661,7 +651,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Compare prices, group errands, and simulate the smartest route to save money and time.',
+                      'Compare standardized prices across online retailers, local markets, and SMBs to maximize your savings.',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -672,7 +662,7 @@ class HomeScreen extends ConsumerWidget {
                     SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: () => context.go('/decision-lab'),
+                        onPressed: () => context.go('/discover'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           shape: RoundedRectangleBorder(
@@ -680,7 +670,7 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                         child: const Text(
-                          'Start Planning',
+                          'Compare Commodity Prices',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: Colors.white,

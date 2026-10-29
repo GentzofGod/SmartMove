@@ -15,6 +15,10 @@ class Product {
   final int observationCount;
   final String? description;
   final String? imageUrl;
+  final String? brandOrGrade;
+  final double? standardizedUnitPrice;
+  final String baseUnit;
+  final String channel;
 
   const Product({
     required this.id,
@@ -31,10 +35,19 @@ class Product {
     this.observationCount = 3,
     this.description,
     this.imageUrl,
+    this.brandOrGrade,
+    this.standardizedUnitPrice,
+    this.baseUnit = 'kg',
+    this.channel = 'Local Market',
   });
 
   String get formattedPrice => '₦${lowestPrice.toStringAsFixed(0).replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (Match m) => '${m[1]},',
       )}';
+
+  String get formattedStandardizedPrice {
+    final unitPrice = standardizedUnitPrice ?? lowestPrice;
+    return '₦${unitPrice.toStringAsFixed(0)} / $baseUnit';
+  }
 }

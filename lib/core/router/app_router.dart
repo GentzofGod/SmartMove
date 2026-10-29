@@ -5,7 +5,6 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/navigation/presentation/main_scaffold.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
-import '../../features/errands/presentation/errands_screen.dart';
 import '../../features/decision_lab/presentation/decision_lab_screen.dart';
 import '../../features/community/presentation/community_screen.dart';
 import '../../features/itinerary/presentation/itinerary_screen.dart';
@@ -44,7 +43,7 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/errands',
-          builder: (context, state) => const ErrandsScreen(),
+          redirect: (context, state) => '/discover',
         ),
         GoRoute(
           path: '/decision-lab',

@@ -186,6 +186,8 @@ class DecisionLabState {
 class DecisionLabNotifier extends Notifier<DecisionLabState> {
   @override
   DecisionLabState build() {
+    final initialErrands = DemoSeedData.getInitialErrands();
+    final initialItems = initialErrands.isNotEmpty ? initialErrands.first.shoppingItems : <ShoppingItem>[];
     return _calculateState(
       budget: 15000,
       transportCost: 1200,
@@ -194,6 +196,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       timeCost: 0.0,
       delayNonUrgent: false,
       selectedId: 'plan-a',
+      items: initialItems,
     );
   }
 
@@ -450,6 +453,10 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     required String unit,
     required String submitterName,
     required String submitterRole,
+    String channel = 'Local Market',
+    String? brandOrGrade,
+    double? standardizedUnitPrice,
+    bool inStock = true,
   }) {
     final newObs = PriceObservation(
       id: 'obs-${DateTime.now().millisecondsSinceEpoch}',
@@ -465,8 +472,12 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           : ObservationSource.communityReported,
       submitterName: submitterName,
       submitterRole: submitterRole,
-      isVerified: true,
+      isVerified: submitterRole == 'Trader' || submitterRole == 'Admin',
       notes: 'Submitted via SmartMove app.',
+      channel: channel,
+      brandOrGrade: brandOrGrade,
+      inStock: inStock,
+      standardizedUnitPrice: standardizedUnitPrice ?? price,
     );
     state = [newObs, ...state];
 
@@ -479,6 +490,46 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       submitterName: submitterName,
       submitterRole: submitterRole,
     );
+  }
+
+  void verifyObservation(String id, bool isVerified) {
+    state = [
+      for (final o in state)
+        if (o.id == id)
+          o.copyWith(
+            isVerified: isVerified,
+            sourceType: isVerified
+                ? ObservationSource.independentlyVerified
+                : ObservationSource.communityReported,
+          )
+        else
+          o,
+    ];
+  }
+
+  void updateListingPrice(String id, double newPrice) {
+    state = [
+      for (final o in state)
+        if (o.id == id)
+          o.copyWith(
+            price: newPrice,
+            timestamp: DateTime.now(),
+          )
+        else
+          o,
+    ];
+  }
+
+  void toggleListingStock(String id) {
+    state = [
+      for (final o in state)
+        if (o.id == id)
+          o.copyWith(
+            inStock: !o.inStock,
+          )
+        else
+          o,
+    ];
   }
 }
 

@@ -5,6 +5,7 @@ import '../../../core/state/app_state.dart';
 import '../../../core/models/errand.dart';
 import '../../../core/models/price_observation.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/services/meta_ai_service.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 import 'product_detail_sheet.dart';
 
@@ -31,6 +32,143 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _showAiResearchDialog(BuildContext context, String commodityName) {
+    const aiService = MetaAiService();
+    final plan = aiService.coordinatePriceResearch(
+      commodityName.isNotEmpty ? commodityName : 'Rice (50kg)',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTint,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Meta AI Price Research: ${plan.commodityName}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                      const Text(
+                        'Multi-channel intelligence grounded on verified market surveys',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Estimated Benchmark Range:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(
+                    plan.estimatedPriceRange,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text('Target Platforms & Channels', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 8),
+            ...plan.targetPlatforms.map((platform) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        platform.toLowerCase().contains('jumia') || platform.toLowerCase().contains('konga') || platform.toLowerCase().contains('supermart')
+                            ? Icons.language
+                            : Icons.storefront,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(platform, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                      ),
+                      const Text(
+                        'Verified Channel',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F8E9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Recommendation: ${plan.recommendation}',
+                style: const TextStyle(fontSize: 12, color: AppColors.primaryDark, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _searchController.text = commodityName;
+                  ref.read(productsProvider.notifier).search(commodityName);
+                },
+                child: const Text('Filter Catalog by this Commodity', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -131,6 +269,34 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+
+          // Meta AI Quick Research Chip Row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 2.0),
+            child: Row(
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+                  backgroundColor: AppColors.primaryTint,
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                  label: Text(
+                    _searchController.text.isNotEmpty
+                        ? 'Research "${_searchController.text.trim()}" with Meta AI'
+                        : 'Meta AI Commodity Price Research',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                  onPressed: () => _showAiResearchDialog(
+                    context,
+                    _searchController.text.isNotEmpty ? _searchController.text.trim() : 'Rice (50kg)',
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -486,31 +652,23 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         ),
                       ),
 
-                      // Add to plan button
+                      // Add to comparison basket button
                       IconButton(
                         onPressed: () {
-                          // Quick add to shopping list
-                          final newErrand = Errand(
-                            id: 'errand-${DateTime.now().millisecondsSinceEpoch}',
-                            title: 'Buy ${p.name}',
-                            locationName: p.bestSeller,
-                            scheduledTime: '10:00 AM',
-                            priority: ErrandPriority.medium,
-                            category: 'groceries',
-                            shoppingItems: [
-                              ShoppingItem(
-                                id: 'item-${p.id}',
-                                productName: p.name,
-                                quantity: 1,
-                                unit: p.standardUnit,
-                                estimatedUnitPrice: p.lowestPrice,
-                              ),
-                            ],
+                          // Quick add to comparison basket
+                          final item = ShoppingItem(
+                            id: 'item-${p.id}-${DateTime.now().millisecondsSinceEpoch}',
+                            productId: p.id,
+                            productName: p.name,
+                            quantity: 1,
+                            unit: p.standardUnit,
+                            estimatedUnitPrice: p.lowestPrice,
+                            priority: CommodityPriority.essential,
                           );
-                          ref.read(errandsProvider.notifier).addErrand(newErrand);
+                          ref.read(decisionLabProvider.notifier).addShoppingItem(item);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Added ${p.name} to My Errands!'),
+                              content: Text('Added ${p.name} to Comparison Basket!'),
                               backgroundColor: AppColors.primary,
                               duration: const Duration(seconds: 2),
                             ),

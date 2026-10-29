@@ -243,7 +243,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                       ? 'Listening... 00:${_secondsRecorded.toString().padLeft(2, '0')} (Tap to finish)'
                       : _isTranscribing
                           ? 'Transcribing audio...'
-                          : 'Tap to speak your errand / shopping request',
+                          : 'Tap to speak your commodity price request',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -254,7 +254,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'e.g. "I have ₦15,000 for rice, eggs, oil and package pickup before 2 PM"',
+                  'e.g. "I have ₦25,000 for 10kg rice, 1 crate eggs, and 2L oil in Bodija"',
                   style: TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,

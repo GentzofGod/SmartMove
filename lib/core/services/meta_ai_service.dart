@@ -3,6 +3,53 @@ import 'package:http/http.dart' as http;
 import '../models/errand.dart';
 import '../models/plan_candidate.dart';
 import '../models/ai_proposal.dart';
+import '../models/product.dart';
+import '../models/price_observation.dart';
+
+/// Plan for conducting coordinated online price research
+class OnlinePriceResearchPlan {
+  final String commodityName;
+  final String category;
+  final String standardizedUnit;
+  final List<String> searchKeywords;
+  final List<String> targetPlatforms;
+  final double estimatedBenchmarkMin;
+  final double estimatedBenchmarkMax;
+
+  const OnlinePriceResearchPlan({
+    required this.commodityName,
+    required this.category,
+    required this.standardizedUnit,
+    required this.searchKeywords,
+    required this.targetPlatforms,
+    required this.estimatedBenchmarkMin,
+    required this.estimatedBenchmarkMax,
+  });
+
+  String get estimatedPriceRange =>
+      '₦${estimatedBenchmarkMin.toStringAsFixed(0)} - ₦${estimatedBenchmarkMax.toStringAsFixed(0)} / $standardizedUnit';
+
+  String get recommendation =>
+      'Local open markets like Bodija offer ~₦${estimatedBenchmarkMin.toStringAsFixed(0)} / $standardizedUnit for bulk/cash buyers, while online and supermarket platforms average ~₦${estimatedBenchmarkMax.toStringAsFixed(0)} with door delivery.';
+}
+
+/// Result of evaluating duplicate listing detection
+class DuplicateMatchResult {
+  final PriceObservation observation;
+  final double similarityScore; // 0.0 to 1.0
+  final bool isLikelyDuplicate;
+  final String reasoning;
+
+  const DuplicateMatchResult({
+    required this.observation,
+    required this.similarityScore,
+    required this.isLikelyDuplicate,
+    required this.reasoning,
+  });
+
+  bool get isProbableDuplicate => isLikelyDuplicate;
+  String get reason => reasoning;
+}
 
 /// Legacy result container preserved for backward compatibility
 class ParsedPromptResult {
@@ -515,16 +562,7 @@ class MetaAiService {
     return AiPlanProposal(
       budget: budget,
       shoppingItems: shoppingList,
-      deadlineErrand: nonShoppingErrand ??
-          Errand(
-            id: 'e-default-pickup',
-            title: 'Collect package',
-            locationName: 'Jumia Pickup Station',
-            scheduledTime: '11:00 AM',
-            deadline: '2:00 PM',
-            priority: ErrandPriority.medium,
-            category: 'pickup',
-          ),
+      deadlineErrand: nonShoppingErrand,
       rawInput: prompt,
       modelName: 'Meta Muse Spark 1.3',
       detectedPreference: preference,
@@ -651,7 +689,7 @@ class MetaAiService {
           id: 'tip-time-express',
           title: 'Fast Express Turnaround',
           message:
-              'In a rush? Plan C completes all high-priority errands in ${planC.estimatedHours}h, saving you $timeSaved minutes of travel delay.',
+              'In a rush? Plan C completes all high-priority commodity purchases in ${planC.estimatedHours}h, saving you $timeSaved minutes of travel delay.',
           iconType: 'time',
           actionLabel: 'Select Express Plan',
           targetPlanId: 'plan-c',
@@ -850,7 +888,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Cashflow protection. Plan D (${planD.formattedTotalCost}) postpones non-urgent tomatoes & cooking oil while completing high-priority errands within a strict budget.',
+            'Muse Spark interpreted your preference: Cashflow protection. Plan D (${planD.formattedTotalCost}) postpones non-urgent tomatoes & cooking oil while completing high-priority essential staples within a strict budget.',
         targetPlanId: 'plan-d',
         suggestedDelayNonUrgent: true,
       );
@@ -863,5 +901,139 @@ class MetaAiService {
           'Muse Spark evaluated your request against calculated plans. Plan A provides the optimal overall price efficiency across all stops.',
       targetPlanId: 'plan-a',
     );
+  }
+
+  // --- 8. Meta Muse Spark Commodity Price Intelligence ---
+
+  /// Coordinates online price research for a commodity across online platforms & local markets
+  OnlinePriceResearchPlan coordinatePriceResearch(String commodityName) {
+    final clean = commodityName.trim();
+    final lower = clean.toLowerCase();
+
+    String category = 'Groceries';
+    String stdUnit = '1kg';
+    double minPrice = 500;
+    double maxPrice = 5000;
+
+    if (lower.contains('rice')) {
+      category = 'Grains & Cereals';
+      stdUnit = '1kg';
+      minPrice = 1400;
+      maxPrice = 2200;
+    } else if (lower.contains('oil')) {
+      category = 'Oils & Fats';
+      stdUnit = '1L';
+      minPrice = 2400;
+      maxPrice = 3500;
+    } else if (lower.contains('egg')) {
+      category = 'Poultry & Dairy';
+      stdUnit = 'crate of 30';
+      minPrice = 4800;
+      maxPrice = 6000;
+    } else if (lower.contains('beans')) {
+      category = 'Legumes';
+      stdUnit = '1kg';
+      minPrice = 2000;
+      maxPrice = 3200;
+    } else if (lower.contains('yam')) {
+      category = 'Tubers';
+      stdUnit = 'tuber';
+      minPrice = 1800;
+      maxPrice = 3500;
+    }
+
+    return OnlinePriceResearchPlan(
+      commodityName: clean,
+      category: category,
+      standardizedUnit: stdUnit,
+      searchKeywords: [
+        clean,
+        '$clean price Nigeria',
+        'buy $clean online Lagos Ibadan',
+        '$clean $stdUnit wholesale',
+      ],
+      targetPlatforms: const [
+        'Jumia Supermarket',
+        'Konga Food & Groceries',
+        'Supermart.ng',
+        'Local Market Community Submissions',
+      ],
+      estimatedBenchmarkMin: minPrice,
+      estimatedBenchmarkMax: maxPrice,
+    );
+  }
+
+  /// Identifies possible duplicate listings for a commodity across sellers
+  List<DuplicateMatchResult> detectDuplicateListings({
+    required Product product,
+    required List<PriceObservation> candidates,
+  }) {
+    final prodLower = product.name.toLowerCase();
+    final results = <DuplicateMatchResult>[];
+
+    for (final candidate in candidates) {
+      final candLower = candidate.productName.toLowerCase();
+
+      double score = 0.0;
+      String reason = 'Distinct commodity listing';
+
+      if (prodLower == candLower) {
+        score = 0.95;
+        reason = 'Exact commodity name match across seller reports';
+      } else if (prodLower.contains(candLower) || candLower.contains(prodLower)) {
+        score = 0.80;
+        reason = 'Close variant or packaging difference';
+      } else {
+        final prodTokens = prodLower.split(RegExp(r'\s+'));
+        final candTokens = candLower.split(RegExp(r'\s+'));
+        final intersection = prodTokens.where((t) => candTokens.contains(t)).length;
+        if (intersection > 0) {
+          score = (intersection / prodTokens.length).clamp(0.0, 0.75);
+          reason = 'Partial keyword overlap in description';
+        }
+      }
+
+      results.add(
+        DuplicateMatchResult(
+          observation: candidate,
+          similarityScore: score,
+          isLikelyDuplicate: score >= 0.75,
+          reasoning: reason,
+        ),
+      );
+    }
+
+    return results;
+  }
+
+  /// Explains commodity price comparison across online stores, local markets, and SMBs
+  String explainCommodityPriceComparison({
+    required Product product,
+    required List<PriceObservation> observations,
+    required double userBudget,
+  }) {
+    if (observations.isEmpty) {
+      return 'Meta Muse Spark Insight: ${product.name} is currently best priced at ${product.bestSeller} (${product.formattedPrice} per ${product.standardUnit}). No alternate seller observations recorded yet in this hub.';
+    }
+
+    final localQuotes = observations.where((o) => o.channel == 'Local Market').toList();
+    final onlineQuotes = observations.where((o) => o.channel == 'Online Retailer').toList();
+
+    final lowest = observations.reduce((a, b) => a.price < b.price ? a : b);
+    final highest = observations.reduce((a, b) => a.price > b.price ? a : b);
+    final diff = highest.price - lowest.price;
+
+    final buffer = StringBuffer();
+    buffer.write('Meta Muse Spark Price Intelligence: ');
+    buffer.write('Comparing ${observations.length} quotes for "${product.name}". ');
+    buffer.write('Best deal is at ${lowest.sellerName} (${lowest.formattedPrice}/${lowest.unit}), saving ₦${diff.toStringAsFixed(0)} compared to ${highest.sellerName} (${highest.formattedPrice}/${highest.unit}). ');
+
+    if (onlineQuotes.isNotEmpty && localQuotes.isNotEmpty) {
+      buffer.write('Local open markets offer ~12% lower unit prices than online retailers, though online ordering eliminates transit time.');
+    } else {
+      buffer.write('Prices are verified by community and trader observations.');
+    }
+
+    return buffer.toString();
   }
 }

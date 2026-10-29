@@ -283,9 +283,9 @@ class _SplashScreenState extends State<SplashScreen> {
           ),
           const Divider(color: Colors.white12, height: 16),
           _buildFeatureRow(
-            icon: Icons.alt_route_rounded,
-            title: 'Errand Coordinator',
-            subtitle: 'Group your errands, find the best routes, save transit time.',
+            icon: Icons.compare_arrows_rounded,
+            title: 'Commodity Price Comparison',
+            subtitle: 'Compare verified prices across online stores, local markets, & SMBs.',
           ),
           const Divider(color: Colors.white12, height: 16),
           _buildFeatureRow(

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smartmove/core/services/meta_ai_service.dart';
 import 'package:smartmove/core/services/decision_engine.dart';
+import 'package:smartmove/core/models/product.dart';
+import 'package:smartmove/core/models/price_observation.dart';
 
 void main() {
   group('Meta AI Integration Tests (Section 6: Muse Spark & Voice Transcribe)', () {
@@ -152,6 +154,121 @@ void main() {
       expect(liveProposal.isLiveCloud, isTrue);
       expect(liveProposal.executionStatus, 'Meta AI Live Cloud: Success');
       expect(liveProposal.fallbackReason, isNull);
+    });
+
+    test('9. Muse Spark coordinates online price research for commodities', () {
+      final researchPlan = aiService.coordinatePriceResearch('Parboiled Rice');
+
+      expect(researchPlan.commodityName, 'Parboiled Rice');
+      expect(researchPlan.category, 'Grains & Cereals');
+      expect(researchPlan.standardizedUnit, '1kg');
+      expect(researchPlan.targetPlatforms.contains('Jumia Supermarket'), true);
+      expect(researchPlan.searchKeywords.isNotEmpty, true);
+      expect(researchPlan.estimatedBenchmarkMin < researchPlan.estimatedBenchmarkMax, true);
+    });
+
+    test('10. Muse Spark detects duplicate listings across sellers', () {
+      const product = Product(
+        id: 'p-rice',
+        name: 'Mama Gold Rice (50kg)',
+        category: 'Groceries',
+        standardUnit: '50kg',
+        lowestPrice: 75000,
+        bestSeller: 'Bodija Market',
+        distanceKm: 2.0,
+        updateTime: '1h ago',
+      );
+
+      final candidateDuplicates = [
+        PriceObservation(
+          id: 'c1',
+          productId: 'p-custom',
+          productName: 'Mama Gold Rice (50kg)',
+          sellerName: 'Jumia Store',
+          marketLocation: 'Online',
+          price: 78000,
+          unit: '50kg',
+          timestamp: DateTime.now(),
+          sourceType: ObservationSource.onlineGrounded,
+          submitterName: 'Web Scraper',
+        ),
+        PriceObservation(
+          id: 'c2',
+          productId: 'p-custom',
+          productName: 'Brown Beans',
+          sellerName: 'Dugbe Mart',
+          marketLocation: 'Dugbe',
+          price: 2400,
+          unit: '1kg',
+          timestamp: DateTime.now(),
+          sourceType: ObservationSource.communityReported,
+          submitterName: 'Trader',
+        ),
+      ];
+
+      final results = aiService.detectDuplicateListings(
+        product: product,
+        candidates: candidateDuplicates,
+      );
+
+      expect(results.length, 2);
+      expect(results[0].isLikelyDuplicate, true); // Exact match
+      expect(results[0].similarityScore >= 0.9, true);
+      expect(results[1].isLikelyDuplicate, false); // Brown Beans != Rice
+    });
+
+    test('11. Muse Spark explains grounded commodity price comparison', () {
+      const product = Product(
+        id: 'p-oil',
+        name: 'Cooking Oil (1L)',
+        category: 'Groceries',
+        standardUnit: '1L',
+        lowestPrice: 2850,
+        bestSeller: 'Bodija Wholesale',
+        distanceKm: 2.5,
+        updateTime: '2h ago',
+      );
+
+      final quotes = [
+        PriceObservation(
+          id: 'q1',
+          productId: 'p-oil',
+          productName: 'Cooking Oil (1L)',
+          sellerName: 'Bodija Wholesale',
+          marketLocation: 'Bodija Market',
+          price: 2850,
+          unit: '1L',
+          timestamp: DateTime.now(),
+          sourceType: ObservationSource.traderConfirmed,
+          submitterName: 'Trader',
+          channel: 'Local Market',
+        ),
+        PriceObservation(
+          id: 'q2',
+          productId: 'p-oil',
+          productName: 'Cooking Oil (1L)',
+          sellerName: 'Jumia Supermarket',
+          marketLocation: 'Online',
+          price: 3300,
+          unit: '1L',
+          timestamp: DateTime.now(),
+          sourceType: ObservationSource.onlineGrounded,
+          submitterName: 'System',
+          channel: 'Online Retailer',
+        ),
+      ];
+
+      final explanation = aiService.explainCommodityPriceComparison(
+        product: product,
+        observations: quotes,
+        userBudget: 15000,
+      );
+
+      expect(explanation.contains('Meta Muse Spark Price Intelligence'), true);
+      expect(explanation.contains('Bodija Wholesale'), true);
+      expect(explanation.contains('Jumia Supermarket'), true);
+      // Explains calculated ₦450 savings
+      expect(explanation.contains('450'), true);
     });
   });
 }

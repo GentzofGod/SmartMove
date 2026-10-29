@@ -109,21 +109,15 @@ class DecisionEngine {
       ];
     }
 
-    // Extract first non-shopping errand deadline if any
-    final firstErrandWithDeadline = errands?.firstWhere(
-      (e) => e.deadline != null,
-      orElse: () => Errand(
-        id: 'e-default',
-        title: 'Collect package',
-        locationName: 'Jumia Pickup Station',
-        scheduledTime: '11:00 AM',
-        deadline: '2:00 PM',
-        priority: ErrandPriority.medium,
-        category: 'pickup',
-      ),
-    );
-    final deadlineString = firstErrandWithDeadline?.deadline ?? '2:00 PM';
-    final errandTitle = firstErrandWithDeadline?.title ?? 'package collection';
+    // Extract first non-shopping errand deadline if any (only if explicitly provided)
+    final firstErrandWithDeadline = (errands != null && errands.isNotEmpty)
+        ? errands.firstWhere(
+            (e) => e.deadline != null,
+            orElse: () => errands.first,
+          )
+        : null;
+    final deadlineString = firstErrandWithDeadline?.deadline;
+    final errandTitle = firstErrandWithDeadline?.title;
 
     // 1. PLAN A: Lowest Estimated Total Cost (Cheapest Products across 2 markets)
     final double planATransport = baseTransportFare * 1.5;
@@ -140,7 +134,11 @@ class DecisionEngine {
       planAViolated.add('Exceeds budget by ₦${(planATotal - userBudget).toStringAsFixed(0)}');
     }
     if (planAHours <= maxTimeHours) {
-      planASatisfied.add('Meets $deadlineString errand deadline');
+      if (deadlineString != null) {
+        planASatisfied.add('Meets $deadlineString errand deadline');
+      } else {
+        planASatisfied.add('Within time budget (${planAHours}h <= ${maxTimeHours}h)');
+      }
     } else {
       planAViolated.add('Exceeds available time limit (${planAHours}h > ${maxTimeHours}h)');
     }
@@ -220,8 +218,9 @@ class DecisionEngine {
       dataDisclaimers: const [
         'Transit fare is demo estimate (no routing provider connected)',
       ],
-      tradeOffExplanation:
-          'Consolidates errands to a single market hub. Cuts transport expense to ₦${planBTransport.toStringAsFixed(0)} and saves 42 minutes, paying slightly higher unit prices.',
+      tradeOffExplanation: (errandTitle != null)
+          ? 'Consolidates errands to a single market hub. Cuts transport expense to ₦${planBTransport.toStringAsFixed(0)} and saves 42 minutes, paying slightly higher unit prices.'
+          : 'Consolidates commodity purchases to a single major market hub. Cuts transport expense to ₦${planBTransport.toStringAsFixed(0)} and saves 42 minutes, paying slightly higher unit prices.',
       stops: planBStopsList,
     );
 
@@ -282,7 +281,9 @@ class DecisionEngine {
 
     final List<String> planDSatisfied = [
       'Strict cashflow budget safety (₦${planDTotal.toStringAsFixed(0)} total)',
-      'Completes high-priority $errandTitle before deadline',
+      errandTitle != null
+          ? 'Completes high-priority $errandTitle before deadline'
+          : 'Focuses immediately on essential staple commodities',
       'Minimal $planDStops stops',
     ];
     final List<String> planDViolated = [];
@@ -310,8 +311,10 @@ class DecisionEngine {
         'Transit fare estimated based on route distance',
       ],
       tradeOffExplanation: hasCustomItems
-          ? 'Delays non-urgent purchases. Focuses on essential items (₦${planDBaseItems.toStringAsFixed(0)}) + $errandTitle, staying under strict budgets without making unsupported claims.'
-          : 'Delays non-urgent cooking oil and tomatoes. Focuses on essential food restock + package pickup, comfortably staying under strict budgets without making unsupported price-drop claims.',
+          ? (errandTitle != null
+              ? 'Delays non-urgent purchases. Focuses on essential items (₦${planDBaseItems.toStringAsFixed(0)}) + $errandTitle, staying under strict budgets without making unsupported claims.'
+              : 'Delays non-urgent purchases. Focuses on essential commodities (₦${planDBaseItems.toStringAsFixed(0)}), comfortably staying under strict budgets.')
+          : 'Delays non-urgent cooking oil and tomatoes. Focuses on essential food restock, comfortably staying under strict budgets without making unsupported price-drop claims.',
       stops: planDStopsList,
     );
 
@@ -465,21 +468,24 @@ class DecisionEngine {
     required List<PlanCandidate> candidates,
     List<Errand>? errands,
   }) {
-    final errandTitle = errands != null && errands.isNotEmpty
-        ? errands.first.title
-        : 'package collection';
-    final deadlineString = errands != null && errands.isNotEmpty && errands.first.deadline != null
-        ? errands.first.deadline!
-        : '2:00 PM';
+    final hasErrands = errands != null && errands.isNotEmpty;
+    final errandTitle = hasErrands ? errands.first.title : null;
+    final deadlineString = hasErrands ? errands.first.deadline : null;
 
     if (budget < 12000) {
-      return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Plan D is recommended. Delaying non-urgent purchases keeps your spending within budget while ensuring $errandTitle is completed before $deadlineString (no price drop prediction made).";
+      if (errandTitle != null && deadlineString != null) {
+        return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Plan D is recommended. Delaying non-urgent purchases keeps your spending within budget while ensuring $errandTitle is completed before $deadlineString (no price drop prediction made).";
+      }
+      return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Plan D is recommended. Delaying non-urgent purchases keeps your spending within budget while prioritizing essential commodities (no price drop prediction made).";
     } else if (timeAvailable < 2.0) {
-      return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Plan C or Plan B is optimal to guarantee your $errandTitle is completed well before the $deadlineString deadline.";
+      if (errandTitle != null && deadlineString != null) {
+        return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Plan C or Plan B is optimal to guarantee your $errandTitle is completed well before the $deadlineString deadline.";
+      }
+      return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Plan C or Plan B is optimal to complete all commodity purchases in a consolidated stop.";
     } else if (transportCost > 2000) {
       return "High transit expense: Consolidating stops in Plan B saves transit fares without adding significant travel delay.";
     } else {
-      return "Optimal recommendation: Plan A delivers the lowest overall product cost for your ₦${budget.toStringAsFixed(0)} budget and comfortably meets all errands.";
+      return "Optimal recommendation: Plan A delivers the lowest overall commodity basket cost for your ₦${budget.toStringAsFixed(0)} budget.";
     }
   }
 }

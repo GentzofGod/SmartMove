@@ -11,9 +11,8 @@ class MainScaffold extends StatelessWidget {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith('/home')) return 0;
     if (location.startsWith('/discover')) return 1;
-    if (location.startsWith('/errands')) return 2;
-    if (location.startsWith('/decision-lab')) return 3;
-    if (location.startsWith('/community')) return 4;
+    if (location.startsWith('/decision-lab')) return 2;
+    if (location.startsWith('/community')) return 3;
     return 0;
   }
 
@@ -26,12 +25,9 @@ class MainScaffold extends StatelessWidget {
         context.go('/discover');
         break;
       case 2:
-        context.go('/errands');
-        break;
-      case 3:
         context.go('/decision-lab');
         break;
-      case 4:
+      case 3:
         context.go('/community');
         break;
     }
@@ -79,18 +75,13 @@ class MainScaffold extends StatelessWidget {
               label: 'Discover',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.assignment_outlined),
-              activeIcon: Icon(Icons.assignment),
-              label: 'My Errands',
+              icon: Icon(Icons.analytics_outlined),
+              activeIcon: Icon(Icons.analytics),
+              label: 'Price Lab',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.science_outlined),
-              activeIcon: Icon(Icons.science),
-              label: 'Decision Lab',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
+              icon: Icon(Icons.storefront_outlined),
+              activeIcon: Icon(Icons.storefront),
               label: 'Community',
             ),
           ],

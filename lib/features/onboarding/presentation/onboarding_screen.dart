@@ -23,10 +23,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'accentColor': const Color(0xFF00875A),
     },
     {
-      'title': 'Plan Your Errands',
+      'title': 'Compare Commodity Prices',
       'subtitle':
-          'Group your errands, find the best routes, and save time and transport costs.',
-      'icon': Icons.alt_route_rounded,
+          'Discover standardized prices across online retailers, local markets, and small businesses to maximize your savings.',
+      'icon': Icons.compare_arrows_rounded,
       'accentColor': const Color(0xFF0052CC),
     },
     {

@@ -252,9 +252,9 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'Your Shopping List',
+                children: [
+                  const Text(
+                    'Commodity Basket',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -262,8 +262,10 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     ),
                   ),
                   Text(
-                    '4 items + 1 errand',
-                    style: TextStyle(
+                    state.activeItems.isNotEmpty
+                        ? '${state.activeItems.length} commodities'
+                        : '4 commodities',
+                    style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
@@ -272,9 +274,13 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                 ],
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Rice (2kg), Eggs (1 crate), Tomatoes (2kg), Cooking Oil (1L)',
-                style: TextStyle(
+              Text(
+                state.activeItems.isNotEmpty
+                    ? state.activeItems
+                        .map((i) => '${i.productName} (${i.quantity.toStringAsFixed(0)} ${i.unit})')
+                        .join(', ')
+                    : 'Rice (2kg), Eggs (1 crate), Tomatoes (2kg), Cooking Oil (1L)',
+                style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
@@ -1442,7 +1448,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         const SizedBox(height: 12),
         _buildScenarioCard(
           title: 'Time Crunch (< 1.5 hrs)',
-          description: 'Simulates limited time to make sure package pickup is strictly completed by 2:00 PM.',
+          description: 'Simulates a tight buying schedule to evaluate if single-stop market hubs save critical time.',
           onApply: () {
             ref.read(decisionLabProvider.notifier).updateTimeAvailable(1.5);
             _tabController.animateTo(0);
