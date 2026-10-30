@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/price_observation.dart';
-import '../../../core/models/product.dart';
 import '../../../core/models/seller_application.dart';
 import '../../../core/services/auth_service.dart';
-import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
@@ -21,7 +20,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   late TabController _tabController;
   String _selectedChannelFilter = 'All';
   String _selectedSourceFilter = 'All';
-  String _moderationFilter = 'All';
 
   static const List<String> _commodityPresets = [
     'Parboiled Rice',
@@ -49,7 +47,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -399,163 +397,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
-  void _showDuplicateScanDialog(BuildContext context, List<PriceObservation> observations) {
-    const aiService = MetaAiService();
-    final products = ref.read(productsProvider);
-
-    final allMatches = <Map<String, dynamic>>[];
-    for (final prod in products) {
-      final matches = aiService.detectDuplicateListings(product: prod, candidates: observations);
-      for (final m in matches) {
-        if (m.isProbableDuplicate) {
-          allMatches.add({
-            'product': prod,
-            'match': m,
-          });
-        }
-      }
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryTint,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Meta AI Duplicate Detection Audit',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                      Text(
-                        'Detected ${allMatches.length} cross-seller matching commodity listings',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (allMatches.isEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F8E9),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: AppColors.badgeSuccessText, size: 20),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'No conflicting duplicate listings found across current seller reports.',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryDark),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              ...allMatches.take(5).map((item) {
-                final prod = item['product'] as Product;
-                final m = item['match'] as DuplicateMatchResult;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${prod.name} ↔ ${m.observation.productName}',
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryTint,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${(m.similarityScore * 100).toInt()}% Match',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Reason: ${m.reason}',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Seller: ${m.observation.sellerName} (${m.observation.channel}) • ${m.observation.formattedPrice}',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close Audit', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _moderationSubTab = 'Observations'; // 'Observations' or 'Applications'
-
   @override
   Widget build(BuildContext context) {
     final observations = ref.watch(communityProvider);
@@ -591,6 +432,29 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
             ),
           ],
         ),
+        actions: [
+          if (userSession.canModerate)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ActionChip(
+                key: const ValueKey('btn_open_superadmin_panel'),
+                avatar: const Icon(Icons.shield_rounded,
+                    size: 15, color: Colors.white),
+                label: Text(
+                  pendingAppsCount > 0
+                      ? 'SuperAdmin ($pendingAppsCount)'
+                      : 'SuperAdmin Panel',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                backgroundColor: const Color(0xFF673AB7),
+                onPressed: () => context.push('/superadmin'),
+              ),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
@@ -598,35 +462,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           indicatorColor: AppColors.primary,
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-          tabs: [
-            const Tab(text: 'Price Feed'),
-            const Tab(text: 'Seller Portal'),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Moderation'),
-                  if (pendingAppsCount > 0) ...[
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE65100),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$pendingAppsCount',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          tabs: const [
+            Tab(text: 'Price Feed'),
+            Tab(text: 'Seller Portal'),
           ],
         ),
       ),
@@ -638,9 +476,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
           // Tab 2: Seller Portal
           _buildSellerPortalTab(observations, userSession),
-
-          // Tab 3: Moderation & Admin
-          _buildModerationTab(observations, applications, userSession),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -1145,517 +980,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
-  Widget _buildModerationTab(
-    List<PriceObservation> observations,
-    List<SellerApplication> applications,
-    UserSession userSession,
-  ) {
-    final isAdmin = userSession.isAdmin;
-    final pendingApps = applications
-        .where((a) => a.status == SellerApplicationStatus.pending)
-        .toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Admin Status Banner
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: isAdmin ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isAdmin ? const Color(0xFFA5D6A7) : const Color(0xFFFFE082),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                isAdmin ? Icons.admin_panel_settings_rounded : Icons.info_outline_rounded,
-                color: isAdmin ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
-                size: 24,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAdmin
-                          ? 'Platform Administrator Mode Active'
-                          : 'Moderation Console (Read Only)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: isAdmin ? const Color(0xFF1B5E20) : const Color(0xFFBF360C),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isAdmin
-                          ? 'Full administrative authority: approve seller applications, verify price quotes, and reject anomalies.'
-                          : 'You are viewing moderation in Customer mode. Switch to Administrator to test approval actions.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isAdmin ? const Color(0xFF2E7D32) : const Color(0xFF795548),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isAdmin) ...[
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.read(authProvider.notifier).updateRole('Admin');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Switched to Platform Administrator mode'),
-                        backgroundColor: AppColors.primary,
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                  ),
-                  child: const Text('Try Admin', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Sub-tab selector: Observations vs Seller Applications
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _moderationSubTab = 'Observations'),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _moderationSubTab == 'Observations' ? AppColors.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Price Quotes (${observations.length})',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: _moderationSubTab == 'Observations' ? Colors.white : AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _moderationSubTab = 'Applications'),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _moderationSubTab == 'Applications' ? AppColors.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Seller Approvals',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: _moderationSubTab == 'Applications' ? Colors.white : AppColors.textSecondary,
-                          ),
-                        ),
-                        if (pendingApps.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: _moderationSubTab == 'Applications' ? Colors.white : const Color(0xFFE65100),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${pendingApps.length}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: _moderationSubTab == 'Applications' ? AppColors.primary : Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        if (_moderationSubTab == 'Applications') ...[
-          // Seller Applications View
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Seller Registration Applications',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-              ),
-              Text(
-                '${pendingApps.length} Pending Review',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE65100)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          if (applications.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: const Center(
-                child: Text('No seller applications submitted yet.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              ),
-            )
-          else
-            for (final app in applications)
-              _buildSellerApplicationCard(app, isAdmin),
-        ] else ...[
-          // Price Observations View
-          Row(
-            children: [
-              _buildKpiCard('Total Quotes', '${observations.length}', AppColors.primary),
-              const SizedBox(width: 8),
-              _buildKpiCard('Verified', '${observations.where((o) => o.isVerified).length}', const Color(0xFF2E7D32)),
-              const SizedBox(width: 8),
-              _buildKpiCard('Pending', '${observations.where((o) => !o.isVerified).length}', const Color(0xFFE65100)),
-              const SizedBox(width: 8),
-              _buildKpiCard('Anomalies', '${observations.where((o) => o.isFlaggedAnomaly).length}', const Color(0xFFC62828)),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Meta AI Tools Row
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showDuplicateScanDialog(context, observations),
-                  icon: const Icon(Icons.copy_rounded, size: 16),
-                  label: const Text('AI Duplicate Audit', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _showPriceAnomalyScanDialog(context, observations),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
-                  icon: const Icon(Icons.shield_outlined, size: 16, color: Colors.white),
-                  label: const Text('AI Anomaly Scan', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Filter chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['All', 'Pending', 'Flagged', 'Verified'].map((f) {
-                final isSel = _moderationFilter == f;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(f == 'All'
-                        ? 'All (${observations.length})'
-                        : f == 'Pending'
-                            ? 'Pending (${observations.where((o) => !o.isVerified).length})'
-                            : f == 'Flagged'
-                                ? 'Anomalies (${observations.where((o) => o.isFlaggedAnomaly).length})'
-                                : 'Verified (${observations.where((o) => o.isVerified).length})'),
-                    selected: isSel,
-                    selectedColor: AppColors.primaryTint,
-                    labelStyle: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                      color: isSel ? AppColors.primary : AppColors.textSecondary,
-                    ),
-                    onSelected: (val) {
-                      if (val) setState(() => _moderationFilter = f);
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          for (final obs in _getFilteredModerationObservations(observations))
-            _buildModerationObservationCard(obs, isAdmin),
-        ],
-      ],
-    );
-  }
-
-  List<PriceObservation> _getFilteredModerationObservations(List<PriceObservation> list) {
-    if (_moderationFilter == 'Pending') {
-      return list.where((o) => !o.isVerified).toList();
-    }
-    if (_moderationFilter == 'Flagged') {
-      return list.where((o) => o.isFlaggedAnomaly).toList();
-    }
-    if (_moderationFilter == 'Verified') {
-      return list.where((o) => o.isVerified).toList();
-    }
-    return list;
-  }
-
-  Widget _buildSellerApplicationCard(SellerApplication app, bool isAdmin) {
-    final isPending = app.status == SellerApplicationStatus.pending;
-    final isApproved = app.status == SellerApplicationStatus.approved;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isPending ? const Color(0xFFFFE082) : isApproved ? const Color(0xFFA5D6A7) : AppColors.cardBorder,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  app.businessName,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: isPending
-                      ? const Color(0xFFFFF8E1)
-                      : isApproved
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFEBEE),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  app.status.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: isPending
-                        ? const Color(0xFFE65100)
-                        : isApproved
-                            ? const Color(0xFF2E7D32)
-                            : AppColors.errorText,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Text('Applicant: ${app.applicantName}  •  ${app.marketHub}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text('Channel: ${app.sellerChannel}  •  Phone: ${app.phone}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          ),
-          if (app.stallLocation != null && app.stallLocation!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text('Stall: ${app.stallLocation!}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-          ],
-          if (app.rejectionReason != null && app.rejectionReason!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text('Reason: ${app.rejectionReason!}', style: const TextStyle(fontSize: 11, color: AppColors.errorText)),
-          ],
-          if (isPending) ...[
-            const Divider(height: 16, color: AppColors.divider),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (isAdmin) ...[
-                  OutlinedButton.icon(
-                    onPressed: () => _showRejectApplicationDialog(context, app),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.errorText),
-                    icon: const Icon(Icons.close_rounded, size: 14),
-                    label: const Text('Reject', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      ref.read(sellerApplicationsProvider.notifier).approveApplication(app.id);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${app.businessName} approved as verified seller!'),
-                          backgroundColor: const Color(0xFF2E7D32),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
-                    icon: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
-                    label: const Text('Approve Seller', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-                  ),
-                ] else ...[
-                  const Text('Admin approval required to activate seller account.', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ],
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModerationObservationCard(PriceObservation obs, bool isAdmin) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: obs.isFlaggedAnomaly ? const Color(0xFFFFCDD2) : AppColors.cardBorder,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  '${obs.productName} — ${obs.formattedPrice}/${obs.unit}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: obs.isFlaggedAnomaly
-                      ? const Color(0xFFFFEBEE)
-                      : obs.isVerified
-                          ? AppColors.badgeSuccessBg
-                          : const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  obs.verificationBadgeLabel,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: obs.isFlaggedAnomaly
-                        ? const Color(0xFFC62828)
-                        : obs.isVerified
-                            ? AppColors.badgeSuccessText
-                            : const Color(0xFFB78103),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${obs.sellerName}  •  ${obs.channel}  •  Submitted by ${obs.submitterName} (${obs.submitterRole})',
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-          ),
-          if (obs.isFlaggedAnomaly) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFEBEE),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFC62828)),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      obs.anomalyReason ?? 'Extreme price variance detected by Meta AI',
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFFC62828), fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          if (isAdmin) ...[
-            const Divider(height: 14, color: AppColors.divider),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    obs.isVerified ? Icons.verified_rounded : Icons.check_circle_outline,
-                    color: obs.isVerified ? AppColors.primary : AppColors.textTertiary,
-                    size: 20,
-                  ),
-                  tooltip: obs.isVerified ? 'Mark Unverified' : 'Verify Observation',
-                  onPressed: () {
-                    ref.read(communityProvider.notifier).verifyObservation(obs.id, !obs.isVerified);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(
-                    obs.isFlaggedAnomaly ? Icons.flag : Icons.flag_outlined,
-                    color: obs.isFlaggedAnomaly ? const Color(0xFFC62828) : AppColors.textTertiary,
-                    size: 20,
-                  ),
-                  tooltip: 'Flag / Unflag Anomaly',
-                  onPressed: () => _showFlagAnomalyDialog(context, obs),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.errorText, size: 20),
-                  tooltip: 'Reject & Remove',
-                  onPressed: () => _showDeleteListingConfirmation(context, obs),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildKpiCard(String label, String value, Color color) {
     return Expanded(
       child: Container(
@@ -1904,328 +1228,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showFlagAnomalyDialog(BuildContext context, PriceObservation obs) {
-    final reasonController = TextEditingController(
-      text: obs.isFlaggedAnomaly ? (obs.anomalyReason ?? '') : 'Suspicious deviation from market average',
-    );
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              obs.isFlaggedAnomaly ? Icons.check_circle_outline : Icons.flag_outlined,
-              color: obs.isFlaggedAnomaly ? AppColors.primary : const Color(0xFFC62828),
-            ),
-            const SizedBox(width: 8),
-            Text(obs.isFlaggedAnomaly ? 'Clear Anomaly Flag' : 'Flag Price Anomaly'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Item: ${obs.productName} (${obs.formattedPrice}/${obs.unit})'),
-            const SizedBox(height: 8),
-            if (!obs.isFlaggedAnomaly)
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason for Flagging',
-                  hintText: 'e.g. Price too low for Grade A rice',
-                  border: OutlineInputBorder(),
-                ),
-              )
-            else
-              const Text('Remove the anomaly warning and restore normal listing status?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: obs.isFlaggedAnomaly ? AppColors.primary : const Color(0xFFC62828),
-            ),
-            onPressed: () {
-              ref.read(communityProvider.notifier).flagListingAnomaly(
-                    obs.id,
-                    isAnomalous: !obs.isFlaggedAnomaly,
-                    reason: !obs.isFlaggedAnomaly ? reasonController.text.trim() : null,
-                  );
-              Navigator.pop(dialogCtx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(obs.isFlaggedAnomaly
-                      ? 'Anomaly flag cleared'
-                      : 'Listing flagged as price anomaly'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
-            child: Text(
-              obs.isFlaggedAnomaly ? 'Restore Listing' : 'Flag as Anomaly',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRejectApplicationDialog(BuildContext context, SellerApplication app) {
-    final reasonController = TextEditingController(text: 'Stall credentials could not be verified in market hub');
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Reject Seller Application'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Applicant: ${app.applicantName} (${app.businessName})'),
-            const SizedBox(height: 10),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for Rejection',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorText),
-            onPressed: () {
-              ref.read(sellerApplicationsProvider.notifier).rejectApplication(
-                    app.id,
-                    reason: reasonController.text.trim(),
-                  );
-              Navigator.pop(dialogCtx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Application for ${app.businessName} rejected.'),
-                  backgroundColor: AppColors.errorText,
-                ),
-              );
-            },
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPriceAnomalyScanDialog(BuildContext context, List<PriceObservation> observations) {
-    const aiService = MetaAiService();
-    final result = aiService.auditPriceAnomalies(candidates: observations);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.shield_outlined, color: Color(0xFFC62828), size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Meta AI Price Anomaly Audit',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                        ),
-                        Text(
-                          result.hasAnomaly
-                              ? 'Found ${result.anomalousItems.length} price outlier(s) exceeding normal variance'
-                              : 'All active listings fall within acceptable market bounds',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // KPI Row
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      children: [
-                        const Text('Market Average', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '₦${result.averageMarketPrice.toStringAsFixed(0)}',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
-                    Container(height: 24, width: 1, color: AppColors.divider),
-                    Column(
-                      children: [
-                        const Text('Price Spread', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${result.priceSpreadPercent.toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: result.priceSpreadPercent > 50 ? const Color(0xFFC62828) : AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(height: 24, width: 1, color: AppColors.divider),
-                    Column(
-                      children: [
-                        const Text('Outliers Flagged', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${result.anomalousItems.length}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: result.anomalousItems.isNotEmpty ? const Color(0xFFC62828) : AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              if (result.explanation.isNotEmpty) ...[
-                Text(
-                  result.explanation,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              if (result.anomalousItems.isNotEmpty) ...[
-                const Text(
-                  'Flagged Outlier Listings',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 8),
-                for (final item in result.anomalousItems)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFFE082)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${item.observation.productName} — ${item.observation.formattedPrice}',
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                              ),
-                              Text(
-                                '${item.observation.sellerName}  •  ${item.deviationPercent > 0 ? "+${item.deviationPercent.toStringAsFixed(0)}%" : "${item.deviationPercent.toStringAsFixed(0)}%"} vs average',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFFB78103)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            ref.read(communityProvider.notifier).flagListingAnomaly(
-                                  item.observation.id,
-                                  isAnomalous: true,
-                                  reason: item.anomalyType,
-                                );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Flagged ${item.observation.productName} as anomaly'),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                            Navigator.pop(ctx);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD32F2F),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            minimumSize: Size.zero,
-                          ),
-                          child: const Text('Flag', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w700)),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Close Audit', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -2499,15 +1501,24 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    '${obs.sellerName}  •  ${obs.channel}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  Expanded(
+                    child: Text(
+                      '${obs.sellerName}  •  ${obs.channel}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   if (obs.standardizedUnitPrice != null) ...[
-                    const Spacer(),
+                    const SizedBox(width: 6),
                     Text(
                       '₦${obs.standardizedUnitPrice!.toStringAsFixed(0)} / ${obs.baseUnit}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary),
                     ),
                   ],
                 ],
@@ -2540,17 +1551,22 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    obs.timeAgo,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      obs.timeAgo,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textTertiary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
                   // In stock indicator
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: obs.inStock ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                      color: obs.inStock
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFEBEE),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -2558,7 +1574,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: obs.inStock ? const Color(0xFF2E7D32) : AppColors.errorText,
+                        color: obs.inStock
+                            ? const Color(0xFF2E7D32)
+                            : AppColors.errorText,
                       ),
                     ),
                   ),

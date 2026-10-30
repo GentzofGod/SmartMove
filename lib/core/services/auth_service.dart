@@ -6,7 +6,8 @@ import '../models/seller_application.dart';
 enum UserRole {
   customer,
   trader,
-  admin;
+  admin,
+  superAdmin;
 
   String get label {
     switch (this) {
@@ -16,6 +17,8 @@ enum UserRole {
         return 'Trader';
       case UserRole.admin:
         return 'Admin';
+      case UserRole.superAdmin:
+        return 'SuperAdmin';
     }
   }
 
@@ -25,6 +28,11 @@ enum UserRole {
       case 'trader':
       case 'seller':
         return UserRole.trader;
+      case 'superadmin':
+      case 'super_admin':
+      case 'super-admin':
+      case 'super administrator':
+        return UserRole.superAdmin;
       case 'admin':
       case 'administrator':
         return UserRole.admin;
@@ -39,7 +47,7 @@ class UserSession {
   final String email;
   final String displayName;
   final bool isGuest;
-  final String role; // 'Customer', 'Trader', 'Admin'
+  final String role; // 'Customer', 'Trader', 'Admin', 'SuperAdmin'
   final String? businessName;
   final String? marketHub;
   final String? sellerChannel;
@@ -62,9 +70,12 @@ class UserSession {
   });
 
   bool get isSeller => role == 'Trader' || role == 'Seller';
-  bool get isAdmin => role == 'Admin' || role == 'Administrator';
+  bool get isSuperAdmin =>
+      role == 'SuperAdmin' || role == 'super_admin' || role == 'superadmin';
+  bool get isAdmin =>
+      role == 'Admin' || role == 'Administrator' || isSuperAdmin;
   bool get isCustomer => !isSeller && !isAdmin;
-  bool get canModerate => isAdmin;
+  bool get canModerate => isAdmin || isSuperAdmin;
   bool get canSubmitVerifiedListing => isSeller || isAdmin;
   bool get isPendingSeller =>
       sellerApplicationStatus == SellerApplicationStatus.pending;
@@ -268,11 +279,13 @@ class AuthService {
 
     // Offline / Demo fallback authentication
     final lower = email.toLowerCase();
-    final role = lower.contains('admin')
-        ? 'Admin'
-        : (lower.contains('trader') || lower.contains('seller'))
-            ? 'Trader'
-            : 'Customer';
+    final role = lower.contains('superadmin')
+        ? 'SuperAdmin'
+        : lower.contains('admin')
+            ? 'Admin'
+            : (lower.contains('trader') || lower.contains('seller'))
+                ? 'Trader'
+                : 'Customer';
     final isTrader = role == 'Trader';
     final session = UserSession(
       id: 'usr-${email.hashCode.abs()}',

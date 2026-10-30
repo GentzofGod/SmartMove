@@ -11,6 +11,7 @@ import '../../features/itinerary/presentation/itinerary_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
+import '../../features/admin/presentation/superadmin_panel_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -74,6 +75,11 @@ final appRouter = GoRouter(
       path: '/auth',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const AuthScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const SuperAdminPanelScreen(),
     ),
   ],
 );

@@ -421,28 +421,62 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFFCE93D8)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.security_rounded, color: Color(0xFF673AB7), size: 26),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Platform Administrator Mode',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF4A148C),
-                          ),
+                  Row(
+                    children: [
+                      const Icon(Icons.security_rounded,
+                          color: Color(0xFF673AB7), size: 26),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              userSession.isSuperAdmin
+                                  ? 'SuperAdmin Console Active'
+                                  : 'Platform Administrator Mode',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF4A148C),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Platform moderation privileges enabled: verify quotes, approve seller applications, and moderate listings.',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF6A1B9A)),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Full moderation privileges enabled: verify quotes, reject anomalies, and moderate listings.',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF6A1B9A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      key: const ValueKey('btn_open_superadmin_from_profile'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF673AB7),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
+                      ),
+                      icon: const Icon(Icons.admin_panel_settings_rounded,
+                          size: 18, color: Colors.white),
+                      label: const Text(
+                        'Open SuperAdmin Moderation Panel',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white),
+                      ),
+                      onPressed: () => context.push('/superadmin'),
                     ),
                   ),
                 ],
@@ -461,6 +495,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             child: Column(
               children: [
+                if (userSession.isAdmin) ...[
+                  _buildMenuItem(
+                    icon: Icons.admin_panel_settings_outlined,
+                    title: 'SuperAdmin Moderation Panel',
+                    trailingText: 'Open',
+                    onTap: () => context.push('/superadmin'),
+                  ),
+                  const Divider(height: 1, indent: 56, color: AppColors.divider),
+                ],
                 _buildMenuItem(
                   icon: Icons.account_balance_wallet_outlined,
                   title: 'My Wallet',
