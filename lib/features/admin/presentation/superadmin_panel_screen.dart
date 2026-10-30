@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/models/seller_application.dart';
 import '../../../core/models/price_observation.dart';
 import '../../../core/services/auth_service.dart';
@@ -36,6 +37,77 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
   @override
   Widget build(BuildContext context) {
     final userSession = ref.watch(authProvider);
+
+    if (!userSession.canModerate) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1E1145),
+          foregroundColor: Colors.white,
+          title: const Text('SuperAdmin Console'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFEBEE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lock_person_rounded,
+                    color: Color(0xFFC62828),
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Access Denied — SuperAdmin Privileges Required',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  userSession.isGuest
+                      ? 'You are currently browsing as a Guest. Platform moderation and governance are strictly restricted to SuperAdmins.'
+                      : 'Your current account (${userSession.displayName}) is signed in with the role "${userSession.role}". Only SuperAdmins have authority to moderate seller applications and market pricing.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => context.go('/home'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E1145),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                  ),
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white),
+                  label: const Text('Return to Home',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final applications = ref.watch(sellerApplicationsProvider);
     final observations = ref.watch(communityProvider);
 

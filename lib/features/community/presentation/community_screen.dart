@@ -58,6 +58,31 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   void _showAddObservationDialog(BuildContext context, {bool isSellerDirect = false}) {
     final userSession = ref.read(authProvider);
+    if (userSession.isGuest) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('Sign In Required'),
+          content: const Text(
+            'Guest users can explore market prices. To publish community price quotes or manage commodity listings, please sign in or create an account.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                context.push('/auth');
+              },
+              child: const Text('Sign In'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final productController = TextEditingController();
     final sellerController = TextEditingController(
       text: isSellerDirect && userSession.businessName != null ? userSession.businessName! : '',
@@ -718,34 +743,43 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          // Demo toggle helper for evaluator
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.science_outlined, color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Evaluator Quick Toggle: Test seller features directly.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          if (userSession.isSuperAdmin) ...[
+            const SizedBox(height: 16),
+            // SuperAdmin simulator toggle
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDE7F6),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFCE93D8)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.shield_outlined,
+                      color: Color(0xFF673AB7), size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'SuperAdmin Simulator: Preview verified seller dashboard.',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF4A148C),
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    ref.read(authProvider.notifier).updateRole('Trader');
-                  },
-                  child: const Text('Try Seller', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ],
+                  TextButton(
+                    onPressed: () {
+                      ref.read(authProvider.notifier).updateRole('Trader');
+                    },
+                    child: const Text('Simulate Seller',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF673AB7))),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       );
     }
@@ -1233,6 +1267,31 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   void _showApplyToBecomeSeller(BuildContext context, UserSession session) {
+    if (session.isGuest) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('Account Required'),
+          content: const Text(
+            'To apply as a verified seller and register your market stall, please sign in or create an account first.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                context.push('/auth');
+              },
+              child: const Text('Sign In / Register'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final bizController = TextEditingController(text: session.businessName ?? '');
     final phoneController = TextEditingController(text: session.phone ?? '');
     final stallController = TextEditingController(text: session.stallLocation ?? '');

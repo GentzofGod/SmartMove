@@ -103,3 +103,4 @@ CREATE POLICY "Submitters and admins can delete observations"
       AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
     )
   );
+

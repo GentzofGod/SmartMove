@@ -84,6 +84,7 @@ class UserSession {
   bool get isRejectedSeller =>
       sellerApplicationStatus == SellerApplicationStatus.rejected;
   bool get canApplyForSeller =>
+      !isGuest &&
       isCustomer &&
       (sellerApplicationStatus == SellerApplicationStatus.none ||
           sellerApplicationStatus == SellerApplicationStatus.rejected);

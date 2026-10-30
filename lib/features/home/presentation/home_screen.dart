@@ -80,6 +80,37 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   Row(
                     children: [
+                      if (userSession.isSuperAdmin) ...[
+                        InkWell(
+                          key: const ValueKey('btn_superadmin_home_chip'),
+                          onTap: () => context.push('/superadmin'),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF673AB7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.shield_rounded,
+                                    size: 14, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text(
+                                  'SuperAdmin',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       InkWell(
                         onTap: () => context.push('/notifications'),
                         borderRadius: BorderRadius.circular(20),
@@ -102,7 +133,9 @@ class HomeScreen extends ConsumerWidget {
                         onTap: () => context.push('/profile'),
                         child: CircleAvatar(
                           radius: 18,
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: userSession.isSuperAdmin
+                              ? const Color(0xFF673AB7)
+                              : AppColors.primary,
                           child: Text(
                             userSession.displayName.isNotEmpty
                                 ? userSession.displayName[0].toUpperCase()
@@ -137,11 +170,13 @@ class HomeScreen extends ConsumerWidget {
                   Text(
                     userSession.isGuest
                         ? (currentLocation.isSet
-                            ? "Guest Mode • Exploring near ${currentLocation.displayTown}"
-                            : "Guest Mode • Tap location above to set your town")
-                        : (currentLocation.isSet
-                            ? "Role: ${userSession.role} • ${currentLocation.displayLocation}"
-                            : "Role: ${userSession.role} • Location Not Set"),
+                            ? "Guest • Exploring near ${currentLocation.displayTown}"
+                            : "Guest • Tap location above to set your town")
+                        : (userSession.isSuperAdmin
+                            ? "SuperAdmin • ${currentLocation.displayLocation}"
+                            : (currentLocation.isSet
+                                ? currentLocation.displayLocation
+                                : "Location Not Set")),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -210,31 +245,37 @@ class HomeScreen extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryTint,
-                                  borderRadius: BorderRadius.circular(8),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryTint,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.insights_rounded,
+                                    color: AppColors.primary,
+                                    size: 16,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.insights_rounded,
-                                  color: AppColors.primary,
-                                  size: 16,
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    "Commodity Price Optimizer",
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              const Text(
-                                "Commodity Price Optimizer",
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 6),
                           const Icon(
                             Icons.chevron_right_rounded,
                             color: AppColors.textSecondary,
@@ -248,12 +289,15 @@ class HomeScreen extends ConsumerWidget {
                           Icon(Icons.shopping_bag_outlined,
                               size: 16, color: AppColors.textSecondary),
                           SizedBox(width: 6),
-                          Text(
-                            'Active Basket: 4 items  •  ₦11,600 est.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                          Expanded(
+                            child: Text(
+                              'Active Basket: 4 items  •  ₦11,600 est.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -261,26 +305,33 @@ class HomeScreen extends ConsumerWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.badgeSuccessBg,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: const [
-                                Icon(Icons.check_circle_outline_rounded,
-                                    size: 12, color: AppColors.primary),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Saves ~₦1,800 across verified local sellers',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primaryDark,
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.badgeSuccessBg,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.check_circle_outline_rounded,
+                                      size: 12, color: AppColors.primary),
+                                  SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'Saves ~₦1,800 across verified local sellers',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primaryDark,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -679,12 +730,14 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Compare Commodity Prices',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                        const Expanded(
+                          child: Text(
+                            'Compare Commodity Prices',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                       ],

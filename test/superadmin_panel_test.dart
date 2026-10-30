@@ -8,6 +8,8 @@ import 'package:smartmove/core/services/auth_service.dart';
 import 'package:smartmove/core/state/app_state.dart';
 import 'package:smartmove/features/admin/presentation/superadmin_panel_screen.dart';
 import 'package:smartmove/features/community/presentation/community_screen.dart';
+import 'package:smartmove/features/home/presentation/home_screen.dart';
+import 'package:smartmove/features/profile/presentation/profile_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -343,6 +345,179 @@ void main() {
 
       expect(find.byType(SuperAdminPanelScreen), findsOneWidget);
       expect(find.text('SuperAdmin Console'), findsOneWidget);
+    });
+
+    testWidgets('11. Customer or Guest accessing SuperAdminPanelScreen sees Access Denied', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Customer session
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'c1',
+              email: 'shopper@test.ng',
+              displayName: 'Shopper Ayo',
+              role: 'Customer',
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: SuperAdminPanelScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Access Denied screen shown
+      expect(find.text('Access Denied — SuperAdmin Privileges Required'), findsOneWidget);
+      expect(find.text('Return to Home'), findsOneWidget);
+      // Governance tabs NOT accessible
+      expect(find.text('Seller Approvals'), findsNothing);
+    });
+
+    testWidgets('12. In ProfileScreen, Customer does not see SuperAdmin role switcher, SuperAdmin does', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Customer session
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'c1',
+              email: 'shopper@test.ng',
+              displayName: 'Shopper Ayo',
+              role: 'Customer',
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: ProfileScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Role switcher is NOT visible for customer
+      expect(find.text('SuperAdmin Role Mode:'), findsNothing);
+      expect(find.text('SuperAdmin Moderation Panel'), findsNothing);
+
+      // Upgrade to SuperAdmin
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'sa1',
+              email: 'super@smartmove.ng',
+              displayName: 'SuperAdmin Chioma',
+              role: 'SuperAdmin',
+            ),
+          );
+      await tester.pumpAndSettle();
+
+      // SuperAdmin sees the switcher and the panel button
+      expect(find.text('SuperAdmin Role Mode:'), findsOneWidget);
+      expect(find.text('Open SuperAdmin Moderation Panel'), findsOneWidget);
+    });
+
+    testWidgets('13. In CommunityScreen, Customer does not see SuperAdmin Simulator', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'c1',
+              email: 'shopper@test.ng',
+              displayName: 'Shopper Ayo',
+              role: 'Customer',
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: CommunityScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap Seller Portal tab
+      await tester.tap(find.text('Seller Portal'));
+      await tester.pumpAndSettle();
+
+      // Simulator is NOT visible for customer
+      expect(find.text('SuperAdmin Simulator: Preview verified seller dashboard.'), findsNothing);
+      expect(find.text('Simulate Seller'), findsNothing);
+
+      // Switch to SuperAdmin
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'sa1',
+              email: 'super@smartmove.ng',
+              displayName: 'SuperAdmin Chioma',
+              role: 'SuperAdmin',
+            ),
+          );
+      await tester.pumpAndSettle();
+
+      // Simulator IS visible for SuperAdmin
+      expect(find.text('SuperAdmin Simulator: Preview verified seller dashboard.'), findsOneWidget);
+      expect(find.text('Simulate Seller'), findsOneWidget);
+    });
+
+    testWidgets('14. In HomeScreen, SuperAdmin sees SuperAdmin chip, Customer does not', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'c1',
+              email: 'shopper@test.ng',
+              displayName: 'Shopper Ayo',
+              role: 'Customer',
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: HomeScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Customer does not see SuperAdmin chip or Role: Customer
+      expect(find.byKey(const ValueKey('btn_superadmin_home_chip')), findsNothing);
+      expect(find.textContaining('Role: Customer'), findsNothing);
+
+      // Switch to SuperAdmin
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'sa1',
+              email: 'super@smartmove.ng',
+              displayName: 'SuperAdmin Chioma',
+              role: 'SuperAdmin',
+            ),
+          );
+      await tester.pumpAndSettle();
+
+      // SuperAdmin chip is present
+      expect(find.byKey(const ValueKey('btn_superadmin_home_chip')), findsOneWidget);
+      expect(find.textContaining('SuperAdmin'), findsWidgets);
     });
   });
 }

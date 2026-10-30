@@ -99,8 +99,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                                 child: Text(
                                   userSession.isGuest
-                                      ? 'Guest (${userSession.role})'
-                                      : userSession.role,
+                                      ? 'Guest'
+                                      : (userSession.isSuperAdmin
+                                          ? 'SuperAdmin'
+                                          : userSession.role),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -147,92 +149,166 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                 ],
-                const Divider(height: 20, color: AppColors.divider),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    const Text(
-                      'Active Role Mode:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                if (userSession.isSuperAdmin) ...[
+                  const Divider(height: 20, color: AppColors.divider),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'SuperAdmin Role Mode:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF673AB7),
+                        ),
                       ),
-                    ),
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('Customer'),
-                          selected: userSession.role == 'Customer',
-                          selectedColor: AppColors.badgeSuccessBg,
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color: userSession.role == 'Customer'
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Customer'),
+                            selected: userSession.role == 'Customer',
+                            selectedColor: AppColors.badgeSuccessBg,
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: userSession.role == 'Customer'
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                ref
+                                    .read(authProvider.notifier)
+                                    .updateRole('Customer');
+                              }
+                            },
                           ),
-                          onSelected: (val) {
-                            if (val) {
-                              ref
-                                  .read(authProvider.notifier)
-                                  .updateRole('Customer');
-                            }
-                          },
-                        ),
-                        ChoiceChip(
-                          label: const Text('Trader / Seller'),
-                          selected: userSession.role == 'Trader',
-                          selectedColor: AppColors.badgeSuccessBg,
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color: userSession.role == 'Trader'
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                          ChoiceChip(
+                            label: const Text('Trader / Seller'),
+                            selected: userSession.role == 'Trader',
+                            selectedColor: AppColors.badgeSuccessBg,
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: userSession.role == 'Trader'
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                ref
+                                    .read(authProvider.notifier)
+                                    .updateRole('Trader');
+                              }
+                            },
                           ),
-                          onSelected: (val) {
-                            if (val) {
-                              ref
-                                  .read(authProvider.notifier)
-                                  .updateRole('Trader');
-                            }
-                          },
-                        ),
-                        ChoiceChip(
-                          label: const Text('Admin'),
-                          selected: userSession.role == 'Admin',
-                          selectedColor: const Color(0xFFEDE7F6),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color: userSession.role == 'Admin'
-                                ? const Color(0xFF673AB7)
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                          ChoiceChip(
+                            label: const Text('Admin'),
+                            selected: userSession.role == 'Admin',
+                            selectedColor: const Color(0xFFEDE7F6),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: userSession.role == 'Admin'
+                                  ? const Color(0xFF673AB7)
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                ref
+                                    .read(authProvider.notifier)
+                                    .updateRole('Admin');
+                              }
+                            },
                           ),
-                          onSelected: (val) {
-                            if (val) {
-                              ref
-                                  .read(authProvider.notifier)
-                                  .updateRole('Admin');
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                          ChoiceChip(
+                            label: const Text('SuperAdmin'),
+                            selected: userSession.role == 'SuperAdmin',
+                            selectedColor: const Color(0xFFFFD54F),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: userSession.role == 'SuperAdmin'
+                                  ? const Color(0xFF1E1145)
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                ref
+                                    .read(authProvider.notifier)
+                                    .updateRole('SuperAdmin');
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // Seller Application Card for Customers (or Pending Status)
-          if (userSession.isCustomer) ...[
+          // Guest Banner vs Seller Application Card for Customers
+          if (userSession.isGuest) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.person_add_outlined,
+                          color: AppColors.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Unlock Full SmartMove Access',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Sign in or create a free account to apply as a verified seller, save itineraries, and contribute verified commodity prices.',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.35),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => context.push('/auth'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Sign In / Register',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else if (userSession.isCustomer) ...[
             if (userSession.canApplyForSeller) ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -487,11 +563,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 20),
 
           // Menu Options List
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
+          Material(
+            color: Colors.white,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.cardBorder),
+              side: const BorderSide(color: AppColors.cardBorder),
             ),
             child: Column(
               children: [
