@@ -6,8 +6,11 @@ import '../models/plan_candidate.dart';
 import '../models/ai_proposal.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'commodity_comparison_service.dart';
 import 'location_service.dart';
+import 'supabase_data_service.dart';
 
 /// User decision priority for multi-criteria seller option analysis
 enum UserDecisionPriority {
@@ -219,6 +222,7 @@ class OnlinePriceResearchPlan {
   final List<String> targetPlatforms;
   final double estimatedBenchmarkMin;
   final double estimatedBenchmarkMax;
+  final String? customRecommendation;
 
   const OnlinePriceResearchPlan({
     required this.commodityName,
@@ -228,13 +232,15 @@ class OnlinePriceResearchPlan {
     required this.targetPlatforms,
     required this.estimatedBenchmarkMin,
     required this.estimatedBenchmarkMax,
+    this.customRecommendation,
   });
 
   String get estimatedPriceRange =>
       '₦${estimatedBenchmarkMin.toStringAsFixed(0)} - ₦${estimatedBenchmarkMax.toStringAsFixed(0)} / $standardizedUnit';
 
   String get recommendation =>
-      'Local open markets like Bodija offer ~₦${estimatedBenchmarkMin.toStringAsFixed(0)} / $standardizedUnit for bulk/cash buyers, while online and supermarket platforms average ~₦${estimatedBenchmarkMax.toStringAsFixed(0)} with door delivery.';
+      customRecommendation ??
+      'Market benchmark range: ₦${estimatedBenchmarkMin.toStringAsFixed(0)} - ₦${estimatedBenchmarkMax.toStringAsFixed(0)} per $standardizedUnit.';
 }
 
 /// Result of evaluating duplicate listing detection
@@ -523,10 +529,114 @@ class MetaAiService {
   final String? apiKey;
   final String? endpoint;
 
+  /// Optional runtime override (useful for testing or dynamic in-app configuration)
+  static String? runtimeApiKey;
+  static String? runtimeEndpoint;
+  static String? _cachedEnvKey;
+
+  static String? _loadKeyFromLocalEnv() {
+    if (kIsWeb) return null;
+    try {
+      if (Platform.environment.containsKey('FLUTTER_TEST')) return null;
+    } catch (_) {}
+    if (_cachedEnvKey != null) return _cachedEnvKey;
+    try {
+      final envFile = File('.env');
+      if (envFile.existsSync()) {
+        final lines = envFile.readAsLinesSync();
+        for (final line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.startsWith('MODEL_API_KEY=')) {
+            final val = trimmed.substring('MODEL_API_KEY='.length).trim();
+            if (val.isNotEmpty) {
+              _cachedEnvKey = val;
+              return val;
+            }
+          }
+          if (trimmed.startsWith('META_API_KEY=')) {
+            final val = trimmed.substring('META_API_KEY='.length).trim();
+            if (val.isNotEmpty) {
+              _cachedEnvKey = val;
+              return val;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   const MetaAiService({
-    this.apiKey = const String.fromEnvironment('META_API_KEY', defaultValue: ''),
-    this.endpoint = const String.fromEnvironment('META_AI_ENDPOINT', defaultValue: ''),
+    this.apiKey,
+    this.endpoint,
   });
+
+  /// Resolves the active Model API key following official dev.meta.ai standards:
+  /// 1. Constructor injected key
+  /// 2. Runtime override (MetaAiService.runtimeApiKey)
+  /// 3. MODEL_API_KEY (Meta standard per dev.meta.ai/docs/quickstart)
+  /// 4. META_API_KEY / META_AI_API_KEY (Project aliases)
+  /// 5. Local .env file fallback
+  String? get effectiveApiKey {
+    if (apiKey != null && apiKey!.isNotEmpty) return apiKey;
+    if (runtimeApiKey != null && runtimeApiKey!.isNotEmpty) return runtimeApiKey;
+    const modelKey = String.fromEnvironment('MODEL_API_KEY', defaultValue: '');
+    if (modelKey.isNotEmpty) return modelKey;
+    const metaKey = String.fromEnvironment('META_API_KEY', defaultValue: '');
+    if (metaKey.isNotEmpty) return metaKey;
+    const legacyKey = String.fromEnvironment('META_AI_API_KEY', defaultValue: '');
+    if (legacyKey.isNotEmpty) return legacyKey;
+    return _loadKeyFromLocalEnv();
+  }
+
+  /// Base URL for Meta Model API (defaults to https://api.meta.ai per dev.meta.ai/docs)
+  String get effectiveEndpoint {
+    final ep = endpoint;
+    if (ep != null && ep.isNotEmpty) {
+      return ep.endsWith('/') ? ep.substring(0, ep.length - 1) : ep;
+    }
+    if (runtimeEndpoint != null && runtimeEndpoint!.isNotEmpty) {
+      return runtimeEndpoint!.endsWith('/')
+          ? runtimeEndpoint!.substring(0, runtimeEndpoint!.length - 1)
+          : runtimeEndpoint!;
+    }
+    const envEndpoint = String.fromEnvironment('META_AI_ENDPOINT', defaultValue: '');
+    if (envEndpoint.isNotEmpty) {
+      return envEndpoint.endsWith('/') ? envEndpoint.substring(0, envEndpoint.length - 1) : envEndpoint;
+    }
+    return 'https://api.meta.ai';
+  }
+
+  /// Whether either direct Meta API credentials OR Supabase Edge Function proxy is available
+  bool get hasValidAuth =>
+      (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) ||
+      SupabaseDataService.isConnected;
+
+  /// Securely invokes the deployed Supabase Edge Function (meta-ai-proxy)
+  /// keeping Meta Model API secrets server-side.
+  Future<dynamic> _invokeEdgeProxy({
+    required String action,
+    required Map<String, dynamic> payload,
+  }) async {
+    final client = SupabaseDataService.client;
+    if (client == null) return null;
+    try {
+      final response = await client.functions.invoke(
+        'meta-ai-proxy',
+        body: {
+          'action': action,
+          'payload': payload,
+        },
+      ).timeout(const Duration(seconds: 25));
+
+      if (response.status == 200 && response.data != null) {
+        return response.data;
+      }
+    } catch (_) {
+      // Supabase Edge Function error or network timeout
+    }
+    return null;
+  }
 
   // --- 1. Muse Voice Transcribe (Speech-to-Text) ---
 
@@ -538,30 +648,57 @@ class MetaAiService {
     String? simulatedVoiceSample,
     VoiceDialect dialect = VoiceDialect.autoDetect,
   }) async {
-    // If a remote server proxy with Muse Voice Transcribe is configured:
-    if (apiKey != null && apiKey!.isNotEmpty && endpoint != null && endpoint!.isNotEmpty) {
+    // If authenticated Meta Model API or proxy is configured:
+    if (hasValidAuth) {
       try {
-        final response = await http
-            .post(
-              Uri.parse('$endpoint/v1/audio/transcriptions'),
-              headers: {
-                'Authorization': 'Bearer $apiKey',
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode({
-                'model': 'muse-voice-transcribe-1.0',
-                'language': dialect.languageCode,
-                'task': 'transcribe',
-                'prompt':
-                    'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
-              }),
-            )
-            .timeout(const Duration(seconds: 4));
+        dynamic data;
+        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+          final uri = Uri.parse('$effectiveEndpoint/v1/asr/transcribe');
+          final response = await http
+              .post(
+                uri,
+                headers: {
+                  'Authorization': 'Bearer $effectiveApiKey',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode({
+                  'model': 'muse-voice-transcribe-1.0',
+                  'language': dialect.languageCode,
+                  'mode': 'PUSH_TO_TALK',
+                  'task': 'transcribe',
+                  'prompt':
+                      'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
+                }),
+              )
+              .timeout(const Duration(seconds: 25));
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data is Map && data['text'] != null) {
-            final transcribedText = data['text'].toString();
+          if (response.statusCode == 200) {
+            data = jsonDecode(response.body);
+          }
+        } else if (SupabaseDataService.isConnected) {
+          data = await _invokeEdgeProxy(
+            action: 'transcribe',
+            payload: {
+              if (audioBytes != null) 'audioBase64': base64Encode(audioBytes),
+              'language': dialect.languageCode,
+              'mode': 'PUSH_TO_TALK',
+              'prompt':
+                  'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
+            },
+          );
+        }
+
+        if (data is Map) {
+          String? transcribedText;
+          if (data['turns'] is List && (data['turns'] as List).isNotEmpty) {
+            transcribedText = (data['turns'] as List)
+                .map((t) => t is Map ? (t['transcript'] ?? t['text'] ?? '') : '')
+                .where((s) => s.toString().isNotEmpty)
+                .join(' ');
+          } else {
+            transcribedText = (data['text'] ?? data['transcript'])?.toString();
+          }
+          if (transcribedText != null && transcribedText.isNotEmpty) {
             final resolvedDialect = (dialect == VoiceDialect.autoDetect)
                 ? detectDialect(transcribedText)
                 : dialect;
@@ -850,60 +987,68 @@ class MetaAiService {
       );
     }
 
-    // 2. If remote Meta AI endpoint is configured and imageBytes provided, attempt multimodal vision inference
-    if (apiKey != null &&
-        apiKey!.isNotEmpty &&
-        endpoint != null &&
-        endpoint!.isNotEmpty &&
-        imageBytes != null &&
-        imageBytes.isNotEmpty) {
+    // 2. If authenticated Meta AI endpoint or Edge Proxy is configured and imageBytes provided, attempt multimodal vision inference
+    if (hasValidAuth && imageBytes != null && imageBytes.isNotEmpty) {
       try {
         final base64Image = base64Encode(imageBytes);
-        final response = await http
-            .post(
-              Uri.parse('$endpoint/v1/chat/completions'),
-              headers: {
-                'Authorization': 'Bearer $apiKey',
-                'Content-Type': 'application/json',
-              },
-              body: jsonEncode({
-                'model': 'muse-spark-1.3',
-                'messages': [
-                  {
-                    'role': 'system',
-                    'content':
-                        'You are Meta Muse Spark Vision for SmartMove. You examine photographed handwritten or printed paper shopping lists in Nigeria / West Africa. Transcribe the handwritten lines and extract budget, shopping items (name, quantity, unit, estimatedUnitPrice, brandOrGrade), and return valid JSON with keys: "transcription", "lines", "budget", "shopping_items".',
-                  },
-                  {
-                    'role': 'user',
-                    'content': [
-                      {
-                        'type': 'text',
-                        'text':
-                            'Transcribe and extract this handwritten paper shopping note into structured commodity items and budget.',
-                      },
-                      {
-                        'type': 'image_url',
-                        'image_url': {
-                          'url': 'data:image/jpeg;base64,$base64Image',
-                        },
-                      },
-                    ],
-                  },
-                ],
-                'temperature': 0.1,
-              }),
-            )
-            .timeout(const Duration(seconds: 5));
+        dynamic body;
 
-        if (response.statusCode == 200) {
-          final body = jsonDecode(response.body);
+        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+          final response = await http
+              .post(
+                Uri.parse('$effectiveEndpoint/v1/chat/completions'),
+                headers: {
+                  'Authorization': 'Bearer $effectiveApiKey',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode({
+                  'model': 'muse-spark-1.3',
+                  'messages': [
+                    {
+                      'role': 'system',
+                      'content':
+                          'You are Meta Muse Spark Vision for SmartMove. You examine photographed handwritten or printed paper shopping lists in Nigeria / West Africa. Transcribe the handwritten lines and extract budget, shopping items (name, quantity, unit, estimatedUnitPrice, brandOrGrade), and return valid JSON with keys: "transcription", "lines", "budget", "shopping_items".',
+                    },
+                    {
+                      'role': 'user',
+                      'content': [
+                        {
+                          'type': 'text',
+                          'text':
+                              'Transcribe and extract this handwritten paper shopping note into structured commodity items and budget.',
+                        },
+                        {
+                          'type': 'image_url',
+                          'image_url': {
+                            'url': 'data:image/jpeg;base64,$base64Image',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  'temperature': 0.1,
+                }),
+              )
+              .timeout(const Duration(seconds: 30));
+
+          if (response.statusCode == 200) {
+            body = jsonDecode(response.body);
+          }
+        } else if (SupabaseDataService.isConnected) {
+          body = await _invokeEdgeProxy(
+            action: 'vision',
+            payload: {'imageBase64': base64Image},
+          );
+        }
+
+        if (body is Map) {
           final content = body['choices']?[0]?['message']?['content'];
           if (content != null) {
-            final parsedJson = jsonDecode(content);
-            if (parsedJson is Map<String, dynamic>) {
-              final transcription = parsedJson['transcription']?.toString() ?? '';
-              final linesRaw = parsedJson['lines'] as List<dynamic>?;
+            final parsedJson = content is Map ? content : jsonDecode(content.toString());
+            if (parsedJson is Map<String, dynamic> || parsedJson is Map) {
+              final jsonMap = Map<String, dynamic>.from(parsedJson as Map);
+              final transcription = jsonMap['transcription']?.toString() ?? '';
+              final linesRaw = jsonMap['lines'] as List<dynamic>?;
               final lines = linesRaw?.map((l) => l.toString()).toList() ??
                   transcription.split('\n').where((l) => l.trim().isNotEmpty).toList();
 
@@ -1038,36 +1183,78 @@ class MetaAiService {
       );
     }
 
-    // If an external Muse Spark endpoint/proxy is configured, attempt remote inference
-    if (apiKey != null && apiKey!.isNotEmpty && endpoint != null && endpoint!.isNotEmpty) {
+    // If authenticated Meta Model API or Supabase Edge Proxy is configured, attempt remote inference
+    if (hasValidAuth) {
       try {
-        final response = await http
-            .post(
-              Uri.parse('$endpoint/v1/chat/completions'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $apiKey',
-              },
-              body: jsonEncode({
-                'model': 'muse-spark-1.3',
-                'messages': [
-                  {
-                    'role': 'system',
-                    'content':
-                        'You are Meta Muse Spark for SmartMove. Extract budget, shopping items (name, quantity, unit, estimatedUnitPrice), deadline errand (title, deadline, locationName), and planning preferences into valid JSON.',
-                  },
-                  {'role': 'user', 'content': sanitizedPrompt}
-                ],
-                'temperature': 0.1,
-              }),
-            )
-            .timeout(const Duration(seconds: 4));
+        dynamic body;
+        int? statusCode;
 
-        if (response.statusCode == 200) {
-          final body = jsonDecode(response.body);
+        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+          try {
+            final response = await http
+                .post(
+                  Uri.parse('$effectiveEndpoint/v1/chat/completions'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $effectiveApiKey',
+                  },
+                  body: jsonEncode({
+                    'model': 'muse-spark-1.3',
+                    'messages': [
+                      {
+                        'role': 'system',
+                        'content':
+                            'You are Meta Muse Spark for SmartMove. Extract budget, shopping items (name, quantity, unit, estimated_unit_price, brand_or_grade), deadline errand (title, deadline, locationName), and planning preferences into valid JSON.\n'
+                            'INTELLIGENT CONCISE & BUNDLE PROMPT HANDLING:\n'
+                            'Users often provide concise, high-level, or bundle prompts (e.g., "i need to buy a set of stationaries", "toiletries", "lathe spare parts", "soup ingredients", "breakfast pack").\n'
+                            '1. When given concise, category, or bundle requests, intelligently decompose them into essential constituent items with realistic default quantities, units, and Nigerian market benchmark prices in Naira.\n'
+                            '2. If no budget is explicitly mentioned, infer a realistic budget based on the extracted basket plus transit buffer.\n'
+                            '3. Only create a deadline errand if the user explicitly mentioned a time-sensitive external errand (e.g., pickup package, visit mechanic before 2 PM). Do not duplicate shopping items as deadline errands.\n'
+                            '4. Output ONLY valid JSON with keys: "budget", "shopping_items" (array of {name, quantity, unit, estimated_unit_price, brand_or_grade}), and optional "deadline_errand".\n'
+                            'ACCURACY & GROUNDING CONSTRAINTS:\n'
+                            '- NEVER hallucinate non-existent, mangled, or absurd items or units (NEVER output things like "soluble lathe" or "litters").\n'
+                            '- For hardware, machinery, automotive, and industrial spare parts (e.g. lathe spare parts, drill bits, bearings, motor components, spark plugs, brake pads), extract real, standard mechanical components (e.g. "Lathe Cutting Tool Bits Set", "Lathe Chuck / Faceplate Spare", "Carbide Turning Inserts Pack") with proper engineering units ("piece", "set", "pack", "unit") and realistic Nigerian industrial market benchmark prices.\n'
+                            '- For cooking oil, use "Vegetable Oil" or "Palm Oil"; never confuse industrial lubricants or machine fluids with cooking oils.',
+                      },
+                      {'role': 'user', 'content': sanitizedPrompt}
+                    ],
+                    'temperature': 0.1,
+                  }),
+                )
+                .timeout(const Duration(seconds: 25));
+
+            statusCode = response.statusCode;
+            if (response.statusCode == 200) {
+              body = jsonDecode(response.body);
+            }
+          } catch (_) {
+            // Direct call failed or timed out; try Edge Proxy if connected
+            if (SupabaseDataService.isConnected) {
+              body = await _invokeEdgeProxy(
+                action: 'parse_request',
+                payload: {
+                  'prompt': sanitizedPrompt,
+                  'contextRecords': const [],
+                },
+              );
+              if (body != null) statusCode = 200;
+            }
+          }
+        } else if (SupabaseDataService.isConnected) {
+          body = await _invokeEdgeProxy(
+            action: 'parse_request',
+            payload: {
+              'prompt': sanitizedPrompt,
+              'contextRecords': const [],
+            },
+          );
+          if (body != null) statusCode = 200;
+        }
+
+        if (body is Map) {
           final content = body['choices']?[0]?['message']?['content'];
           if (content != null) {
-            final parsedJson = jsonDecode(content);
+            final parsedJson = content is Map ? content : jsonDecode(content.toString());
             final validated = validateProposal(
               parsedJson,
               sanitizedPrompt,
@@ -1080,7 +1267,7 @@ class MetaAiService {
         }
         return AiPlanProposal.error(
           message:
-              'Meta AI cloud service returned an error (HTTP ${response.statusCode}). Please enter your commodities manually in Price Lab.',
+              'Meta AI cloud service returned an error (HTTP ${statusCode ?? 'unavailable'}). Please enter your commodities manually in Price Lab.',
           rawInput: sanitizedPrompt,
         );
       } catch (err) {
@@ -1128,19 +1315,32 @@ class MetaAiService {
 
       if (itemsRaw != null) {
         for (final item in itemsRaw) {
-          if (item is Map<String, dynamic>) {
-            final name = item['name']?.toString().trim();
-            final quantity = (item['quantity'] as num?)?.toDouble() ?? 1.0;
-            final unit = item['unit']?.toString().trim() ?? 'item';
-            final price = (item['estimated_unit_price'] as num?)?.toDouble() ?? 1000.0;
+          if (item is Map) {
+            final itemMap = Map<String, dynamic>.from(item);
+            final name = (itemMap['name'] ?? itemMap['productName'] ?? itemMap['item'])?.toString().trim();
+            final quantity = (itemMap['quantity'] as num?)?.toDouble() ?? 1.0;
+            final unit = (itemMap['unit'] ?? itemMap['unitType'] ?? itemMap['standardUnit'])?.toString().trim() ?? 'item';
+            final price = (itemMap['estimated_unit_price'] ?? itemMap['estimatedUnitPrice'] ?? itemMap['price'] as num?)?.toDouble() ?? 1000.0;
+            final brand = (itemMap['brand_or_grade'] ?? itemMap['brandOrGrade'] ?? itemMap['brand'])?.toString().trim();
 
             if (name != null && name.isNotEmpty && quantity > 0) {
+              String cleanedName = name;
+              String cleanedUnit = unit;
+              if (cleanedName.toLowerCase().contains('soluble lathe')) {
+                cleanedName = 'Lathe Machine Spare Tooling Parts';
+                cleanedUnit = 'set';
+              }
+              if (cleanedUnit.toLowerCase() == 'litters' || cleanedUnit.toLowerCase() == 'litter') {
+                cleanedUnit = 'liters';
+              }
+
               validatedItems.add(
                 ShoppingItem(
-                  id: 'si-${name.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}',
-                  productName: name,
+                  id: 'si-${cleanedName.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}',
+                  productName: cleanedName,
+                  brandOrGrade: brand,
                   quantity: quantity,
-                  unit: unit,
+                  unit: cleanedUnit,
                   estimatedUnitPrice: price,
                 ),
               );
@@ -1150,17 +1350,34 @@ class MetaAiService {
       }
 
       Errand? errand;
-      final errandRaw = json['deadline_errand'] as Map<String, dynamic>?;
+      final errandRaw = (json['deadline_errand'] != null && json['deadline_errand'] is Map)
+          ? Map<String, dynamic>.from(json['deadline_errand'] as Map)
+          : null;
       if (errandRaw != null && errandRaw['title'] != null) {
-        errand = Errand(
-          id: 'e-ai-${DateTime.now().millisecondsSinceEpoch}',
-          title: errandRaw['title'].toString(),
-          locationName: errandRaw['location']?.toString() ?? 'Service Point',
-          scheduledTime: errandRaw['scheduled_time']?.toString() ?? '11:00 AM',
-          deadline: errandRaw['deadline']?.toString() ?? '2:00 PM',
-          priority: ErrandPriority.high,
-          category: errandRaw['category']?.toString() ?? 'pickup',
-        );
+        final title = errandRaw['title'].toString().trim();
+        final rawDeadline = errandRaw['deadline']?.toString();
+        final hasRealDeadline = rawDeadline != null &&
+            rawDeadline.isNotEmpty &&
+            rawDeadline != 'null' &&
+            rawDeadline != 'None';
+        final isShoppingEcho = title.toLowerCase().startsWith('buy ') ||
+            title.toLowerCase().startsWith('purchase ') ||
+            title.toLowerCase().startsWith('get ');
+
+        // Only register as an errand if it's a real deadline or an actual external task
+        if (!isShoppingEcho || hasRealDeadline) {
+          errand = Errand(
+            id: 'e-ai-${DateTime.now().millisecondsSinceEpoch}',
+            title: title,
+            locationName: errandRaw['locationName']?.toString() ??
+                errandRaw['location']?.toString() ??
+                'Service Point',
+            scheduledTime: errandRaw['scheduled_time']?.toString() ?? '11:00 AM',
+            deadline: hasRealDeadline ? rawDeadline : '2:00 PM',
+            priority: ErrandPriority.high,
+            category: errandRaw['category']?.toString() ?? 'pickup',
+          );
+        }
       }
 
       if (validatedItems.isEmpty) {
@@ -1234,10 +1451,28 @@ class MetaAiService {
             field: 'quantity_${item.productName}',
             question:
                 'Did you need 1 crate of eggs or individual pieces?',
-            suggestions: ['1 Crate (30 eggs)', '10 pieces', '1 Roll'],
+            suggestions: const ['1 Crate (30 eggs)', '10 pieces', '1 Roll'],
           ),
         );
       }
+    }
+
+    // 4. Bundle / Category Expansion Confirmation
+    if (lower.contains('stationar') ||
+        lower.contains('stationer') ||
+        lower.contains('toiletr') ||
+        lower.contains('breakfast') ||
+        lower.contains('soup ingredient') ||
+        lower.contains('baby suppl') ||
+        lower.contains('cleaning suppl')) {
+      questions.add(
+        const ClarificationQuestion(
+          field: 'bundle_confirmation',
+          question:
+              'We expanded your category request into an essential basket. You can adjust quantities or remove items before confirming.',
+          suggestions: ['Looks good', 'Adjust quantities', 'Add more items'],
+        ),
+      );
     }
 
     return questions;
@@ -1295,26 +1530,34 @@ class MetaAiService {
 
     // 1. Extract Budget
     double budget = 15000.0;
+    bool hasExplicitBudget = false;
     // 1a. Regional dialect numeral markers
     if (lower.contains('ẹgbẹ̀rún mẹ́ẹ̀ẹ́dógún') ||
         lower.contains('egberun meedogun') ||
         lower.contains('dubu goma sha biyar') ||
         lower.contains('puku iri na ise') ||
+        lower.contains('puku naira iri na ise') ||
         lower.contains('fifteen thousand')) {
       budget = 15000.0;
+      hasExplicitBudget = true;
     } else if (lower.contains('ẹgbẹ̀rún mẹ́wàá') ||
         lower.contains('egberun mewaa') ||
         lower.contains('dubu goma') ||
         lower.contains('puku iri') ||
+        lower.contains('puku naira iri') ||
         lower.contains('ten thousand')) {
       budget = 10000.0;
+      hasExplicitBudget = true;
     } else if (lower.contains('ẹgbẹ̀rún ogún') ||
         lower.contains('egberun ogun') ||
         lower.contains('dubu ashirin') ||
         lower.contains('puku iri abụọ') ||
         lower.contains('puku iri abuo') ||
+        lower.contains('puku naira iri abụọ') ||
+        lower.contains('puku naira iri abuo') ||
         lower.contains('twenty thousand')) {
       budget = 20000.0;
+      hasExplicitBudget = true;
     } else {
       // 1b. Explicit Naira symbol: ₦25,000 or ₦ 15000 or NGN 20,000
       final nairaMatch = RegExp(r'(?:₦|ngn)\s*(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower);
@@ -1326,13 +1569,22 @@ class MetaAiService {
 
       if (nairaMatch != null) {
         final val = double.tryParse(nairaMatch.group(1)!.replaceAll(',', ''));
-        if (val != null && val >= 500) budget = val;
+        if (val != null && val >= 500) {
+          budget = val;
+          hasExplicitBudget = true;
+        }
       } else if (keywordMatch != null) {
         final val = double.tryParse(keywordMatch.group(1)!.replaceAll(',', ''));
-        if (val != null && val >= 500) budget = val;
+        if (val != null && val >= 500) {
+          budget = val;
+          hasExplicitBudget = true;
+        }
       } else if (kMatch != null) {
         final val = double.tryParse(kMatch.group(1)!);
-        if (val != null) budget = val * 1000;
+        if (val != null) {
+          budget = val * 1000;
+          hasExplicitBudget = true;
+        }
       }
     }
 
@@ -1568,6 +1820,126 @@ class MetaAiService {
         aliases: ['paint'],
         regex: '$qtyToken\\s*(?:tin|bucket)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}paint',
       ),
+      'notebook': (
+        name: 'A4 Notebooks',
+        unit: 'pcs',
+        defaultQty: 2.0,
+        price: 1500.0,
+        aliases: ['notebook', 'notebooks', 'exercise book', 'exercise books', 'spiral notebook'],
+        regex: '$qtyToken\\s*(?:pcs|piece|pieces|book|books)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:notebook|notebooks|exercise\\s*book|spiral\\s*notebook)',
+      ),
+      'pen': (
+        name: 'Ballpoint Pens',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 1500.0,
+        aliases: ['pen', 'pens', 'biro', 'biros'],
+        regex: '$qtyToken\\s*(?:pack|packs|pcs|pieces)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:pen|pens|biro|biros)',
+      ),
+      'pencil': (
+        name: 'HB Pencils',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 800.0,
+        aliases: ['pencil', 'pencils', 'eraser'],
+        regex: '$qtyToken\\s*(?:pack|packs|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:pencil|pencils|eraser)',
+      ),
+      'maths set': (
+        name: 'Mathematical Set',
+        unit: 'set',
+        defaultQty: 1.0,
+        price: 2200.0,
+        aliases: ['maths set', 'mathematical set', 'ruler'],
+        regex: '$qtyToken\\s*(?:set|sets|piece)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:maths\\s*set|mathematical\\s*set|ruler)',
+      ),
+      'paper': (
+        name: 'A4 Printing Paper',
+        unit: 'ream',
+        defaultQty: 1.0,
+        price: 5500.0,
+        aliases: ['a4 paper', 'printing paper', 'ream of paper'],
+        regex: '$qtyToken\\s*(?:ream|reams|pack)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:a4\\s*paper|printing\\s*paper|ream\\s*of\\s*paper)',
+      ),
+      'tissue': (
+        name: 'Toilet Tissue',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 2200.0,
+        aliases: ['tissue', 'toilet paper', 'toilet roll'],
+        regex: '$qtyToken\\s*(?:pack|packs|roll|rolls)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:tissue|toilet\\s*paper|toilet\\s*roll)',
+      ),
+      'diaper': (
+        name: 'Baby Diapers',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 6500.0,
+        aliases: ['diaper', 'diapers', 'pampers', 'molfix'],
+        regex: '$qtyToken\\s*(?:pack|packs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:diaper|diapers|pampers|molfix)',
+      ),
+      'electric cooker': (
+        name: 'Electric Cooker',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 35000.0,
+        aliases: ['electric cooker', 'hot plate', 'electric hot plate', 'induction cooker'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:electric\\s*cooker|hot\\s*plate|induction\\s*cooker)',
+      ),
+      'gas cooker': (
+        name: 'Gas Cooker',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 42000.0,
+        aliases: ['gas cooker', 'table top cooker', 'camping gas'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:gas\\s*cooker|table\\s*top\\s*cooker)',
+      ),
+      'rice cooker': (
+        name: 'Rice Cooker',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 28000.0,
+        aliases: ['rice cooker'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}rice\\s*cooker',
+      ),
+      'blender': (
+        name: 'Kitchen Blender',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 18500.0,
+        aliases: ['blender', 'food processor', 'grinder'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:blender|food\\s*processor|grinder)',
+      ),
+      'electric kettle': (
+        name: 'Electric Kettle',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 9500.0,
+        aliases: ['electric kettle', 'jug kettle', 'kettle'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:electric\\s*kettle|jug\\s*kettle|kettle)',
+      ),
+      'iron': (
+        name: 'Electric Pressing Iron',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 12000.0,
+        aliases: ['pressing iron', 'electric iron', 'steam iron'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:pressing\\s*iron|electric\\s*iron|steam\\s*iron)',
+      ),
+      'microwave': (
+        name: 'Microwave Oven',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 65000.0,
+        aliases: ['microwave', 'microwave oven'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:microwave|microwave\\s*oven)',
+      ),
+      'fan': (
+        name: 'Standing Fan',
+        unit: 'unit',
+        defaultQty: 1.0,
+        price: 22000.0,
+        aliases: ['standing fan', 'table fan', 'ceiling fan', 'rechargeable fan'],
+        regex: '$qtyToken\\s*(?:unit|units|pcs)?\\s*(?:of\\s*)?(?:[a-z0-9\\-()]+\\s+){0,4}(?:standing\\s*fan|table\\s*fan|ceiling\\s*fan|rechargeable\\s*fan)',
+      ),
     };
 
     // First, scan for known commodities (recognizing English and regional dialect aliases)
@@ -1577,6 +1949,11 @@ class MetaAiService {
           entry.value.aliases.any((alias) => lower.contains(alias));
 
       if (isMatched) {
+        // Prevent generic grain rice from matching when "rice cooker" is requested
+        if (entry.key == 'rice' && (lower.contains('rice cooker') || lower.contains('rice-cooker'))) {
+          continue;
+        }
+
         // Prevent generic cooking oil from duplicating when palm oil is explicitly detected
         if (entry.key == 'oil' && matchedCommodityNames.contains('Palm Oil')) {
           if (!lower.contains('cooking oil') &&
@@ -1747,6 +2124,461 @@ class MetaAiService {
       }
     }
 
+    // 2b. Intelligent Bundle & Everyday Category Expansion
+    // When users provide concise category prompts like "set of stationaries", "toiletries", "soup ingredients", etc.
+    String? detectedBundleName;
+
+    if (lower.contains('stationar') ||
+        lower.contains('stationer') ||
+        lower.contains('school suppl') ||
+        lower.contains('writing material') ||
+        lower.contains('office suppl')) {
+      detectedBundleName = 'Stationery Essentials';
+      final bundlePack = [
+        ShoppingItem(
+          id: 'si-stationery-notebooks',
+          productName: 'A4 Exercise Notebooks (80 Leaves)',
+          brandOrGrade: 'Standard Ruled',
+          quantity: 4.0,
+          unit: 'notebooks',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 1200.0,
+          specification: 'Higher education 80-leaves exercise notebooks',
+          preferredSellerType: 'SMB Store',
+          acceptableAlternatives: ['Spiral Notebooks', 'Hardcover Journal'],
+        ),
+        ShoppingItem(
+          id: 'si-stationery-pens',
+          productName: 'Ballpoint Pens Pack (Blue & Black)',
+          brandOrGrade: 'Bic / Reynolds',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 1500.0,
+          specification: 'Smooth-writing 0.7mm ballpoint pens (pack of 10)',
+          preferredSellerType: 'SMB Store',
+          acceptableAlternatives: ['Cello Gripper', 'Schneider'],
+        ),
+        ShoppingItem(
+          id: 'si-stationery-maths-set',
+          productName: 'Mathematical Set & Ruler',
+          brandOrGrade: 'Helix / Oxford Standard',
+          quantity: 1.0,
+          unit: 'set',
+          standardizedUnit: 'set',
+          estimatedUnitPrice: 2200.0,
+          specification: 'Complete geometry set with 30cm ruler, compass, protractor',
+          preferredSellerType: 'SMB Store',
+          acceptableAlternatives: ['Keyroad Geometry Set'],
+        ),
+        ShoppingItem(
+          id: 'si-stationery-pencils',
+          productName: 'HB Pencils & Erasers',
+          brandOrGrade: 'Staedtler / Standard',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 800.0,
+          specification: 'Pack of 6 HB pencils with dust-free eraser',
+          preferredSellerType: 'SMB Store',
+          acceptableAlternatives: ['Faber-Castell Pack'],
+        ),
+        ShoppingItem(
+          id: 'si-stationery-highlighters',
+          productName: 'Highlighters & Sticky Notes',
+          brandOrGrade: 'Standard Office',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 1400.0,
+          specification: 'Assorted pastel highlighters with 3x3 sticky notes pad',
+          preferredSellerType: 'SMB Store',
+          acceptableAlternatives: ['Deli Highlighter Set'],
+        ),
+      ];
+      for (final bi in bundlePack) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    } else if (lower.contains('toiletr') ||
+        lower.contains('personal hygiene') ||
+        lower.contains('bathroom essential') ||
+        lower.contains('hygiene kit')) {
+      detectedBundleName = 'Toiletries & Hygiene Essentials';
+      final bundlePack = [
+        ShoppingItem(
+          id: 'si-toiletries-soap',
+          productName: 'Bath Soap (Multi-pack)',
+          brandOrGrade: 'Dettol / Premier',
+          quantity: 3.0,
+          unit: 'bars',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 650.0,
+          specification: 'Antibacterial daily bathing soap bars',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-toiletries-oral',
+          productName: 'Toothpaste & Toothbrush Combo',
+          brandOrGrade: 'Oral-B / CloseUp',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 1800.0,
+          specification: '140g herbal toothpaste with medium-bristle toothbrush',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-toiletries-tissue',
+          productName: 'Toilet Tissue Rolls',
+          brandOrGrade: 'Rose Belle / Bel Impex',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 2200.0,
+          specification: 'Pack of 4 soft 2-ply embossed bathroom tissue rolls',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-toiletries-lotion',
+          productName: 'Moisturizing Body Lotion',
+          brandOrGrade: 'Nivea / Vaseline',
+          quantity: 1.0,
+          unit: 'bottle',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 3500.0,
+          specification: '400ml daily hydrating body lotion',
+          preferredSellerType: 'SMB Store',
+        ),
+      ];
+      for (final bi in bundlePack) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    } else if (lower.contains('breakfast') ||
+        lower.contains('morning tea') ||
+        lower.contains('provisions pack')) {
+      detectedBundleName = 'Breakfast & Provisions Pack';
+      final bundlePack = [
+        ShoppingItem(
+          id: 'si-breakfast-bread',
+          productName: 'Sliced Bread',
+          brandOrGrade: 'Standard Bakery Fresh',
+          quantity: 1.0,
+          unit: 'loaf',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 1400.0,
+          specification: 'Family-size sliced sandwich bread',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-breakfast-milk',
+          productName: 'Evaporated Milk',
+          brandOrGrade: 'Peak / Three Crowns',
+          quantity: 2.0,
+          unit: 'tin',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 1200.0,
+          specification: '160g rich filled evaporated milk tins',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-breakfast-eggs',
+          productName: 'Eggs',
+          brandOrGrade: 'Farm Fresh Medium',
+          quantity: 1.0,
+          unit: 'crate',
+          standardizedUnit: 'crate',
+          estimatedUnitPrice: 5200.0,
+          specification: '1 crate (30 pieces) fresh farm table eggs',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-breakfast-sugar',
+          productName: 'Granulated Sugar',
+          brandOrGrade: 'Dangote Fortified',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 1300.0,
+          specification: '500g refined granulated white sugar',
+          preferredSellerType: 'SMB Store',
+        ),
+      ];
+      for (final bi in bundlePack) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    } else if (lower.contains('soup ingredient') ||
+        lower.contains('soup foodstuff') ||
+        lower.contains('stew ingredient') ||
+        lower.contains('pot of soup') ||
+        lower.contains('jollof ingredient')) {
+      detectedBundleName = 'Soup & Cooking Essentials';
+      final bundlePack = [
+        ShoppingItem(
+          id: 'si-soup-tomatoes',
+          productName: 'Tomatoes',
+          brandOrGrade: 'Jos Round Fresh',
+          quantity: 2.0,
+          unit: 'kg',
+          standardizedUnit: 'kg',
+          estimatedUnitPrice: 1100.0,
+          specification: 'Fresh firm round stew tomatoes',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-soup-pepper',
+          productName: 'Pepper',
+          brandOrGrade: 'Fresh Ata Rodo',
+          quantity: 1.0,
+          unit: 'kg',
+          standardizedUnit: 'kg',
+          estimatedUnitPrice: 1200.0,
+          specification: 'Fresh scotch bonnet soup pepper',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-soup-onions',
+          productName: 'Onions',
+          brandOrGrade: 'Red Dry Onions',
+          quantity: 1.0,
+          unit: 'kg',
+          standardizedUnit: 'kg',
+          estimatedUnitPrice: 1500.0,
+          specification: 'Medium dried red cooking onions',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-soup-palm-oil',
+          productName: 'Palm Oil',
+          brandOrGrade: 'Pure Omuo-Ekiti Grade',
+          quantity: 1.0,
+          unit: 'L',
+          standardizedUnit: 'L',
+          estimatedUnitPrice: 2400.0,
+          specification: '1 Liter unadulterated red palm oil bottle',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-soup-beef',
+          productName: 'Beef',
+          brandOrGrade: 'Fresh Lean Cut',
+          quantity: 1.0,
+          unit: 'kg',
+          standardizedUnit: 'kg',
+          estimatedUnitPrice: 4500.0,
+          specification: '1kg fresh butchered beef pieces',
+          preferredSellerType: 'Local Market',
+        ),
+      ];
+      for (final bi in bundlePack) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    } else if (lower.contains('baby suppl') ||
+        lower.contains('baby item') ||
+        lower.contains('baby stuff') ||
+        lower.contains('infant care')) {
+      detectedBundleName = 'Baby Care Essentials';
+      final bundlePack = [
+        ShoppingItem(
+          id: 'si-baby-diapers',
+          productName: 'Baby Diapers (Economy Pack)',
+          brandOrGrade: 'Molfix / Pampers',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 6500.0,
+          specification: 'Size 3/4 midi breathable tape diapers',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-baby-wipes',
+          productName: 'Baby Gentle Wet Wipes',
+          brandOrGrade: 'Huggies / Molfix',
+          quantity: 2.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 1400.0,
+          specification: '80-sheet fragrance-free moisturizing wipes',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-baby-formula',
+          productName: 'Baby Cereal / Formula',
+          brandOrGrade: 'Cerelac / NAN',
+          quantity: 1.0,
+          unit: 'tin',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 4800.0,
+          specification: '400g infant cereal nutrition tin',
+          preferredSellerType: 'SMB Store',
+        ),
+      ];
+      for (final bi in bundlePack) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    } else if (lower.contains('cleaning suppl') ||
+        lower.contains('cleaning item') ||
+        lower.contains('house cleaning') ||
+        lower.contains('laundry suppl')) {
+      detectedBundleName = 'Cleaning & Laundry Essentials';
+      final bundlePack = [
+        ShoppingItem(
+          id: 'si-clean-detergent',
+          productName: 'Washing Detergent Powder',
+          brandOrGrade: 'Omo / Ariel Multipurpose',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'pack',
+          estimatedUnitPrice: 1600.0,
+          specification: '900g concentrated enzyme active foam detergent',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-clean-soap',
+          productName: 'Multipurpose Bar Soap',
+          brandOrGrade: 'Canoe / Key Laundry',
+          quantity: 2.0,
+          unit: 'bars',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 650.0,
+          specification: 'Traditional laundry bar soap for washing',
+          preferredSellerType: 'SMB Store',
+        ),
+        ShoppingItem(
+          id: 'si-clean-disinfectant',
+          productName: 'Surface Disinfectant Cleaner',
+          brandOrGrade: 'Hypo / Jik Bleach',
+          quantity: 1.0,
+          unit: 'bottle',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 2400.0,
+          specification: '1 Liter germicidal surface disinfectant cleaner',
+          preferredSellerType: 'SMB Store',
+        ),
+      ];
+      for (final bi in bundlePack) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    }
+
+    if (lower.contains('lathe') ||
+        lower.contains('machinery spare') ||
+        lower.contains('machine part') ||
+        lower.contains('lathe part')) {
+      detectedBundleName = 'Lathe Machine Spares & Tooling';
+      final latheBundle = [
+        ShoppingItem(
+          id: 'si-lathe-tool-bits',
+          productName: 'Lathe High-Speed Steel (HSS) Tool Bits Set',
+          brandOrGrade: 'Industrial Grade M2',
+          quantity: 1.0,
+          unit: 'set',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 14500.0,
+          specification: 'Set of high-speed steel ground turning tool bits for metal lathe',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-lathe-carbide-inserts',
+          productName: 'Indexable Carbide Turning Inserts Pack',
+          brandOrGrade: 'Carbide Coated',
+          quantity: 1.0,
+          unit: 'pack',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 18000.0,
+          specification: 'Indexable triangular/diamond carbide inserts for precision turning',
+          preferredSellerType: 'Local Market',
+        ),
+        ShoppingItem(
+          id: 'si-lathe-chuck-spares',
+          productName: 'Lathe Chuck / Faceplate Spare',
+          brandOrGrade: 'OEM Standard',
+          quantity: 1.0,
+          unit: 'piece',
+          standardizedUnit: 'unit',
+          estimatedUnitPrice: 38000.0,
+          specification: 'Hardened steel 3-jaw / 4-jaw replacement lathe chuck & key',
+          preferredSellerType: 'Local Market',
+        ),
+      ];
+      for (final bi in latheBundle) {
+        if (!matchedCommodityNames.contains(bi.productName)) {
+          items.add(bi);
+          matchedCommodityNames.add(bi.productName);
+        }
+      }
+    }
+
+    // 2c. Dynamic Heuristic Extraction for concise single-item shopping prompts
+    if (items.isEmpty) {
+      final buyMatch = RegExp(
+        r'(?:i\s+need(?:\s+to)?\s+buy|i\s+want(?:\s+to)?\s+buy|\bbuy\b|\bget\b|\bpurchase\b|\blooking\s+for\b|\border\b|\bsearch\s+for\b|\bsearch\b|\bfind\b)\s+(?:a\s+|an\s+|some\s+)?([a-zA-Z0-9\s\-]{2,35}?)(?:\s+(?:before|by|under|at|in|for|from|budget)|\s*[,.]|\s*$)',
+        caseSensitive: false,
+      ).firstMatch(prompt);
+
+      String? candidateName;
+      if (buyMatch != null && buyMatch.group(1) != null) {
+        candidateName = buyMatch.group(1)!.trim();
+      } else {
+        // Direct concise search / product name (e.g. "lathe spare parts" or "generator plug")
+        final trimmed = prompt.trim().replaceAll(RegExp(r'^[.,!?"\s]+|[.,!?"\s]+$'), '');
+        final words = trimmed.split(RegExp(r'\s+'));
+        if (words.length <= 6 && trimmed.length >= 3) {
+          final nonItems = {'help', 'hello', 'hi', 'start', 'cancel', 'menu', 'it', 'them', 'things', 'stuff', 'something'};
+          if (!nonItems.contains(trimmed.toLowerCase())) {
+            candidateName = trimmed;
+          }
+        }
+      }
+
+      if (candidateName != null) {
+        final nonItems = {'it', 'them', 'things', 'stuff', 'something', 'now', 'today', 'tomorrow', 'market'};
+        if (candidateName.length >= 3 && !nonItems.contains(candidateName.toLowerCase())) {
+          final formattedName = candidateName
+              .split(' ')
+              .where((w) => w.isNotEmpty)
+              .map((w) => '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+              .join(' ');
+
+          items.add(
+            ShoppingItem(
+              id: 'si-custom-${candidateName.toLowerCase().replaceAll(RegExp(r'\s+'), '-')}',
+              productName: formattedName,
+              quantity: 1.0,
+              unit: 'item',
+              standardizedUnit: 'unit',
+              estimatedUnitPrice: hasExplicitBudget ? (budget * 0.7).clamp(1000.0, 50000.0) : 15000.0,
+              specification: 'Concise user shopping request',
+              preferredSellerType: 'Any',
+            ),
+          );
+        }
+      }
+    }
+
+    // 2d. If items were found and no explicit budget was stated, infer a realistic budget
+    if (items.isNotEmpty && !hasExplicitBudget) {
+      final totalItemOutlay = items.fold(0.0, (sum, i) => sum + (i.quantity * i.estimatedUnitPrice));
+      budget = (((totalItemOutlay * 1.25) / 1000).ceil() * 1000.0).clamp(8000.0, 500000.0);
+    }
+
     // 3. Extract Non-shopping Errand with deadline
     Errand? nonShoppingErrand;
     final errandKeywords = [
@@ -1754,8 +2586,10 @@ class MetaAiService {
       'dry cleaning', 'laundry', 'cleaners', 'bank', 'atm',
       'mechanic', 'car repair', 'repair', 'tailor', 'salon', 'barber',
       'pharmacy', 'chemist', 'hospital', 'clinic', 'dentist',
-      'electricity', 'electric', 'phcn', 'utility', 'deliver', 'delivery',
-      'drop off', 'drop',
+      'electricity bill', 'electric bill', 'phcn bill', 'phcn token',
+      'nepa bill', 'nepa token', 'recharge nepa', 'pay electric',
+      'pay electricity', 'buy electricity token', 'buy electric unit',
+      'utility', 'deliver', 'delivery',
       'ẹrù', 'eru', 'gba ẹrù', 'gba eru', // Yoruba
       'kayan', 'kaya', // Hausa
       'ngwongwo', // Igbo
@@ -1814,7 +2648,18 @@ class MetaAiService {
         title = 'Visit pharmacy';
         location = 'Pharmacy Plus';
         category = 'pharmacy';
-      } else if (lower.contains('electric') || lower.contains('phcn')) {
+      } else if (lower.contains('electric bill') ||
+          lower.contains('electricity bill') ||
+          lower.contains('pay electric') ||
+          lower.contains('pay electricity') ||
+          lower.contains('phcn bill') ||
+          lower.contains('phcn token') ||
+          lower.contains('nepa bill') ||
+          lower.contains('nepa token') ||
+          lower.contains('recharge nepa') ||
+          lower.contains('buy electricity token') ||
+          lower.contains('buy electric unit') ||
+          (lower.contains('phcn') && !lower.contains('cooker') && !lower.contains('kettle') && !lower.contains('appliance'))) {
         title = 'Pay Electricity Bill';
         location = 'PHCN / Utility Office';
         category = 'utility';
@@ -1869,8 +2714,13 @@ class MetaAiService {
       clarificationQuestions: ambiguities,
       hasAmbiguity: ambiguities.isNotEmpty,
       isFallback: true,
-      executionStatus: 'Meta AI: Resilient Fallback Active',
-      fallbackReason: fallbackReason ?? 'Offline / Local deterministic NLP extractor used',
+      executionStatus: detectedBundleName != null
+          ? 'Meta AI: Bundle Expansion ($detectedBundleName)'
+          : 'Meta AI: Resilient Fallback Active',
+      fallbackReason: fallbackReason ??
+          (detectedBundleName != null
+              ? 'Intelligent category decomposition: $detectedBundleName'
+              : 'Offline / Local deterministic NLP extractor used'),
     );
   }
 
@@ -1906,6 +2756,10 @@ class MetaAiService {
     required List<ShoppingItem> items,
     required List<Errand> errands,
   }) {
+    if (currentPlans.isEmpty) {
+      return const <AiOptimizationTip>[];
+    }
+
     final List<AiOptimizationTip> tips = [];
 
     final planA = currentPlans.firstWhere((p) => p.id == 'plan-a', orElse: () => currentPlans.first);
@@ -1983,8 +2837,16 @@ class MetaAiService {
     // Command 1: Add item (e.g. "Add 2 tubers of yam", "Add 1 loaf of bread")
     if (lower.startsWith('add ') || lower.contains('also need') || lower.contains('include ')) {
       // Clean command
-      final itemSub = lower.replaceFirst('add ', '').replaceFirst('also need ', '').replaceFirst('include ', '');
-      final extracted = _extractLocalProposal('I have ₦15,000. I need $itemSub');
+      String itemSub = command.trim();
+      if (lower.startsWith('add ')) {
+        itemSub = command.trim().substring(4).trim();
+      } else if (lower.contains('also need ')) {
+        itemSub = command.substring(lower.indexOf('also need ') + 10).trim();
+      } else if (lower.contains('include ')) {
+        itemSub = command.substring(lower.indexOf('include ') + 8).trim();
+      }
+      final effectiveBudget = currentBudget > 0 ? currentBudget : 15000.0;
+      final extracted = _extractLocalProposal('I have ₦${effectiveBudget.toInt()}. I need $itemSub');
       if (extracted.shoppingItems.isNotEmpty) {
         final newItem = extracted.shoppingItems.first;
         return AiCommandExecutionResult(
@@ -2088,6 +2950,15 @@ class MetaAiService {
     required double currentBudget,
     required double currentTransport,
   }) {
+    if (currentPlans.isEmpty) {
+      return FollowUpInterpretation(
+        userMessage: userFollowUp,
+        interpretationExplanation:
+            'No candidate plans are currently generated. Please add commodities to your cart first in the Cart Menu.',
+        targetPlanId: '',
+      );
+    }
+
     final lower = userFollowUp.toLowerCase();
 
     // Case 1: "Spend less on transport even if shopping bill is slightly higher"
@@ -2095,18 +2966,24 @@ class MetaAiService {
         lower.contains('lower transport') ||
         lower.contains('cheaper transport') ||
         lower.contains('reduce travel')) {
-      final planB = currentPlans.firstWhere(
+      final lowestTransportPlan = currentPlans.firstWhere(
         (p) => p.id == 'plan-b',
+        orElse: () => currentPlans.reduce((a, b) => a.transportCost < b.transportCost ? a : b),
+      );
+      final basePlan = currentPlans.firstWhere(
+        (p) => p.id == 'plan-a',
         orElse: () => currentPlans.first,
       );
+      final groceryDiff = (lowestTransportPlan.itemCost - basePlan.itemCost).abs();
+      final diffText = groceryDiff > 0 ? '₦${groceryDiff.toStringAsFixed(0)}' : 'minimal';
 
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Prioritize transit savings. Plan B cuts your transport cost to ${planB.formattedTransportCost} by consolidating errands into 2 stops, absorbing a small ₦1,000 grocery difference.',
-        targetPlanId: 'plan-b',
-        suggestedTransport: currentTransport * 0.8,
-        suggestedMaxStops: 2,
+            'Muse Spark interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating errands into ${lowestTransportPlan.stopCount} stops, absorbing a small $diffText grocery difference.',
+        targetPlanId: lowestTransportPlan.id,
+        suggestedTransport: lowestTransportPlan.transportCost,
+        suggestedMaxStops: lowestTransportPlan.stopCount,
       );
     }
 
@@ -2116,17 +2993,17 @@ class MetaAiService {
         lower.contains('less time') ||
         lower.contains('rush') ||
         lower.contains('before 1')) {
-      final planC = currentPlans.firstWhere(
+      final fastestPlan = currentPlans.firstWhere(
         (p) => p.id == 'plan-c',
-        orElse: () => currentPlans.first,
+        orElse: () => currentPlans.reduce((a, b) => a.estimatedHours < b.estimatedHours ? a : b),
       );
 
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Prioritize completion speed. Plan C is an express single-hub route finishing in ${planC.estimatedHours} hours, guaranteeing all high-priority deadlines are met.',
-        targetPlanId: 'plan-c',
-        suggestedMaxHours: 1.5,
+            'Muse Spark interpreted your preference: Prioritize completion speed. ${fastestPlan.name} is an express route finishing in ${fastestPlan.estimatedHours} hours across ${fastestPlan.stopCount} stops, guaranteeing all high-priority deadlines are met.',
+        targetPlanId: fastestPlan.id,
+        suggestedMaxHours: fastestPlan.estimatedHours,
       );
     }
 
@@ -2136,16 +3013,19 @@ class MetaAiService {
         lower.contains('spend less overall') ||
         lower.contains('delay') ||
         lower.contains('cannot afford')) {
-      final planD = currentPlans.firstWhere(
+      final cashflowPlan = currentPlans.firstWhere(
         (p) => p.id == 'plan-d',
-        orElse: () => currentPlans.first,
+        orElse: () => currentPlans.firstWhere(
+          (p) => p.tag.toLowerCase().contains('delay') || p.tag.toLowerCase().contains('essential'),
+          orElse: () => currentPlans.reduce((a, b) => a.totalCost < b.totalCost ? a : b),
+        ),
       );
 
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Cashflow protection. Plan D (${planD.formattedTotalCost}) postpones non-urgent commodity purchases while completing high-priority essential staples within a strict budget.',
-        targetPlanId: 'plan-d',
+            'Muse Spark interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while completing high-priority essential staples within a strict budget.',
+        targetPlanId: cashflowPlan.id,
         suggestedDelayNonUrgent: true,
       );
     }
@@ -2160,6 +3040,89 @@ class MetaAiService {
   }
 
   // --- 8. Meta Muse Spark Commodity Price Intelligence ---
+
+  /// Queries Meta AI for live commodity price intelligence.
+  /// Returns null if there is no proper response from the AI or if external endpoint is not configured.
+  Future<OnlinePriceResearchPlan?> queryAiPriceResearch(String commodityName) async {
+    final clean = commodityName.trim();
+    if (clean.isEmpty) return null;
+
+    if (hasValidAuth) {
+      try {
+        dynamic data;
+
+        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+          final response = await http
+              .post(
+                Uri.parse('$effectiveEndpoint/v1/chat/completions'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $effectiveApiKey',
+                },
+                body: jsonEncode({
+                  'model': 'muse-spark-1.3',
+                  'messages': [
+                    {
+                      'role': 'system',
+                      'content':
+                          'You are Meta Muse Spark Price Intelligence. Provide realistic price benchmarks for Nigerian commodities. Return valid JSON only with keys: "commodityName" (string), "category" (string), "standardizedUnit" (string), "searchKeywords" (array of strings), "targetPlatforms" (array of strings), "estimatedBenchmarkMin" (number), "estimatedBenchmarkMax" (number), "recommendation" (string).',
+                    },
+                    {
+                      'role': 'user',
+                      'content': 'Research current market prices for $clean in Nigeria.',
+                    }
+                  ],
+                  'temperature': 0.1,
+                }),
+              )
+              .timeout(const Duration(seconds: 25));
+
+          if (response.statusCode == 200) {
+            data = jsonDecode(response.body);
+          }
+        } else if (SupabaseDataService.isConnected) {
+          data = await _invokeEdgeProxy(
+            action: 'research_price',
+            payload: {
+              'prompt': 'Research current market prices for $clean in Nigeria.',
+            },
+          );
+        }
+
+        if (data is Map) {
+          final text = data['choices']?[0]?['message']?['content']?.toString();
+          if (text != null) {
+            final json = jsonDecode(text);
+            if (json is Map<String, dynamic>) {
+              final minP = (json['estimatedBenchmarkMin'] as num?)?.toDouble() ?? 0.0;
+              final maxP = (json['estimatedBenchmarkMax'] as num?)?.toDouble() ?? 0.0;
+              if (minP > 0 && maxP >= minP) {
+                return OnlinePriceResearchPlan(
+                  commodityName: json['commodityName']?.toString() ?? clean,
+                  category: json['category']?.toString() ?? 'General',
+                  standardizedUnit: json['standardizedUnit']?.toString() ?? 'unit',
+                  searchKeywords: (json['searchKeywords'] as List<dynamic>?)
+                          ?.map((e) => e.toString())
+                          .toList() ??
+                      [clean],
+                  targetPlatforms: (json['targetPlatforms'] as List<dynamic>?)
+                          ?.map((e) => e.toString())
+                          .toList() ??
+                      [],
+                  estimatedBenchmarkMin: minP,
+                  estimatedBenchmarkMax: maxP,
+                  customRecommendation: json['recommendation']?.toString(),
+                );
+              }
+            }
+          }
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
 
   /// Coordinates online price research for a commodity across online platforms & local markets
   OnlinePriceResearchPlan coordinatePriceResearch(String commodityName) {

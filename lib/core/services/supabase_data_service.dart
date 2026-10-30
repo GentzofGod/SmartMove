@@ -15,6 +15,7 @@ class SupabaseDataService {
   }
 
   static bool get isConnected => _client != null;
+  static SupabaseClient? get client => _client;
 
   /// Fetch all active products from Cloud Supabase
   static Future<List<Product>?> fetchProducts() async {

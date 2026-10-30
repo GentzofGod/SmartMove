@@ -91,8 +91,8 @@ class UserSession {
 
   static const guest = UserSession(
     id: 'usr-guest-001',
-    email: 'guest@smartmove.app',
-    displayName: 'Gent (Guest)',
+    email: 'guest@smartmove',
+    displayName: 'Guest',
     isGuest: true,
     role: 'Customer',
   );
@@ -179,50 +179,120 @@ class AuthService {
     return null;
   }
 
-  /// Restore persisted user session on app launch
+  /// Restore persisted user session on app launch and sync live role from Supabase
   static Future<UserSession> restorePersistedSession() async {
+    UserSession? cached;
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionJson = prefs.getString(_sessionStorageKey);
       if (sessionJson != null) {
         final decoded = jsonDecode(sessionJson) as Map<String, dynamic>;
-        return UserSession.fromJson(decoded);
+        cached = UserSession.fromJson(decoded);
       }
     } catch (_) {}
 
-    // Check if live Supabase has a logged in user
+    // Check if live Supabase has a logged in user and fetch fresh profile & role
     final client = _client;
     if (client != null) {
       final user = client.auth.currentUser;
       if (user != null) {
-        final meta = user.userMetadata ?? {};
-        final role = (meta['role'] as String?) ?? 'Customer';
-        final session = UserSession(
-          id: user.id,
-          email: user.email ?? 'user@smartmove.app',
-          displayName: (meta['name'] as String?) ??
-              user.email?.split('@').first ??
-              'User',
-          role: role,
-          businessName: meta['business_name'] as String?,
-          marketHub: meta['market_hub'] as String?,
-          sellerChannel: meta['seller_channel'] as String?,
-          phone: meta['phone'] as String?,
-          stallLocation: meta['stall_location'] as String?,
-          sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
-            (s) => s.name == meta['seller_application_status'],
-            orElse: () => role == 'Trader'
-                ? SellerApplicationStatus.approved
-                : SellerApplicationStatus.none,
-          ),
-          isGuest: false,
-        );
-        await persistSession(session);
-        return session;
+        final liveSession = await fetchLiveSessionForUser(user);
+        if (liveSession != null) {
+          return liveSession;
+        }
       }
     }
 
+    if (cached != null) {
+      return cached;
+    }
+
     return UserSession.guest;
+  }
+
+  /// Live synchronization with public.profiles table and auth metadata
+  static Future<UserSession?> fetchLiveSessionForUser(User user) async {
+    final client = _client;
+    if (client == null) return null;
+
+    String? dbRole;
+    String? displayName;
+    String? businessName;
+    String? marketHub;
+    String? sellerChannel;
+    String? phone;
+    String? stallLocation;
+    String? appStatus;
+
+    // 1. Fetch live row from public.profiles table
+    try {
+      final profile = await client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (profile != null) {
+        dbRole = profile['role']?.toString();
+        displayName = profile['display_name']?.toString();
+        businessName = profile['business_name']?.toString();
+        marketHub = profile['market_hub']?.toString();
+        sellerChannel = profile['seller_channel']?.toString();
+        phone = profile['phone']?.toString();
+        stallLocation = profile['stall_location']?.toString();
+        appStatus = profile['seller_application_status']?.toString();
+      }
+    } catch (_) {}
+
+    // 2. Check auth.users app_metadata / user_metadata as fallback
+    final appMeta = user.appMetadata;
+    final userMeta = user.userMetadata ?? {};
+    final rawRole = dbRole ??
+        appMeta['role']?.toString() ??
+        userMeta['role']?.toString() ??
+        'Customer';
+
+    final parsedRole = UserRole.fromString(rawRole);
+    final canonicalRole = parsedRole.label; // 'Customer', 'Trader', 'Admin', 'SuperAdmin'
+
+    final name = displayName ??
+        (userMeta['name'] as String?) ??
+        user.email?.split('@').first ??
+        'User';
+
+    final session = UserSession(
+      id: user.id,
+      email: user.email ?? 'user@smartmove.app',
+      displayName: name,
+      role: canonicalRole,
+      businessName: businessName ?? (userMeta['business_name'] as String?),
+      marketHub: marketHub ?? (userMeta['market_hub'] as String?),
+      sellerChannel: sellerChannel ?? (userMeta['seller_channel'] as String?),
+      phone: phone ?? (userMeta['phone'] as String?),
+      stallLocation: stallLocation ?? (userMeta['stall_location'] as String?),
+      sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
+        (s) => s.name == (appStatus ?? userMeta['seller_application_status']),
+        orElse: () => canonicalRole == 'Trader'
+            ? SellerApplicationStatus.approved
+            : SellerApplicationStatus.none,
+      ),
+      isGuest: false,
+    );
+
+    await persistSession(session);
+    return session;
+  }
+
+  /// Sync the current logged-in user profile from Supabase profiles table
+  static Future<UserSession?> syncCurrentUserProfile() async {
+    final client = _client;
+    if (client != null) {
+      final user = client.auth.currentUser;
+      if (user != null) {
+        return fetchLiveSessionForUser(user);
+      }
+    }
+    return null;
   }
 
   /// Persist session to local disk
@@ -247,6 +317,10 @@ class AuthService {
         );
         final user = response.user;
         if (user != null) {
+          final liveSession = await fetchLiveSessionForUser(user);
+          if (liveSession != null) {
+            return liveSession;
+          }
           final meta = user.userMetadata ?? {};
           final role = (meta['role'] as String?) ?? 'Customer';
           final session = UserSession(

@@ -248,7 +248,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         TextFormField(
                           controller: _nameController,
                           decoration: InputDecoration(
-                            hintText: 'e.g. Gent Joshua',
+                            hintText: 'e.g. John Doe',
                             prefixIcon: const Icon(Icons.person_outline_rounded,
                                 size: 20),
                             border: OutlineInputBorder(

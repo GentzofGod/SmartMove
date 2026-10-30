@@ -1,4 +1,5 @@
 import 'itinerary_stop.dart';
+import 'item_acquisition_source.dart';
 
 class PlanCandidate {
   final String id;
@@ -18,6 +19,10 @@ class PlanCandidate {
   final List<String> dataDisclaimers;
   final String tradeOffExplanation;
   final List<ItineraryStop> stops;
+  final List<ItemAcquisitionSource> acquisitionSources;
+  final String? sourcingChannel;
+  final String? easeOfAccess;
+  final String? accessRating;
 
   const PlanCandidate({
     required this.id,
@@ -37,7 +42,41 @@ class PlanCandidate {
     this.dataDisclaimers = const [],
     required this.tradeOffExplanation,
     required this.stops,
+    this.acquisitionSources = const [],
+    this.sourcingChannel,
+    this.easeOfAccess,
+    this.accessRating,
   });
+
+  String get displaySourcingChannel =>
+      sourcingChannel ??
+      (id == 'plan-a'
+          ? 'Open Wholesale Market'
+          : id == 'plan-b'
+              ? 'Verified Platform Traders'
+              : id == 'plan-c'
+                  ? 'Neighborhood Retail Mart'
+                  : 'Doorstep Delivery & Essentials');
+
+  String get displayEaseOfAccess =>
+      easeOfAccess ??
+      (id == 'plan-a'
+          ? 'Low Ease (2.5h • 3 stops • Multi-Stall Trek)'
+          : id == 'plan-b'
+              ? 'Balanced Access (1.8h • Single Hub • In-App Chat)'
+              : id == 'plan-c'
+                  ? 'High Ease (25 mins • 1 walk-in stop)'
+                  : 'Maximum Ease (Zero travel • Doorstep delivery)');
+
+  String get accessLevelLabel =>
+      accessRating ??
+      (id == 'plan-a'
+          ? 'Low Ease'
+          : id == 'plan-b'
+              ? 'Balanced Access'
+              : id == 'plan-c'
+                  ? 'High Ease'
+                  : 'Maximum Ease');
 
   double get totalCost => itemCost + transportCost + otherCost;
 
@@ -64,4 +103,9 @@ class PlanCandidate {
             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
             (Match m) => '${m[1]},',
           )}';
+
+  String get formattedTravelTime =>
+      estimatedHours % 1 == 0
+          ? '${estimatedHours.toInt()} hrs'
+          : '${estimatedHours.toStringAsFixed(1)} hrs';
 }

@@ -21,7 +21,11 @@ serve(async (req) => {
     // Securely retrieve Meta App credentials from Server Environment Secrets
     const META_APP_ID = Deno.env.get("META_APP_ID");
     const META_CLIENT_TOKEN = Deno.env.get("META_CLIENT_TOKEN");
-    const META_API_KEY = Deno.env.get("META_API_KEY") || `${META_APP_ID}|${META_CLIENT_TOKEN}`;
+    const META_API_KEY =
+      Deno.env.get("MODEL_API_KEY") ||
+      Deno.env.get("META_API_KEY") ||
+      Deno.env.get("META_AI_API_KEY") ||
+      (META_APP_ID && META_CLIENT_TOKEN ? `${META_APP_ID}|${META_CLIENT_TOKEN}` : "");
 
     if (!META_API_KEY) {
       return new Response(
@@ -30,11 +34,10 @@ serve(async (req) => {
       );
     }
 
-    // 1. Muse Voice Transcribe Gateway
+    // 1. Muse Voice Transcribe Gateway (dev.meta.ai/docs asr transcribe)
     if (action === "transcribe") {
-      const { audioBase64 } = payload;
-      // Forward to Meta Muse Voice Transcribe endpoint (muse-voice-transcribe-1.0)
-      const metaResponse = await fetch("https://api.meta.ai/v1/audio/transcriptions", {
+      const { audioBase64, language = "en", mode = "PUSH_TO_TALK", prompt } = payload || {};
+      const metaResponse = await fetch("https://api.meta.ai/v1/asr/transcribe", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${META_API_KEY}`,
@@ -43,20 +46,25 @@ serve(async (req) => {
         body: JSON.stringify({
           model: "muse-voice-transcribe-1.0",
           audio: audioBase64,
-          language: "en",
+          language,
+          mode,
+          task: "transcribe",
+          prompt:
+            prompt ||
+            "West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market",
         }),
       });
 
       const result = await metaResponse.json();
       return new Response(JSON.stringify(result), {
+        status: metaResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // 2. Muse Spark Reasoning Gateway
-    if (action === "parse_request" || action === "explain_plan") {
-      const { prompt, contextRecords } = payload;
-
+    // 2. Multimodal Vision Paper Note Gateway
+    if (action === "parse_image" || action === "vision") {
+      const { imageBase64, prompt } = payload || {};
       const metaResponse = await fetch("https://api.meta.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -69,11 +77,20 @@ serve(async (req) => {
             {
               role: "system",
               content:
-                "You are Meta Muse Spark for SmartMove. Extract shopping items, quantities, budget, and deadline errands into strict JSON. Refer only to provided context records; never invent prices or travel facts.",
+                "You are Meta Muse Spark Vision. Transcribe handwritten shopping lists into JSON with fields: shoppingItems (array of {productName, quantity, unit, estimatedUnitPrice}), budget (number), notes (string).",
             },
             {
               role: "user",
-              content: JSON.stringify({ prompt, contextRecords }),
+              content: [
+                {
+                  type: "text",
+                  text: prompt || "Transcribe this paper shopping note into structured items.",
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+                },
+              ],
             },
           ],
           temperature: 0.1,
@@ -82,6 +99,53 @@ serve(async (req) => {
 
       const result = await metaResponse.json();
       return new Response(JSON.stringify(result), {
+        status: metaResponse.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 3. Muse Spark Reasoning Gateway (Chat Completions & Price Intelligence)
+    if (
+      action === "parse_request" ||
+      action === "explain_plan" ||
+      action === "chat_completions" ||
+      action === "research_price"
+    ) {
+      const { prompt, contextRecords, messages, model = "muse-spark-1.3", temperature = 0.1 } =
+        payload || {};
+
+      const chatMessages =
+        messages || [
+          {
+            role: "system",
+            content:
+              "You are Meta Muse Spark for SmartMove. Extract shopping items (name, quantity, unit, estimated_unit_price, brand_or_grade), quantities, budget, and deadline errands into strict JSON. When users provide concise, bundle, or category requests (e.g., 'i need to buy a set of stationaries', 'toiletries', 'soup ingredients', 'breakfast pack'), intelligently decompose the request into essential constituent items with realistic default quantities, units, and Nigerian market benchmark prices in Naira. Infer a realistic budget if none is specified. Output only valid JSON with keys: budget, shopping_items, deadline_errand.",
+          },
+          {
+            role: "user",
+            content:
+              typeof prompt === "string"
+                ? prompt
+                : JSON.stringify({ prompt, contextRecords }),
+          },
+        ];
+
+      const metaResponse = await fetch("https://api.meta.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${META_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: chatMessages,
+          temperature,
+        }),
+      });
+
+      const result = await metaResponse.json();
+      return new Response(JSON.stringify(result), {
+        status: metaResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

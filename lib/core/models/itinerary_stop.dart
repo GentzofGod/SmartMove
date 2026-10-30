@@ -1,3 +1,5 @@
+import 'item_acquisition_source.dart';
+
 class ItineraryStop {
   final String id;
   final int stopNumber;
@@ -10,6 +12,14 @@ class ItineraryStop {
   final String? badgeText; // e.g. "Best prices"
   final double estimatedCost;
   final List<String> taskItems;
+  final List<ItemAcquisitionSource> itemSources;
+  final String? outletName;
+  final AcquisitionChannel? channel;
+  final bool isPlatformRegisteredTrader;
+  final String? traderId;
+  final String? contactPhone;
+  final String? whatsappNumber;
+  final String? webUrl;
   bool isCompleted;
 
   ItineraryStop({
@@ -24,6 +34,14 @@ class ItineraryStop {
     this.badgeText,
     this.estimatedCost = 0.0,
     this.taskItems = const [],
+    this.itemSources = const [],
+    this.outletName,
+    this.channel,
+    this.isPlatformRegisteredTrader = false,
+    this.traderId,
+    this.contactPhone,
+    this.whatsappNumber,
+    this.webUrl,
     this.isCompleted = false,
   });
 
@@ -39,6 +57,14 @@ class ItineraryStop {
     String? badgeText,
     double? estimatedCost,
     List<String>? taskItems,
+    List<ItemAcquisitionSource>? itemSources,
+    String? outletName,
+    AcquisitionChannel? channel,
+    bool? isPlatformRegisteredTrader,
+    String? traderId,
+    String? contactPhone,
+    String? whatsappNumber,
+    String? webUrl,
     bool? isCompleted,
   }) {
     return ItineraryStop(
@@ -53,6 +79,15 @@ class ItineraryStop {
       badgeText: badgeText ?? this.badgeText,
       estimatedCost: estimatedCost ?? this.estimatedCost,
       taskItems: taskItems ?? this.taskItems,
+      itemSources: itemSources ?? this.itemSources,
+      outletName: outletName ?? this.outletName,
+      channel: channel ?? this.channel,
+      isPlatformRegisteredTrader:
+          isPlatformRegisteredTrader ?? this.isPlatformRegisteredTrader,
+      traderId: traderId ?? this.traderId,
+      contactPhone: contactPhone ?? this.contactPhone,
+      whatsappNumber: whatsappNumber ?? this.whatsappNumber,
+      webUrl: webUrl ?? this.webUrl,
       isCompleted: isCompleted ?? this.isCompleted,
     );
   }

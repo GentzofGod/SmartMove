@@ -133,11 +133,25 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     );
   }
 
-  void _showAiResearchDialog(BuildContext context, String commodityName) {
+  Future<void> _showAiResearchDialog(BuildContext context, String commodityName) async {
     final query = commodityName.trim();
     if (query.isEmpty) return;
+
+    final messenger = ScaffoldMessenger.of(context);
     const aiService = MetaAiService();
-    final plan = aiService.coordinatePriceResearch(query);
+    final plan = await aiService.queryAiPriceResearch(query);
+
+    if (!context.mounted) return;
+
+    if (plan == null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('No response from Meta AI for "$query". Live AI research is unavailable.'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,

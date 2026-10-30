@@ -432,6 +432,31 @@ void main() {
       expect(scanResult.proposal.hasError, isTrue);
       expect(scanResult.proposal.shoppingItems, isEmpty);
     });
+
+    test('19. parseToProposal intelligently expands concise bundle prompt "i need to buy a set of stationaries"', () async {
+      final proposal = await aiService.parseToProposal('i need to buy a set of stationaries');
+      expect(proposal.hasError, isFalse);
+      expect(proposal.shoppingItems.length >= 4, isTrue);
+      expect(proposal.shoppingItems.any((i) => i.productName.toLowerCase().contains('notebook')), isTrue);
+      expect(proposal.shoppingItems.any((i) => i.productName.toLowerCase().contains('pen')), isTrue);
+      expect(proposal.shoppingItems.any((i) => i.productName.toLowerCase().contains('mathematical') || i.productName.toLowerCase().contains('ruler')), isTrue);
+      expect(proposal.budget >= 8000.0, isTrue);
+      expect(proposal.clarificationQuestions.any((q) => q.field == 'bundle_confirmation'), isTrue);
+    });
+
+    test('20. parseToProposal extracts single concise items and toiletries bundles', () async {
+      final toiletriesProposal = await aiService.parseToProposal('buy toiletries');
+      expect(toiletriesProposal.hasError, isFalse);
+      expect(toiletriesProposal.shoppingItems.length >= 3, isTrue);
+      expect(toiletriesProposal.shoppingItems.any((i) => i.productName.toLowerCase().contains('soap')), isTrue);
+      expect(toiletriesProposal.shoppingItems.any((i) => i.productName.toLowerCase().contains('tissue')), isTrue);
+
+      final singleItemProposal = await aiService.parseToProposal('i need to buy a powerbank');
+      expect(singleItemProposal.hasError, isFalse);
+      expect(singleItemProposal.shoppingItems.length, 1);
+      expect(singleItemProposal.shoppingItems.first.productName, 'Powerbank');
+      expect(singleItemProposal.shoppingItems.first.quantity, 1.0);
+    });
   });
 }
 

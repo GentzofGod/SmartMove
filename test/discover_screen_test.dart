@@ -70,9 +70,9 @@ void main() {
     await tester.tap(find.text('Research Prices'));
     await tester.pumpAndSettle();
 
-    // Verify Meta AI research sheet opens with researched commodity
-    expect(find.textContaining('Meta AI Price Research: Beans'), findsOneWidget);
-    expect(find.text('Estimated Benchmark Range:'), findsOneWidget);
+    // Verify when AI is unconfigured or unresponsive, no fake fallback sheet is displayed
+    expect(find.text('No response from Meta AI for "Beans". Live AI research is unavailable.'), findsOneWidget);
+    expect(find.textContaining('Meta AI Price Research: Beans'), findsNothing);
   });
 
   testWidgets('Meta AI research chip dynamically adapts to search bar input', (tester) async {
@@ -104,7 +104,8 @@ void main() {
     await tester.tap(find.text('Research "Palm Oil" with Meta AI'));
     await tester.pumpAndSettle();
 
-    // Verify AI Price Research sheet opens directly for Palm Oil
-    expect(find.textContaining('Meta AI Price Research: Palm Oil'), findsOneWidget);
+    // Verify when AI is unconfigured or unresponsive, no fake fallback sheet is displayed
+    expect(find.text('No response from Meta AI for "Palm Oil". Live AI research is unavailable.'), findsOneWidget);
+    expect(find.textContaining('Meta AI Price Research: Palm Oil'), findsNothing);
   });
 }

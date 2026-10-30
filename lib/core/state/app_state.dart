@@ -232,6 +232,22 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
   DecisionLabState build() {
     final initialErrands = DemoSeedData.getInitialErrands();
     final initialItems = initialErrands.isNotEmpty ? initialErrands.first.shoppingItems : <ShoppingItem>[];
+    final userLocation = ref.read(locationProvider);
+    final registeredTraders = ref.read(sellerApplicationsProvider);
+    final observations = ref.read(communityProvider);
+
+    // Reactively recalculate when user location changes
+    ref.listen<GeoPoint>(locationProvider, (previous, next) {
+      if (previous != next) {
+        state = _recalculate(userLocation: next);
+      }
+    });
+
+    // Reactively recalculate when seller applications change
+    ref.listen<List<SellerApplication>>(sellerApplicationsProvider, (previous, next) {
+      state = _recalculate(registeredTraders: next);
+    });
+
     return _calculateState(
       budget: initialItems.isNotEmpty ? 15000.0 : 0.0,
       transportCost: 1200,
@@ -242,6 +258,39 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       selectedId: 'plan-a',
       items: initialItems,
       errands: initialErrands,
+      userLocation: userLocation,
+      registeredTraders: registeredTraders,
+      observations: observations,
+    );
+  }
+
+  DecisionLabState _recalculate({
+    double? budget,
+    double? transportCost,
+    double? timeHours,
+    int? maxStops,
+    double? timeCost,
+    bool? delayNonUrgent,
+    String? selectedId,
+    List<ShoppingItem>? items,
+    List<Errand>? errands,
+    GeoPoint? userLocation,
+    List<SellerApplication>? registeredTraders,
+    List<PriceObservation>? observations,
+  }) {
+    return _calculateState(
+      budget: budget ?? state.budget,
+      transportCost: transportCost ?? state.transportCost,
+      timeHours: timeHours ?? state.timeAvailableHours,
+      maxStops: maxStops ?? state.maxStops,
+      timeCost: timeCost ?? state.timeCostPerHour,
+      delayNonUrgent: delayNonUrgent ?? state.delayNonUrgent,
+      selectedId: selectedId ?? state.selectedPlanId,
+      items: items ?? state.activeItems,
+      errands: errands ?? state.activeErrands,
+      userLocation: userLocation ?? ref.read(locationProvider),
+      registeredTraders: registeredTraders ?? ref.read(sellerApplicationsProvider),
+      observations: observations ?? ref.read(communityProvider),
     );
   }
 
@@ -255,6 +304,9 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     required String selectedId,
     List<ShoppingItem>? items,
     List<Errand>? errands,
+    GeoPoint? userLocation,
+    List<SellerApplication>? registeredTraders,
+    List<PriceObservation>? observations,
   }) {
     final candidatePlans = DecisionEngine.calculateCandidatePlans(
       userBudget: budget,
@@ -265,6 +317,9 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       delayNonUrgent: delayNonUrgent,
       items: items,
       errands: errands,
+      userLocation: userLocation,
+      registeredTraders: registeredTraders,
+      observations: observations,
     );
 
     final insight = DecisionEngine.generateRecommendationInsight(
@@ -306,14 +361,8 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     List<Errand>? errands,
     double? budget,
   }) {
-    state = _calculateState(
+    state = _recalculate(
       budget: budget ?? state.budget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
       items: items,
       errands: errands ?? state.activeErrands,
     );
@@ -321,31 +370,48 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
 
   void addShoppingItem(ShoppingItem item) {
     final updated = [...state.activeItems, item];
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
+    state = _recalculate(
+      budget: state.budget > 0 ? state.budget : (updated.fold(0.0, (sum, i) => sum + i.totalEstimatedCost) * 1.25).roundToDouble(),
       items: updated,
-      errands: state.activeErrands,
     );
   }
 
   void removeShoppingItem(String itemId) {
     final updated = state.activeItems.where((i) => i.id != itemId).toList();
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
-      items: updated,
-      errands: state.activeErrands,
+    state = _recalculate(items: updated);
+  }
+
+  void updateItemQuantity(String itemId, double newQuantity) {
+    if (newQuantity <= 0) {
+      removeShoppingItem(itemId);
+      return;
+    }
+    final updated = state.activeItems.map((item) {
+      if (item.id == itemId) {
+        return item.copyWith(quantity: newQuantity);
+      }
+      return item;
+    }).toList();
+    state = _recalculate(items: updated);
+  }
+
+  void toggleItemPriority(String itemId) {
+    final updated = state.activeItems.map((item) {
+      if (item.id == itemId) {
+        final newPriority = item.priority == CommodityPriority.essential
+            ? CommodityPriority.low
+            : CommodityPriority.essential;
+        return item.copyWith(priority: newPriority);
+      }
+      return item;
+    }).toList();
+    state = _recalculate(items: updated);
+  }
+
+  void clearCart() {
+    state = _recalculate(
+      selectedId: 'plan-a',
+      items: const <ShoppingItem>[],
     );
   }
 
@@ -369,12 +435,11 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       errands.add(result.addedErrand!);
     }
 
-    state = _calculateState(
+    state = _recalculate(
       budget: newBudget,
       transportCost: newTransport,
       timeHours: newHours,
       maxStops: newStops,
-      timeCost: state.timeCostPerHour,
       delayNonUrgent: newDelay,
       selectedId: newSelectedId,
       items: items,
@@ -383,87 +448,27 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
   }
 
   void updateBudget(double newBudget) {
-    state = _calculateState(
-      budget: newBudget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
-      items: state.activeItems,
-      errands: state.activeErrands,
-    );
+    state = _recalculate(budget: newBudget);
   }
 
   void updateTransport(double newTransport) {
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: newTransport,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
-      items: state.activeItems,
-      errands: state.activeErrands,
-    );
+    state = _recalculate(transportCost: newTransport);
   }
 
   void updateTimeAvailable(double newHours) {
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: state.transportCost,
-      timeHours: newHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
-      items: state.activeItems,
-      errands: state.activeErrands,
-    );
+    state = _recalculate(timeHours: newHours);
   }
 
   void updateMaxStops(int newStops) {
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: newStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
-      items: state.activeItems,
-      errands: state.activeErrands,
-    );
+    state = _recalculate(maxStops: newStops);
   }
 
   void updateTimeCostPerHour(double newCost) {
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: newCost,
-      delayNonUrgent: state.delayNonUrgent,
-      selectedId: state.selectedPlanId,
-      items: state.activeItems,
-      errands: state.activeErrands,
-    );
+    state = _recalculate(timeCost: newCost);
   }
 
   void toggleDelayNonUrgent(bool delay) {
-    state = _calculateState(
-      budget: state.budget,
-      transportCost: state.transportCost,
-      timeHours: state.timeAvailableHours,
-      maxStops: state.maxStops,
-      timeCost: state.timeCostPerHour,
-      delayNonUrgent: delay,
-      selectedId: state.selectedPlanId,
-      items: state.activeItems,
-      errands: state.activeErrands,
-    );
+    state = _recalculate(delayNonUrgent: delay);
   }
 
   void selectPlan(String planId) {
@@ -474,6 +479,188 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
 final decisionLabProvider =
     NotifierProvider<DecisionLabNotifier, DecisionLabState>(
   DecisionLabNotifier.new,
+);
+
+// --- Trader Negotiation Chat State ---
+class TraderChatMessage {
+  final String id;
+  final String senderName;
+  final bool isTrader;
+  final String text;
+  final DateTime timestamp;
+  final double? proposedPrice;
+
+  const TraderChatMessage({
+    required this.id,
+    required this.senderName,
+    required this.isTrader,
+    required this.text,
+    required this.timestamp,
+    this.proposedPrice,
+  });
+}
+
+class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> {
+  @override
+  Map<String, List<TraderChatMessage>> build() {
+    return {};
+  }
+
+  void sendCustomerMessage({
+    required String traderName,
+    required String commodityName,
+    required double quantity,
+    required String unit,
+    required double listedPrice,
+    required String messageText,
+    double? proposedPrice,
+  }) {
+    final now = DateTime.now();
+    final currentHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
+
+    // Initial greeting if history was empty
+    if (currentHistory.isEmpty) {
+      final lowerItem = commodityName.toLowerCase();
+      final isHardwareOrSpares = lowerItem.contains('lathe') ||
+          lowerItem.contains('spare') ||
+          lowerItem.contains('tool') ||
+          lowerItem.contains('bearing') ||
+          lowerItem.contains('cutter') ||
+          lowerItem.contains('hardware') ||
+          lowerItem.contains('machine');
+      final isElectronicsOrAppliances = lowerItem.contains('cooker') ||
+          lowerItem.contains('kettle') ||
+          lowerItem.contains('iron') ||
+          lowerItem.contains('blender') ||
+          lowerItem.contains('microwave') ||
+          lowerItem.contains('appliance') ||
+          lowerItem.contains('electronics') ||
+          lowerItem.contains('fan') ||
+          lowerItem.contains('tv');
+      final isProduce = lowerItem.contains('tomato') ||
+          lowerItem.contains('pepper') ||
+          lowerItem.contains('egg') ||
+          lowerItem.contains('yam') ||
+          lowerItem.contains('vegetable') ||
+          lowerItem.contains('fruit');
+
+      final welcomeText = isHardwareOrSpares
+          ? 'Hello! Thank you for inquiring about $commodityName. We have genuine stock ready. How can we assist you with this specification or order?'
+          : (isElectronicsOrAppliances
+              ? 'Hello! We have authentic, warrantied stock of $commodityName ready for you. How can we assist you today?'
+              : (isProduce
+                  ? 'Welcome! We have fresh, genuine harvest of $commodityName ready for you. How can I serve you today?'
+                  : 'Welcome! We have verified stock of $commodityName ready for you. How can I serve you today?'));
+
+      currentHistory.add(
+        TraderChatMessage(
+          id: 'welcome-${now.millisecondsSinceEpoch}',
+          senderName: traderName,
+          isTrader: true,
+          text: welcomeText,
+          timestamp: now.subtract(const Duration(minutes: 1)),
+        ),
+      );
+    }
+
+    // Append customer message
+    currentHistory.add(
+      TraderChatMessage(
+        id: 'cust-${now.millisecondsSinceEpoch}',
+        senderName: 'You',
+        isTrader: false,
+        text: messageText,
+        timestamp: now,
+        proposedPrice: proposedPrice,
+      ),
+    );
+
+    state = {
+      ...state,
+      traderName: currentHistory,
+    };
+
+    // Simulate responsive trader reply
+    _simulateTraderReply(
+      traderName: traderName,
+      commodityName: commodityName,
+      quantity: quantity,
+      listedPrice: listedPrice,
+      unit: unit,
+      proposedPrice: proposedPrice,
+      customerQuery: messageText,
+    );
+  }
+
+  void _simulateTraderReply({
+    required String traderName,
+    required String commodityName,
+    required double quantity,
+    required double listedPrice,
+    required String unit,
+    double? proposedPrice,
+    required String customerQuery,
+  }) {
+    final totalListed = listedPrice * quantity;
+    final qtyDisplay = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
+    String replyText;
+
+    if (proposedPrice != null) {
+      final discountPct = (totalListed - proposedPrice) / (totalListed > 0 ? totalListed : 1.0);
+      if (discountPct <= 0) {
+        replyText = 'Deal agreed! I appreciate your patronage for $qtyDisplay $unit of $commodityName. I will prepare your order for pickup right away.';
+      } else if (discountPct <= 0.15) {
+        replyText = 'Deal agreed! As a valued SmartMove customer, I accept your offer of ₦${proposedPrice.toStringAsFixed(0)} for $qtyDisplay $unit of $commodityName. Please come to my stall for prompt pickup!';
+      } else {
+        final fairCounter = (totalListed * 0.90).roundToDouble();
+        replyText = '₦${proposedPrice.toStringAsFixed(0)} is below our cost price for Grade A $commodityName. The best discount I can offer today is ₦${fairCounter.toStringAsFixed(0)} for the $qtyDisplay $unit. Would that work for you?';
+      }
+    } else {
+      final lower = customerQuery.toLowerCase();
+      if (lower.contains('bulk') || lower.contains('discount')) {
+        replyText = 'Yes! For purchases of 5 or more units, we offer up to 8% discount. How many $unit do you need in total?';
+      } else if (lower.contains('quality') || lower.contains('grade')) {
+        final isProduce = commodityName.toLowerCase().contains('egg') ||
+            commodityName.toLowerCase().contains('tomato') ||
+            commodityName.toLowerCase().contains('pepper') ||
+            commodityName.toLowerCase().contains('yam') ||
+            commodityName.toLowerCase().contains('fruit');
+        replyText = isProduce
+            ? 'All our $commodityName is Grade A certified and freshly harvested. You can inspect it when you arrive.'
+            : 'All our $commodityName is authentic, high-quality specification. You are welcome to inspect it upon pickup.';
+      } else if (lower.contains('pickup') || lower.contains('hold') || lower.contains('minutes')) {
+        replyText = 'Certainly! I will set aside your $qtyDisplay $unit of $commodityName now. Please ask for my stall when you arrive at the market.';
+      } else if (lower.contains('deliver')) {
+        replyText = 'Yes, dispatch riders are available at our hub for delivery within the city. Delivery fee depends on your destination.';
+      } else if (lower.contains('cash') || lower.contains('transfer')) {
+        replyText = 'We accept both instant bank transfer and cash on physical pickup at our stall.';
+      } else {
+        replyText = 'Thank you for your message! Our $commodityName is in stock and available at ₦${listedPrice.toStringAsFixed(0)} per $unit. We look forward to fulfilling your order!';
+      }
+    }
+
+    Future.delayed(const Duration(milliseconds: 600), () {
+      final updatedHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
+      updatedHistory.add(
+        TraderChatMessage(
+          id: 'trader-${DateTime.now().millisecondsSinceEpoch}',
+          senderName: traderName,
+          isTrader: true,
+          text: replyText,
+          timestamp: DateTime.now(),
+        ),
+      );
+      state = {
+        ...state,
+        traderName: updatedHistory,
+      };
+    });
+  }
+}
+
+final traderChatProvider =
+    NotifierProvider<TraderChatNotifier, Map<String, List<TraderChatMessage>>>(
+  TraderChatNotifier.new,
 );
 
 // --- Community Observations State ---
@@ -681,6 +868,14 @@ class AuthNotifier extends Notifier<UserSession> {
     state = session;
   }
 
+  /// Live refresh of user role and attributes from Supabase profiles table
+  Future<void> refreshProfileFromDatabase() async {
+    final live = await AuthService.syncCurrentUserProfile();
+    if (live != null) {
+      state = live;
+    }
+  }
+
   void setSession(UserSession session) {
     state = session;
     AuthService.persistSession(session);
@@ -797,20 +992,6 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
         status: SellerApplicationStatus.pending,
         submittedAt: now.subtract(const Duration(hours: 3)),
       ),
-      SellerApplication(
-        id: 'app-seed-002',
-        userId: 'usr-bello',
-        applicantName: 'Mama Bello',
-        applicantEmail: 'bello@bodijamarket.ng',
-        businessName: 'Mama Bello Grains & Oil Enterprise',
-        marketHub: 'Bodija Market',
-        sellerChannel: 'Local Market',
-        stallLocation: 'Stall 14, Main Grain Line',
-        phone: '+234 802 345 6789',
-        status: SellerApplicationStatus.approved,
-        submittedAt: now.subtract(const Duration(days: 2)),
-        reviewedAt: now.subtract(const Duration(days: 1)),
-      ),
     ];
   }
 
@@ -871,11 +1052,8 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
 
     // If the approved application belongs to current user, upgrade them to Trader
     final currentUser = ref.read(authProvider);
-    final app = state.firstWhere(
-      (a) => a.id == applicationId,
-      orElse: () => state.first,
-    );
-    if (app.userId == currentUser.id) {
+    final appMatches = state.where((a) => a.id == applicationId);
+    if (appMatches.isNotEmpty && appMatches.first.userId == currentUser.id) {
       ref.read(authProvider.notifier).approveSellerStatus();
     }
   }
@@ -902,11 +1080,8 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
 
     // If the rejected application belongs to current user, mark rejected
     final currentUser = ref.read(authProvider);
-    final app = state.firstWhere(
-      (a) => a.id == applicationId,
-      orElse: () => state.first,
-    );
-    if (app.userId == currentUser.id) {
+    final appMatches = state.where((a) => a.id == applicationId);
+    if (appMatches.isNotEmpty && appMatches.first.userId == currentUser.id) {
       ref.read(authProvider.notifier).rejectSellerStatus(reason: reason);
     }
   }

@@ -21,17 +21,15 @@ class ProductDetailSheet extends ConsumerStatefulWidget {
 class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
   double _quantity = 1.0;
   String? _selectedChannelFilter;
-  ComparisonSortPreference _sortPreference = ComparisonSortPreference.cheapestUnitPrice;
+  ComparisonSortPreference _sortPreference =
+      ComparisonSortPreference.cheapestUnitPrice;
   bool _showAiAnalysis = false;
   UserDecisionPriority _decisionPriority = UserDecisionPriority.balancedValue;
   bool _showExpandedCriteria = false;
   final MetaAiService _metaAiService = const MetaAiService();
 
   String _formatAmount(double amount) {
-    return '₦${amount.toStringAsFixed(0).replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        )}';
+    return '₦${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
   }
 
   void _showReportStaleDialog(BuildContext context) {
@@ -79,57 +77,83 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   const SizedBox(height: 6),
                   const Text(
                     'Help the community keep commodity price intelligence honest and up to date.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 14),
 
                   // Reason choices
-                  ...['Price is higher in market', 'Seller is out of stock', 'Suspicious / inaccurate report']
-                      .map((reason) {
-                        final isSelected = selectedReason == reason;
-                        return InkWell(
-                          onTap: () => setModalState(() => selectedReason = reason),
+                  ...[
+                    'Price is higher in market',
+                    'Seller is out of stock',
+                    'Suspicious / inaccurate report',
+                  ].map((reason) {
+                    final isSelected = selectedReason == reason;
+                    return InkWell(
+                      onTap: () => setModalState(() => selectedReason = reason),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primaryTint
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primaryTint : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: isSelected ? AppColors.primary : AppColors.cardBorder),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                                  size: 16,
-                                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    reason,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                      color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.cardBorder,
                           ),
-                        );
-                      }),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSelected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_off,
+                              size: 16,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                reason,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? AppColors.primaryDark
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 10),
                   TextField(
                     controller: notesController,
                     decoration: InputDecoration(
-                      hintText: 'Optional notes (e.g. Current price seen is ₦1,850)',
+                      hintText:
+                          'Optional notes (e.g. Current price seen is ₦1,850)',
                       hintStyle: const TextStyle(fontSize: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.cardBorder),
+                        borderSide: const BorderSide(
+                          color: AppColors.cardBorder,
+                        ),
                       ),
                     ),
                   ),
@@ -142,7 +166,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Report submitted. Thank you for keeping local commodity prices verified!'),
+                            content: Text(
+                              'Report submitted. Thank you for keeping local commodity prices verified!',
+                            ),
                             backgroundColor: AppColors.primary,
                           ),
                         );
@@ -155,7 +181,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       ),
                       child: const Text(
                         'Submit Observation Flag',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -168,13 +197,22 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     );
   }
 
-  List<PriceObservation> _getComparisonQuotes(List<PriceObservation> communityObs) {
+  List<PriceObservation> _getComparisonQuotes(
+    List<PriceObservation> communityObs,
+  ) {
     final matching = communityObs
-        .where((o) =>
-            o.productId == widget.product.id ||
-            o.productName.toLowerCase() == widget.product.name.toLowerCase() ||
-            o.productName.toLowerCase().contains(widget.product.name.toLowerCase()) ||
-            widget.product.name.toLowerCase().contains(o.productName.toLowerCase()))
+        .where(
+          (o) =>
+              o.productId == widget.product.id ||
+              o.productName.toLowerCase() ==
+                  widget.product.name.toLowerCase() ||
+              o.productName.toLowerCase().contains(
+                widget.product.name.toLowerCase(),
+              ) ||
+              widget.product.name.toLowerCase().contains(
+                o.productName.toLowerCase(),
+              ),
+        )
         .toList();
 
     final basePrice = widget.product.lowestPrice;
@@ -192,9 +230,13 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
       sourceType: widget.product.sourceType,
       submitterName: widget.product.bestSeller,
       submitterRole: 'Trader',
-      isVerified: widget.product.sourceType == ObservationSource.independentlyVerified ||
+      isVerified:
+          widget.product.sourceType ==
+              ObservationSource.independentlyVerified ||
           widget.product.sourceType == ObservationSource.traderConfirmed,
-      channel: widget.product.channel.isNotEmpty ? widget.product.channel : 'Local Market',
+      channel: widget.product.channel.isNotEmpty
+          ? widget.product.channel
+          : 'Local Market',
       brandOrGrade: widget.product.brandOrGrade ?? 'Grade A / Market Benchmark',
       standardizedUnitPrice: widget.product.standardizedUnitPrice ?? basePrice,
       baseUnit: widget.product.baseUnit,
@@ -204,10 +246,12 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
 
     final quotes = <PriceObservation>[productQuote];
     for (final obs in matching) {
-      final isDuplicate = quotes.any((q) =>
-          q.id == obs.id ||
-          (q.sellerName.toLowerCase() == obs.sellerName.toLowerCase() &&
-              (q.price - obs.price).abs() < 0.01));
+      final isDuplicate = quotes.any(
+        (q) =>
+            q.id == obs.id ||
+            (q.sellerName.toLowerCase() == obs.sellerName.toLowerCase() &&
+                (q.price - obs.price).abs() < 0.01),
+      );
       if (!isDuplicate) {
         quotes.add(obs);
       }
@@ -235,8 +279,12 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     var filteredQuotes = _selectedChannelFilter == null
         ? standardizedQuotes
         : standardizedQuotes
-            .where((q) => q.observation.channel.toLowerCase() == _selectedChannelFilter!.toLowerCase())
-            .toList();
+              .where(
+                (q) =>
+                    q.observation.channel.toLowerCase() ==
+                    _selectedChannelFilter!.toLowerCase(),
+              )
+              .toList();
 
     filteredQuotes = CommodityComparisonService.rankQuotes(
       quotes: filteredQuotes,
@@ -258,14 +306,20 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     );
 
     // Price History Trend: Only when genuine historical observations exist across time
-    final historyQuotes = observations
-        .where((o) =>
-            (o.productId == widget.product.id ||
-                o.productName.toLowerCase() == widget.product.name.toLowerCase() ||
-                widget.product.name.toLowerCase().contains(o.productName.toLowerCase())) &&
-            o.isVerified)
-        .toList()
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final historyQuotes =
+        observations
+            .where(
+              (o) =>
+                  (o.productId == widget.product.id ||
+                      o.productName.toLowerCase() ==
+                          widget.product.name.toLowerCase() ||
+                      widget.product.name.toLowerCase().contains(
+                        o.productName.toLowerCase(),
+                      )) &&
+                  o.isVerified,
+            )
+            .toList()
+          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     final hasHistoricalTrend = historyQuotes.length >= 3;
 
@@ -366,7 +420,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             const SizedBox(width: 6),
                             Text(
                               'per ${widget.product.standardUnit}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -374,19 +431,29 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         Builder(
                           builder: (context) {
                             final currentLocation = ref.watch(locationProvider);
-                            final marketCoord = LocationService.knownMarketCoordinates[widget.product.bestSeller];
-                            final dynamicDistance = (currentLocation.isSet && marketCoord != null)
+                            final marketCoord =
+                                LocationService.knownMarketCoordinates[widget
+                                    .product
+                                    .bestSeller];
+                            final dynamicDistance =
+                                (currentLocation.isSet && marketCoord != null)
                                 ? LocationService.calculateDistanceKm(
                                     lat1: currentLocation.latitude,
                                     lon1: currentLocation.longitude,
                                     lat2: marketCoord.latitude,
                                     lon2: marketCoord.longitude,
                                   )
-                                : (currentLocation.isSet ? widget.product.distanceKm : null);
+                                : (currentLocation.isSet
+                                      ? widget.product.distanceKm
+                                      : null);
 
                             return Row(
                               children: [
-                                const Icon(Icons.store_outlined, size: 14, color: AppColors.textSecondary),
+                                const Icon(
+                                  Icons.store_outlined,
+                                  size: 14,
+                                  color: AppColors.textSecondary,
+                                ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
@@ -410,7 +477,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.badgeSuccessBg,
                       borderRadius: BorderRadius.circular(8),
@@ -443,7 +513,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     widget.product.sourceType == ObservationSource.simulatedDemo
                         ? Icons.info_outline_rounded
                         : Icons.verified_outlined,
-                    color: widget.product.sourceType == ObservationSource.simulatedDemo
+                    color:
+                        widget.product.sourceType ==
+                            ObservationSource.simulatedDemo
                         ? AppColors.textSecondary
                         : AppColors.primary,
                     size: 16,
@@ -499,7 +571,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF1F8E9),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,7 +582,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.badgeSuccessBg,
                           borderRadius: BorderRadius.circular(6),
@@ -553,7 +630,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE65100)),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: Color(0xFFE65100),
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -579,7 +660,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               children: [
                 const Text(
                   'Sort by:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -591,7 +676,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 6.0),
                           child: ChoiceChip(
-                            label: Text(pref.label, style: const TextStyle(fontSize: 11)),
+                            label: Text(
+                              pref.label,
+                              style: const TextStyle(fontSize: 11),
+                            ),
                             selected: isSelected,
                             selectedColor: AppColors.primaryTint,
                             onSelected: (val) {
@@ -614,11 +702,20 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                 children: [
                   _buildChannelFilterChip(label: 'All Channels', channel: null),
                   const SizedBox(width: 6),
-                  _buildChannelFilterChip(label: 'Local Market', channel: 'Local Market'),
+                  _buildChannelFilterChip(
+                    label: 'Local Market',
+                    channel: 'Local Market',
+                  ),
                   const SizedBox(width: 6),
-                  _buildChannelFilterChip(label: 'SMB Store', channel: 'SMB Store'),
+                  _buildChannelFilterChip(
+                    label: 'SMB Store',
+                    channel: 'SMB Store',
+                  ),
                   const SizedBox(width: 6),
-                  _buildChannelFilterChip(label: 'Online Retailer', channel: 'Online Retailer'),
+                  _buildChannelFilterChip(
+                    label: 'Online Retailer',
+                    channel: 'Online Retailer',
+                  ),
                 ],
               ),
             ),
@@ -638,7 +735,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isLowest ? AppColors.primary.withValues(alpha: 0.4) : AppColors.cardBorder,
+                      color: isLowest
+                          ? AppColors.primary.withValues(alpha: 0.4)
+                          : AppColors.cardBorder,
                       width: isLowest ? 1.5 : 1.0,
                     ),
                     boxShadow: [
@@ -663,7 +762,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 width: 7,
                                 height: 7,
                                 decoration: BoxDecoration(
-                                  color: obs.inStock ? AppColors.badgeSuccessText : AppColors.errorText,
+                                  color: obs.inStock
+                                      ? AppColors.badgeSuccessText
+                                      : AppColors.errorText,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -673,12 +774,18 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: obs.inStock ? AppColors.badgeSuccessText : AppColors.errorText,
+                                  color: obs.inStock
+                                      ? AppColors.badgeSuccessText
+                                      : AppColors.errorText,
                                 ),
                               ),
                               if (obs.isVerified) ...[
                                 const SizedBox(width: 6),
-                                const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                                const Icon(
+                                  Icons.verified,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
                               ],
                             ],
                           ),
@@ -697,14 +804,21 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                               children: [
                                 Text(
                                   obs.sellerName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${obs.marketLocation} • ${sq.dynamicDistanceKm.toStringAsFixed(1)} km away • ${obs.sourceType.displayLabel}',
-                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
-                                if (obs.brandOrGrade != null && obs.brandOrGrade!.isNotEmpty) ...[
+                                if (obs.brandOrGrade != null &&
+                                    obs.brandOrGrade!.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     'Grade: ${obs.brandOrGrade}',
@@ -731,12 +845,18 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                               ),
                               Text(
                                 sq.displayStandardizedRate,
-                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                               const SizedBox(height: 2),
                               if (isLowest)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.badgeSuccessBg,
                                     borderRadius: BorderRadius.circular(6),
@@ -766,7 +886,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       const SizedBox(height: 8),
                       // Outlay for selected quantity
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.background,
                           borderRadius: BorderRadius.circular(6),
@@ -776,13 +899,13 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                           children: [
                             Text(
                               'Outlay for ${_quantity.toInt()} ${widget.product.standardUnit}:',
-                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                             Text(
-                              '₦${(obs.price * _quantity).toStringAsFixed(0).replaceAllMapped(
-                                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                    (Match m) => '${m[1]},',
-                                  )}',
+                              '₦${(obs.price * _quantity).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -805,7 +928,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                 ),
                 child: const Text(
                   'No seller reports logged in this channel yet. Submit yours in Community tab!',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -833,11 +959,17 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       children: const [
                         Text(
                           'Price History Trend',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         Text(
                           'Based on verified reports',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
@@ -857,7 +989,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
             ] else ...[
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   borderRadius: BorderRadius.circular(12),
@@ -865,12 +1000,19 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.query_stats_rounded, size: 16, color: AppColors.textSecondary),
+                    Icon(
+                      Icons.query_stats_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Price history hidden: requires at least 3 confirmed observations across time.',
-                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -895,15 +1037,26 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     children: [
                       const Text(
                         'Quantity to Compare:',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       Row(
                         children: [
                           IconButton(
                             onPressed: _quantity > 1.0
-                                ? () => setState(() => _quantity = (_quantity - 1.0).clamp(1.0, 100.0))
+                                ? () => setState(
+                                    () => _quantity = (_quantity - 1.0).clamp(
+                                      1.0,
+                                      100.0,
+                                    ),
+                                  )
                                 : null,
-                            icon: const Icon(Icons.remove_circle_outline, size: 20),
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              size: 20,
+                            ),
                             color: AppColors.textSecondary,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -912,12 +1065,23 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
                               '${_quantity.toInt()} ${widget.product.standardUnit}',
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                           IconButton(
-                            onPressed: () => setState(() => _quantity = (_quantity + 1.0).clamp(1.0, 100.0)),
-                            icon: const Icon(Icons.add_circle_outline, size: 20),
+                            onPressed: () => setState(
+                              () => _quantity = (_quantity + 1.0).clamp(
+                                1.0,
+                                100.0,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 20,
+                            ),
                             color: AppColors.primary,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -928,21 +1092,27 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   ),
                   const SizedBox(height: 8),
                   // Quantity quick preset chips
-                  Row(
-                    children: [1.0, 2.0, 5.0, 10.0, 25.0].map((qty) {
-                      final isSelected = _quantity == qty;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          label: Text('${qty.toInt()} ${widget.product.standardUnit}', style: const TextStyle(fontSize: 11)),
-                          selected: isSelected,
-                          selectedColor: AppColors.primaryTint,
-                          onSelected: (val) {
-                            if (val) setState(() => _quantity = qty);
-                          },
-                        ),
-                      );
-                    }).toList(),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [1.0, 2.0, 5.0, 10.0, 25.0].map((qty) {
+                        final isSelected = _quantity == qty;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(
+                              '${qty.toInt()} ${widget.product.standardUnit}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            selected: isSelected,
+                            selectedColor: AppColors.primaryTint,
+                            onSelected: (val) {
+                              if (val) setState(() => _quantity = qty);
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -950,7 +1120,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     children: [
                       const Text(
                         'Estimated Basket Outlay:',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       Text(
                         _formatAmount(estimatedBasketTotal),
@@ -983,11 +1156,15 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                           unit: widget.product.standardUnit,
                           estimatedUnitPrice: lowestQuotePrice,
                           priority: CommodityPriority.essential,
-                          brandOrGrade: widget.product.brandOrGrade ?? 'Standard Grade',
+                          brandOrGrade:
+                              widget.product.brandOrGrade ?? 'Standard Grade',
                           standardizedUnit: widget.product.baseUnit,
-                          specification: 'Added from Discover catalog comparison',
+                          specification:
+                              'Added from Discover catalog comparison',
                         );
-                        ref.read(decisionLabProvider.notifier).addShoppingItem(item);
+                        ref
+                            .read(decisionLabProvider.notifier)
+                            .addShoppingItem(item);
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -1004,10 +1181,15 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                      icon: const Icon(
+                        Icons.add_shopping_cart_rounded,
+                        size: 18,
+                      ),
                       label: Text(
                         'Add to Comparison Basket (${_formatAmount(estimatedBasketTotal)})',
                         style: const TextStyle(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ),
@@ -1016,7 +1198,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                 IconButton(
                   onPressed: () => _showReportStaleDialog(context),
                   tooltip: 'Report Stale or Suspicious Observation',
-                  icon: const Icon(Icons.flag_outlined, color: AppColors.badgeWarningText),
+                  icon: const Icon(
+                    Icons.flag_outlined,
+                    color: AppColors.badgeWarningText,
+                  ),
                 ),
               ],
             ),
@@ -1026,7 +1211,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     );
   }
 
-  Widget _buildChannelFilterChip({required String label, required String? channel}) {
+  Widget _buildChannelFilterChip({
+    required String label,
+    required String? channel,
+  }) {
     final isSelected = _selectedChannelFilter == channel;
     return ChoiceChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
@@ -1091,7 +1279,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     );
   }
 
-  Widget _buildMultiCriteriaAnalysisSection(MultiCriteriaAnalysisResult result) {
+  Widget _buildMultiCriteriaAnalysisSection(
+    MultiCriteriaAnalysisResult result,
+  ) {
     final rec = result.recommendedOption;
 
     return Container(
@@ -1121,30 +1311,36 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       color: AppColors.primary.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.primary),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
-                          children: [
-                            Text(
-                              'Meta AI Multi-Criteria Options Matrix',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primaryDark,
-                              ),
-                            ),
-                          ],
+                        const Text(
+                          'Meta AI Multi-Criteria Options Matrix',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primaryDark,
+                          ),
                         ),
                         Text(
                           'Evaluated on Distance, Price, Quality, Delivery, Trust & Support',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary.withValues(alpha: 0.9),
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.9,
+                            ),
                           ),
                         ),
                       ],
@@ -1170,12 +1366,23 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Buyer Priority Preference:',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      const Expanded(
+                        child: Text(
+                          'Buyer Priority Preference:',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
@@ -1183,7 +1390,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         ),
                         child: Text(
                           '${result.evaluatedOptions.length} Options Evaluated',
-                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -1202,15 +1413,21 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                               p.label,
                               style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                color: isSel ? AppColors.primary : AppColors.textPrimary,
+                                fontWeight: isSel
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color: isSel
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
                               ),
                             ),
                             selected: isSel,
                             selectedColor: AppColors.primaryTint,
                             backgroundColor: Colors.white,
                             side: BorderSide(
-                              color: isSel ? AppColors.primary : AppColors.cardBorder,
+                              color: isSel
+                                  ? AppColors.primary
+                                  : AppColors.cardBorder,
                             ),
                             onSelected: (val) {
                               if (val) {
@@ -1225,7 +1442,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   const SizedBox(height: 4),
                   Text(
                     _decisionPriority.description,
-                    style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 14),
 
@@ -1236,7 +1457,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF81C784), width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFF81C784),
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),
@@ -1252,19 +1476,29 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFFF8E1),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFFFFD54F)),
+                                  border: Border.all(
+                                    color: const Color(0xFFFFD54F),
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.stars_rounded, size: 14, color: Color(0xFFF57F17)),
+                                    const Icon(
+                                      Icons.stars_rounded,
+                                      size: 14,
+                                      color: Color(0xFFF57F17),
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      rec.recommendationBadge ?? 'Top Recommendation',
+                                      rec.recommendationBadge ??
+                                          'Top Recommendation',
                                       style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
@@ -1275,7 +1509,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryTint,
                                   borderRadius: BorderRadius.circular(8),
@@ -1312,7 +1549,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                     const SizedBox(height: 2),
                                     Text(
                                       '${rec.channel.displayName} • ${rec.formattedStandardizedRate}',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1330,7 +1570,12 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                   ),
                                   Text(
                                     'Landed Outlay',
-                                    style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary.withValues(alpha: 0.8)),
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: AppColors.textSecondary.withValues(
+                                        alpha: 0.8,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1346,7 +1591,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                               _buildCriteriaPill(
                                 Icons.near_me_outlined,
                                 'Distance',
-                                rec.distanceKm == 0 ? 'Doorstep' : '${rec.distanceKm.toStringAsFixed(1)} km',
+                                rec.distanceKm == 0
+                                    ? 'Doorstep'
+                                    : '${rec.distanceKm.toStringAsFixed(1)} km',
                                 const Color(0xFF1976D2),
                               ),
                               _buildCriteriaPill(
@@ -1370,7 +1617,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                               _buildCriteriaPill(
                                 Icons.support_agent_outlined,
                                 'Support',
-                                rec.customerSupportPolicy.split(' ').take(3).join(' '),
+                                rec.customerSupportPolicy
+                                    .split(' ')
+                                    .take(3)
+                                    .join(' '),
                                 const Color(0xFF00796B),
                               ),
                               _buildCriteriaPill(
@@ -1391,14 +1641,22 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 3),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF2E7D32)),
+                                      const Icon(
+                                        Icons.check_circle_outline,
+                                        size: 13,
+                                        color: Color(0xFF2E7D32),
+                                      ),
                                       const SizedBox(width: 5),
                                       Expanded(
                                         child: Text(
                                           pro,
-                                          style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textPrimary,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -1426,7 +1684,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.psychology_outlined, size: 15, color: AppColors.primary),
+                            Icon(
+                              Icons.psychology_outlined,
+                              size: 15,
+                              color: AppColors.primary,
+                            ),
                             SizedBox(width: 6),
                             Text(
                               'Meta Muse Spark Rationale',
@@ -1441,7 +1703,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         const SizedBox(height: 6),
                         Text(
                           result.executiveSummary,
-                          style: const TextStyle(fontSize: 11.5, height: 1.45, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            height: 1.45,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ],
                     ),
@@ -1450,10 +1716,15 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
 
                   // Toggle to view all options side by side
                   InkWell(
-                    onTap: () => setState(() => _showExpandedCriteria = !_showExpandedCriteria),
+                    onTap: () => setState(
+                      () => _showExpandedCriteria = !_showExpandedCriteria,
+                    ),
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(10),
@@ -1466,10 +1737,16 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             _showExpandedCriteria
                                 ? 'Hide Comparison Matrix'
                                 : 'Compare All ${result.evaluatedOptions.length} Options by Criteria',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
                           ),
                           Icon(
-                            _showExpandedCriteria ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            _showExpandedCriteria
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
                             size: 18,
                             color: AppColors.primary,
                           ),
@@ -1492,7 +1769,12 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     );
   }
 
-  Widget _buildCriteriaPill(IconData icon, String title, String value, Color color) {
+  Widget _buildCriteriaPill(
+    IconData icon,
+    String title,
+    String value,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1507,11 +1789,19 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
           const SizedBox(width: 4),
           Text(
             '$title: ',
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: color),
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
           Text(
             value,
-            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
           ),
         ],
       ),
@@ -1544,7 +1834,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     Expanded(
                       child: Text(
                         opt.observation.sellerName,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -1576,10 +1869,20 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Product Subtotal: ${opt.formattedSubtotal}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                  Text('Delivery Fee: ${opt.formattedDeliveryFee}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  Text(
+                    'Product Subtotal: ${opt.formattedSubtotal}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    'Delivery Fee: ${opt.formattedDeliveryFee}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
               Column(
@@ -1587,9 +1890,19 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                 children: [
                   Text(
                     opt.formattedTotalLandedCost,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  const Text('Total Landed', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                  const Text(
+                    'Total Landed',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1598,7 +1911,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
 
           Text(
             'Distance: ${opt.distanceKm == 0 ? "Doorstep" : "${opt.distanceKm.toStringAsFixed(1)} km"} • Quality: ${opt.qualityGrade} • Support: ${opt.customerSupportPolicy}',
-            style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),

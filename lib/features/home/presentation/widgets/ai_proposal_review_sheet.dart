@@ -496,6 +496,8 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                             children: [
                               Text(
                                 _items[i].productName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -511,6 +513,8 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                                     if (_items[i].preferredSellerType != null && _items[i].preferredSellerType != 'Any')
                                       'Pref: ${_items[i].preferredSellerType}',
                                   ].join(' • '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w600,
@@ -520,6 +524,8 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                               ],
                               Text(
                                 '₦${_items[i].estimatedUnitPrice.toStringAsFixed(0)} / ${_items[i].unit}  •  Subtotal: ₦${(_items[i].quantity * _items[i].estimatedUnitPrice).toStringAsFixed(0)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: AppColors.textSecondary,
@@ -528,8 +534,10 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         // Quantity adjuster
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
                               icon: const Icon(Icons.remove_circle_outline, size: 20),
@@ -539,9 +547,11 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                               onPressed: () => _updateQuantity(i, -1),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
                               child: Text(
-                                '${_items[i].quantity.toInt()} ${_items[i].unit}',
+                                '${_items[i].quantity % 1 == 0 ? _items[i].quantity.toInt() : _items[i].quantity} ${_items[i].unit}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -555,7 +565,7 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                               color: AppColors.primary,
                               onPressed: () => _updateQuantity(i, 1),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18),
                               padding: EdgeInsets.zero,
@@ -578,20 +588,29 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Estimated Basket Outlay:',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
+              const Expanded(
+                child: Text(
+                  'Estimated Basket Outlay:',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              Text(
-                '₦${_itemsTotal.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+              const SizedBox(width: 8),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '₦${_itemsTotal.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -618,9 +637,12 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                       ),
                     ),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text(
-                      'Confirm & Calculate Plans',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Confirm & Calculate Plans',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
                     ),
                   ),
                 ),

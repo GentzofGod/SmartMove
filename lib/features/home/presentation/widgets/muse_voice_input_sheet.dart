@@ -168,45 +168,46 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
             // Header
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryTint,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.mic_rounded,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Muse Voice Transcribe',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTint,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.mic_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Muse Voice Transcribe',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
                         ),
-                        Text(
-                          'Multi-Dialect West African Speech-to-Text Model',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Multi-Dialect West African Speech-to-Text Model',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
-                  ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, size: 22),
@@ -225,15 +226,19 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                   color: AppColors.primary,
                 ),
                 const SizedBox(width: 5),
-                const Text(
-                  'Select Spoken Dialect / Vernacular:',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                const Expanded(
+                  child: Text(
+                    'Select Spoken Dialect / Vernacular:',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -443,38 +448,45 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Transcribed Request:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (_transcriptionResult != null) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE7F6),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFD1C4E9)),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Transcribed Request:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
-                        child: Text(
-                          _transcriptionResult!.detectedDialect.label,
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF512DA8),
+                      ),
+                      if (_transcriptionResult != null) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE7F6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFD1C4E9)),
+                            ),
+                            child: Text(
+                              _transcriptionResult!.detectedDialect.label,
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF512DA8),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 const Text(
                   'Text Fallback Ready',
                   style: TextStyle(
@@ -550,24 +562,31 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.g_translate_rounded,
-                              size: 14,
-                              color: Color(0xFF3538CD),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'English Translation (${_transcriptionResult!.detectedDialect.label}):',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.g_translate_rounded,
+                                size: 14,
                                 color: Color(0xFF3538CD),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  'English Translation (${_transcriptionResult!.detectedDialect.label}):',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF3538CD),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         InkWell(
                           key: const ValueKey('btn_use_translation'),
                           onTap: () {

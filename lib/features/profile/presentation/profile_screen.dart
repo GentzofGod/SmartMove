@@ -17,6 +17,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notificationsEnabled = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authProvider.notifier).refreshProfileFromDatabase();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final decisionState = ref.watch(decisionLabProvider);
     final userSession = ref.watch(authProvider);
@@ -33,6 +41,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             color: AppColors.textPrimary,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync_rounded, color: AppColors.textPrimary),
+            tooltip: 'Sync Role with Database',
+            onPressed: () async {
+              await ref.read(authProvider.notifier).refreshProfileFromDatabase();
+              if (context.mounted) {
+                final currentRole = ref.read(authProvider).role;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: AppColors.primary,
+                    content: Text('Profile synced with database! Current role: $currentRole'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
