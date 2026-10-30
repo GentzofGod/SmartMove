@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
 import '../models/errand.dart';
+import '../models/seller_application.dart';
 
 class SupabaseDataService {
   static SupabaseClient? get _client {
@@ -178,6 +179,76 @@ class SupabaseDataService {
 
         await client.from('shopping_items').insert(shoppingRows);
       }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetch pending and reviewed seller applications from Cloud Supabase
+  static Future<List<SellerApplication>?> fetchSellerApplications() async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final response = await client
+          .from('seller_applications')
+          .select()
+          .order('submitted_at', ascending: false);
+
+      final List<dynamic> data = response as List<dynamic>;
+      if (data.isEmpty) return null;
+
+      return data.map((json) {
+        return SellerApplication.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Submit a seller application to Cloud Supabase
+  static Future<bool> insertSellerApplication(SellerApplication app) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final user = client.auth.currentUser;
+      final payload = app.toDbMap();
+      if (user != null) {
+        payload['user_id'] = user.id;
+      }
+      await client.from('seller_applications').insert(payload);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update application review status in Cloud Supabase (Admin approval / rejection)
+  static Future<bool> updateSellerApplicationStatus({
+    required String applicationId,
+    required SellerApplicationStatus status,
+    String? reason,
+  }) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final reviewer = client.auth.currentUser;
+      final updateData = <String, dynamic>{
+        'status': status.name,
+        'reviewed_at': DateTime.now().toIso8601String(),
+        'reviewed_by': reviewer?.id,
+      };
+      if (reason != null && reason.isNotEmpty) {
+        updateData['rejection_reason'] = reason;
+      }
+
+      await client
+          .from('seller_applications')
+          .update(updateData)
+          .eq('id', applicationId);
       return true;
     } catch (_) {
       return false;

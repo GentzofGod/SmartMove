@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/seller_application.dart';
 
 enum UserRole {
   customer,
@@ -43,6 +44,8 @@ class UserSession {
   final String? marketHub;
   final String? sellerChannel;
   final String? phone;
+  final String? stallLocation;
+  final SellerApplicationStatus sellerApplicationStatus;
 
   const UserSession({
     required this.id,
@@ -54,6 +57,8 @@ class UserSession {
     this.marketHub,
     this.sellerChannel,
     this.phone,
+    this.stallLocation,
+    this.sellerApplicationStatus = SellerApplicationStatus.none,
   });
 
   bool get isSeller => role == 'Trader' || role == 'Seller';
@@ -61,6 +66,16 @@ class UserSession {
   bool get isCustomer => !isSeller && !isAdmin;
   bool get canModerate => isAdmin;
   bool get canSubmitVerifiedListing => isSeller || isAdmin;
+  bool get isPendingSeller =>
+      sellerApplicationStatus == SellerApplicationStatus.pending;
+  bool get isApprovedSeller =>
+      isSeller || sellerApplicationStatus == SellerApplicationStatus.approved;
+  bool get isRejectedSeller =>
+      sellerApplicationStatus == SellerApplicationStatus.rejected;
+  bool get canApplyForSeller =>
+      isCustomer &&
+      (sellerApplicationStatus == SellerApplicationStatus.none ||
+          sellerApplicationStatus == SellerApplicationStatus.rejected);
 
   static const guest = UserSession(
     id: 'usr-guest-001',
@@ -80,6 +95,8 @@ class UserSession {
         'marketHub': marketHub,
         'sellerChannel': sellerChannel,
         'phone': phone,
+        'stallLocation': stallLocation,
+        'sellerApplicationStatus': sellerApplicationStatus.name,
       };
 
   factory UserSession.fromJson(Map<String, dynamic> json) => UserSession(
@@ -92,6 +109,13 @@ class UserSession {
         marketHub: json['marketHub'] as String?,
         sellerChannel: json['sellerChannel'] as String?,
         phone: json['phone'] as String?,
+        stallLocation: json['stallLocation'] as String?,
+        sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
+          (s) => s.name == json['sellerApplicationStatus'],
+          orElse: () => json['role'] == 'Trader'
+              ? SellerApplicationStatus.approved
+              : SellerApplicationStatus.none,
+        ),
       );
 
   UserSession copyWith({
@@ -104,6 +128,8 @@ class UserSession {
     String? marketHub,
     String? sellerChannel,
     String? phone,
+    String? stallLocation,
+    SellerApplicationStatus? sellerApplicationStatus,
   }) {
     return UserSession(
       id: id ?? this.id,
@@ -115,6 +141,9 @@ class UserSession {
       marketHub: marketHub ?? this.marketHub,
       sellerChannel: sellerChannel ?? this.sellerChannel,
       phone: phone ?? this.phone,
+      stallLocation: stallLocation ?? this.stallLocation,
+      sellerApplicationStatus:
+          sellerApplicationStatus ?? this.sellerApplicationStatus,
     );
   }
 }
@@ -155,17 +184,25 @@ class AuthService {
       final user = client.auth.currentUser;
       if (user != null) {
         final meta = user.userMetadata ?? {};
+        final role = (meta['role'] as String?) ?? 'Customer';
         final session = UserSession(
           id: user.id,
           email: user.email ?? 'user@smartmove.app',
           displayName: (meta['name'] as String?) ??
               user.email?.split('@').first ??
               'User',
-          role: (meta['role'] as String?) ?? 'Customer',
+          role: role,
           businessName: meta['business_name'] as String?,
           marketHub: meta['market_hub'] as String?,
           sellerChannel: meta['seller_channel'] as String?,
           phone: meta['phone'] as String?,
+          stallLocation: meta['stall_location'] as String?,
+          sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
+            (s) => s.name == meta['seller_application_status'],
+            orElse: () => role == 'Trader'
+                ? SellerApplicationStatus.approved
+                : SellerApplicationStatus.none,
+          ),
           isGuest: false,
         );
         await persistSession(session);
@@ -199,17 +236,25 @@ class AuthService {
         final user = response.user;
         if (user != null) {
           final meta = user.userMetadata ?? {};
+          final role = (meta['role'] as String?) ?? 'Customer';
           final session = UserSession(
             id: user.id,
             email: user.email ?? email,
             displayName: (meta['name'] as String?) ??
                 user.email?.split('@').first ??
                 'User',
-            role: (meta['role'] as String?) ?? 'Customer',
+            role: role,
             businessName: meta['business_name'] as String?,
             marketHub: meta['market_hub'] as String?,
             sellerChannel: meta['seller_channel'] as String?,
             phone: meta['phone'] as String?,
+            stallLocation: meta['stall_location'] as String?,
+            sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
+              (s) => s.name == meta['seller_application_status'],
+              orElse: () => role == 'Trader'
+                  ? SellerApplicationStatus.approved
+                  : SellerApplicationStatus.none,
+            ),
             isGuest: false,
           );
           await persistSession(session);
@@ -237,31 +282,27 @@ class AuthService {
       businessName: isTrader ? '${email.split('@').first} Enterprise' : null,
       marketHub: isTrader ? 'Bodija Market' : null,
       sellerChannel: isTrader ? 'Local Market' : null,
+      sellerApplicationStatus: isTrader
+          ? SellerApplicationStatus.approved
+          : SellerApplicationStatus.none,
       isGuest: false,
     );
     await persistSession(session);
     return session;
   }
 
-  /// Sign up with Email & Password
+  /// Sign up with Email & Password (all accounts initialize as Customer)
   static Future<UserSession> signUpWithEmail({
     required String email,
     required String password,
     required String displayName,
     String role = 'Customer',
-    String? businessName,
-    String? marketHub,
-    String? sellerChannel,
-    String? phone,
   }) async {
     final client = _client;
     final metadata = {
       'name': displayName,
       'role': role,
-      if (businessName != null && businessName.isNotEmpty) 'business_name': businessName,
-      if (marketHub != null && marketHub.isNotEmpty) 'market_hub': marketHub,
-      if (sellerChannel != null && sellerChannel.isNotEmpty) 'seller_channel': sellerChannel,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      'seller_application_status': SellerApplicationStatus.none.name,
     };
 
     if (client != null) {
@@ -279,10 +320,7 @@ class AuthService {
             displayName: displayName,
             isGuest: false,
             role: role,
-            businessName: businessName,
-            marketHub: marketHub,
-            sellerChannel: sellerChannel,
-            phone: phone,
+            sellerApplicationStatus: SellerApplicationStatus.none,
           );
           await persistSession(session);
           return session;
@@ -298,10 +336,7 @@ class AuthService {
       displayName: displayName,
       isGuest: false,
       role: role,
-      businessName: businessName,
-      marketHub: marketHub,
-      sellerChannel: sellerChannel,
-      phone: phone,
+      sellerApplicationStatus: SellerApplicationStatus.none,
     );
     await persistSession(session);
     return session;

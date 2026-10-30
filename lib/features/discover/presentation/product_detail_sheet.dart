@@ -170,18 +170,16 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     final matching = communityObs
         .where((o) =>
             o.productId == widget.product.id ||
-            o.productName.toLowerCase() == widget.product.name.toLowerCase())
+            o.productName.toLowerCase() == widget.product.name.toLowerCase() ||
+            o.productName.toLowerCase().contains(widget.product.name.toLowerCase()) ||
+            widget.product.name.toLowerCase().contains(o.productName.toLowerCase()))
         .toList();
-
-    if (matching.length >= 2) {
-      return matching;
-    }
 
     // Synthesize multi-channel benchmark quotes across Local Market, SMB Store, Online Retailer
     final basePrice = widget.product.lowestPrice;
     final now = DateTime.now();
 
-    return [
+    final benchmarks = [
       PriceObservation(
         id: 'quote-local-${widget.product.id}',
         productId: widget.product.id,
@@ -243,6 +241,20 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
         notes: 'Online listing with home delivery option.',
       ),
     ];
+
+    if (matching.isEmpty) {
+      return benchmarks;
+    }
+
+    final combined = <PriceObservation>[...matching];
+    for (final b in benchmarks) {
+      if (!combined.any((c) =>
+          c.channel.toLowerCase() == b.channel.toLowerCase() ||
+          c.sellerName.toLowerCase() == b.sellerName.toLowerCase())) {
+        combined.add(b);
+      }
+    }
+    return combined;
   }
 
   @override

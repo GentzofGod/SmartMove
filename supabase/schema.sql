@@ -15,11 +15,13 @@ DROP TABLE IF EXISTS public.itinerary_stops CASCADE;
 DROP TABLE IF EXISTS public.user_plans CASCADE;
 DROP TABLE IF EXISTS public.shopping_items CASCADE;
 DROP TABLE IF EXISTS public.errands CASCADE;
+DROP TABLE IF EXISTS public.seller_applications CASCADE;
 DROP TABLE IF EXISTS public.price_observations CASCADE;
 DROP TABLE IF EXISTS public.products CASCADE;
 DROP TABLE IF EXISTS public.markets CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
+DROP TYPE IF EXISTS public.seller_application_status CASCADE;
 DROP TYPE IF EXISTS public.observation_source CASCADE;
 DROP TYPE IF EXISTS public.errand_priority CASCADE;
 DROP TYPE IF EXISTS public.user_role CASCADE;
@@ -31,7 +33,15 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TYPE public.user_role AS ENUM (
   'Customer',
-  'Trader'
+  'Trader',
+  'Admin'
+);
+
+CREATE TYPE public.seller_application_status AS ENUM (
+  'none',
+  'pending',
+  'approved',
+  'rejected'
 );
 
 CREATE TYPE public.observation_source AS ENUM (
@@ -55,13 +65,18 @@ CREATE TABLE public.profiles (
   email TEXT NOT NULL,
   display_name TEXT NOT NULL,
   role public.user_role NOT NULL DEFAULT 'Customer',
+  business_name TEXT,
+  market_hub TEXT,
+  seller_channel TEXT,
+  stall_location TEXT,
+  seller_application_status public.seller_application_status NOT NULL DEFAULT 'none',
   avatar_url TEXT,
   phone TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- Trigger to auto-create user profile when auth.users signs up
+-- Trigger to auto-create user profile when auth.users signs up (all default to Customer)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -69,12 +84,19 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, display_name, role)
+  INSERT INTO public.profiles (
+    id, email, display_name, role, business_name, market_hub, seller_channel, stall_location, seller_application_status
+  )
   VALUES (
     NEW.id,
     COALESCE(NEW.email, ''),
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1), 'User'),
-    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'Customer'::public.user_role)
+    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'Customer'::public.user_role),
+    NEW.raw_user_meta_data->>'business_name',
+    NEW.raw_user_meta_data->>'market_hub',
+    NEW.raw_user_meta_data->>'seller_channel',
+    NEW.raw_user_meta_data->>'stall_location',
+    COALESCE((NEW.raw_user_meta_data->>'seller_application_status')::public.seller_application_status, 'none'::public.seller_application_status)
   );
   RETURN NEW;
 END;
@@ -231,7 +253,66 @@ CREATE TABLE public.saved_items (
 );
 
 -- ------------------------------------------------------------------------------
--- 13. ROW LEVEL SECURITY (RLS) POLICIES
+-- 13. SELLER APPLICATIONS TABLE & REVIEW TRIGGER
+-- ------------------------------------------------------------------------------
+CREATE TABLE public.seller_applications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  applicant_name TEXT NOT NULL,
+  applicant_email TEXT NOT NULL,
+  business_name TEXT NOT NULL,
+  market_hub TEXT NOT NULL,
+  seller_channel TEXT NOT NULL DEFAULT 'Local Market',
+  stall_location TEXT,
+  phone TEXT NOT NULL,
+  status public.seller_application_status NOT NULL DEFAULT 'pending',
+  rejection_reason TEXT,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX idx_seller_applications_user ON public.seller_applications(user_id);
+CREATE INDEX idx_seller_applications_status ON public.seller_applications(status);
+
+-- Trigger to automatically promote user profile when application is approved
+CREATE OR REPLACE FUNCTION public.handle_seller_application_review()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status = 'approved' AND (OLD IS NULL OR OLD.status != 'approved') THEN
+    UPDATE public.profiles
+    SET role = 'Trader',
+        business_name = NEW.business_name,
+        market_hub = NEW.market_hub,
+        seller_channel = NEW.seller_channel,
+        stall_location = NEW.stall_location,
+        phone = COALESCE(NEW.phone, public.profiles.phone),
+        seller_application_status = 'approved',
+        updated_at = timezone('utc'::text, now())
+    WHERE id = NEW.user_id;
+  ELSIF NEW.status = 'rejected' AND (OLD IS NULL OR OLD.status != 'rejected') THEN
+    UPDATE public.profiles
+    SET seller_application_status = 'rejected',
+        updated_at = timezone('utc'::text, now())
+    WHERE id = NEW.user_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_seller_application_status_changed
+  AFTER INSERT OR UPDATE OF status ON public.seller_applications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_seller_application_review();
+
+-- ------------------------------------------------------------------------------
+-- 14. ROW LEVEL SECURITY (RLS) POLICIES
 -- ------------------------------------------------------------------------------
 
 -- Enable RLS across all tables
@@ -239,6 +320,7 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.markets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.price_observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.seller_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.errands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shopping_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_plans ENABLE ROW LEVEL SECURITY;
@@ -312,8 +394,30 @@ CREATE POLICY "Users can manage their saved items"
   ON public.saved_items FOR ALL 
   USING (auth.uid() = user_id);
 
+-- Seller Applications: Users can submit & view their own, Admins can view & update all
+CREATE POLICY "Users can submit their own seller application"
+  ON public.seller_applications FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users and admins can view seller applications"
+  ON public.seller_applications FOR SELECT
+  USING (
+    auth.uid() = user_id OR
+    EXISTS (
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+    )
+  );
+
+CREATE POLICY "Admins can update seller applications"
+  ON public.seller_applications FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+    )
+  );
+
 -- ------------------------------------------------------------------------------
--- 14. INITIAL SEED DATA (Nigerian Markets & Baseline Prices)
+-- 15. INITIAL SEED DATA (Nigerian Markets & Baseline Prices)
 -- ------------------------------------------------------------------------------
 INSERT INTO public.markets (id, name, city, state, latitude, longitude, description) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Market A (Oyingbo Market)', 'Lagos', 'Lagos', 6.4950, 3.3780, 'Major wholesale and retail agricultural market on Lagos Mainland.'),

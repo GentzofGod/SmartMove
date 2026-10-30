@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
+import '../models/seller_application.dart';
 import '../models/errand.dart';
 import '../models/itinerary_stop.dart';
 import '../models/plan_candidate.dart';
@@ -12,6 +13,7 @@ import '../services/meta_ai_service.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import '../services/supabase_data_service.dart';
+import '../services/commodity_comparison_service.dart';
 
 // --- Products State ---
 class ProductsNotifier extends Notifier<List<Product>> {
@@ -458,27 +460,43 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     String? brandOrGrade,
     double? standardizedUnitPrice,
     bool inStock = true,
+    String? marketLocation,
+    String? notes,
   }) {
+    final multiplier = CommodityComparisonService.calculateUnitMultiplier(
+      unit,
+      commodityName: productName,
+    );
+    final computedUnitPrice = standardizedUnitPrice ??
+        (multiplier > 0 ? (price / multiplier) : price);
+    final baseUnit = CommodityComparisonService.resolveBaseUnit(unit, commodityName: productName);
+
+    final isTrader = submitterRole == 'Trader' || submitterRole == 'Seller';
+    final isAdmin = submitterRole == 'Admin' || submitterRole == 'Administrator';
+
     final newObs = PriceObservation(
       id: 'obs-${DateTime.now().millisecondsSinceEpoch}',
       productId: 'p-custom',
       productName: productName,
       sellerName: sellerName,
-      marketLocation: sellerName,
+      marketLocation: marketLocation ?? sellerName,
       price: price,
       unit: unit,
       timestamp: DateTime.now(),
-      sourceType: submitterRole == 'Trader'
+      sourceType: isTrader
           ? ObservationSource.traderConfirmed
-          : ObservationSource.communityReported,
+          : (isAdmin
+              ? ObservationSource.independentlyVerified
+              : ObservationSource.communityReported),
       submitterName: submitterName,
       submitterRole: submitterRole,
-      isVerified: submitterRole == 'Trader' || submitterRole == 'Admin',
-      notes: 'Submitted via SmartMove app.',
+      isVerified: isTrader || isAdmin,
+      notes: notes ?? 'Submitted via SmartMove app.',
       channel: channel,
       brandOrGrade: brandOrGrade,
       inStock: inStock,
-      standardizedUnitPrice: standardizedUnitPrice ?? price,
+      standardizedUnitPrice: computedUnitPrice,
+      baseUnit: baseUnit,
     );
     state = [newObs, ...state];
 
@@ -502,6 +520,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
             sourceType: isVerified
                 ? ObservationSource.independentlyVerified
                 : ObservationSource.communityReported,
+            isFlaggedAnomaly: isVerified ? false : o.isFlaggedAnomaly,
           )
         else
           o,
@@ -515,6 +534,49 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           o.copyWith(
             price: newPrice,
             timestamp: DateTime.now(),
+            standardizedUnitPrice: () {
+              final mult = CommodityComparisonService.calculateUnitMultiplier(
+                  o.unit,
+                  commodityName: o.productName);
+              return mult > 0 ? (newPrice / mult) : newPrice;
+            }(),
+          )
+        else
+          o,
+    ];
+  }
+
+  void updateListingDetails({
+    required String id,
+    required double price,
+    String? unit,
+    String? brandOrGrade,
+    bool? inStock,
+    String? notes,
+    String? channel,
+    String? sellerName,
+    String? marketLocation,
+  }) {
+    state = [
+      for (final o in state)
+        if (o.id == id)
+          o.copyWith(
+            price: price,
+            unit: unit ?? o.unit,
+            brandOrGrade: brandOrGrade ?? o.brandOrGrade,
+            inStock: inStock ?? o.inStock,
+            notes: notes ?? o.notes,
+            channel: channel ?? o.channel,
+            sellerName: sellerName ?? o.sellerName,
+            marketLocation: marketLocation ?? o.marketLocation,
+            timestamp: DateTime.now(),
+            standardizedUnitPrice: () {
+              final effectiveUnit = unit ?? o.unit;
+              final mult = CommodityComparisonService.calculateUnitMultiplier(
+                  effectiveUnit,
+                  commodityName: o.productName);
+              return mult > 0 ? (price / mult) : price;
+            }(),
           )
         else
           o,
@@ -527,6 +589,24 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
         if (o.id == id)
           o.copyWith(
             inStock: !o.inStock,
+            timestamp: DateTime.now(),
+          )
+        else
+          o,
+    ];
+  }
+
+  void deleteListing(String id) {
+    state = state.where((o) => o.id != id).toList();
+  }
+
+  void flagListingAnomaly(String id, {required bool isAnomalous, String? reason}) {
+    state = [
+      for (final o in state)
+        if (o.id == id)
+          o.copyWith(
+            isFlaggedAnomaly: isAnomalous,
+            anomalyReason: reason,
           )
         else
           o,
@@ -571,6 +651,9 @@ class AuthNotifier extends Notifier<UserSession> {
       businessName: defaultBiz,
       marketHub: defaultHub,
       sellerChannel: defaultChannel,
+      sellerApplicationStatus: newRole == 'Trader'
+          ? SellerApplicationStatus.approved
+          : state.sellerApplicationStatus,
     );
     AuthService.persistSession(state);
   }
@@ -590,6 +673,40 @@ class AuthNotifier extends Notifier<UserSession> {
     AuthService.persistSession(state);
   }
 
+  void submitSellerApplication({
+    required String businessName,
+    required String marketHub,
+    required String sellerChannel,
+    required String phone,
+    String? stallLocation,
+  }) {
+    state = state.copyWith(
+      businessName: businessName,
+      marketHub: marketHub,
+      sellerChannel: sellerChannel,
+      phone: phone,
+      stallLocation: stallLocation,
+      sellerApplicationStatus: SellerApplicationStatus.pending,
+    );
+    AuthService.persistSession(state);
+  }
+
+  void approveSellerStatus() {
+    state = state.copyWith(
+      role: 'Trader',
+      sellerApplicationStatus: SellerApplicationStatus.approved,
+    );
+    AuthService.persistSession(state);
+  }
+
+  void rejectSellerStatus({String? reason}) {
+    state = state.copyWith(
+      role: 'Customer',
+      sellerApplicationStatus: SellerApplicationStatus.rejected,
+    );
+    AuthService.persistSession(state);
+  }
+
   Future<void> logout() async {
     await AuthService.signOut();
     state = UserSession.guest;
@@ -598,6 +715,157 @@ class AuthNotifier extends Notifier<UserSession> {
 
 final authProvider = NotifierProvider<AuthNotifier, UserSession>(
   AuthNotifier.new,
+);
+
+// --- Seller Applications State ---
+class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
+  @override
+  List<SellerApplication> build() {
+    _fetchLive();
+    return _getInitialApplications();
+  }
+
+  Future<void> _fetchLive() async {
+    final live = await SupabaseDataService.fetchSellerApplications();
+    if (live != null && live.isNotEmpty) {
+      state = live;
+    }
+  }
+
+  List<SellerApplication> _getInitialApplications() {
+    final now = DateTime.now();
+    return [
+      SellerApplication(
+        id: 'app-seed-001',
+        userId: 'usr-kudirat',
+        applicantName: 'Alhaja Kudirat',
+        applicantEmail: 'kudirat.grains@gmail.com',
+        businessName: 'Alhaja Kudirat Grains & Staples',
+        marketHub: 'Bodija Market',
+        sellerChannel: 'Local Market',
+        stallLocation: 'Stall B44, Bodija Market Wholesale Hub',
+        phone: '+234 803 234 5678',
+        status: SellerApplicationStatus.pending,
+        submittedAt: now.subtract(const Duration(hours: 3)),
+      ),
+      SellerApplication(
+        id: 'app-seed-002',
+        userId: 'usr-bello',
+        applicantName: 'Mama Bello',
+        applicantEmail: 'bello@bodijamarket.ng',
+        businessName: 'Mama Bello Grains & Oil Enterprise',
+        marketHub: 'Bodija Market',
+        sellerChannel: 'Local Market',
+        stallLocation: 'Stall 14, Main Grain Line',
+        phone: '+234 802 345 6789',
+        status: SellerApplicationStatus.approved,
+        submittedAt: now.subtract(const Duration(days: 2)),
+        reviewedAt: now.subtract(const Duration(days: 1)),
+      ),
+    ];
+  }
+
+  void submitApplication({
+    required UserSession user,
+    required String businessName,
+    required String marketHub,
+    required String sellerChannel,
+    required String phone,
+    String? stallLocation,
+  }) {
+    final newApp = SellerApplication(
+      id: 'app-${DateTime.now().millisecondsSinceEpoch}',
+      userId: user.id,
+      applicantName: user.displayName,
+      applicantEmail: user.email,
+      businessName: businessName,
+      marketHub: marketHub,
+      sellerChannel: sellerChannel,
+      stallLocation: stallLocation,
+      phone: phone,
+      status: SellerApplicationStatus.pending,
+      submittedAt: DateTime.now(),
+    );
+
+    state = [newApp, ...state];
+
+    // Asynchronously sync to Cloud Supabase
+    SupabaseDataService.insertSellerApplication(newApp);
+
+    // Update current user session to pending review
+    ref.read(authProvider.notifier).submitSellerApplication(
+          businessName: businessName,
+          marketHub: marketHub,
+          sellerChannel: sellerChannel,
+          phone: phone,
+          stallLocation: stallLocation,
+        );
+  }
+
+  void approveApplication(String applicationId) {
+    state = [
+      for (final app in state)
+        if (app.id == applicationId)
+          app.copyWith(
+            status: SellerApplicationStatus.approved,
+            reviewedAt: DateTime.now(),
+          )
+        else
+          app,
+    ];
+
+    // Asynchronously sync approval to Cloud Supabase
+    SupabaseDataService.updateSellerApplicationStatus(
+      applicationId: applicationId,
+      status: SellerApplicationStatus.approved,
+    );
+
+    // If the approved application belongs to current user, upgrade them to Trader
+    final currentUser = ref.read(authProvider);
+    final app = state.firstWhere(
+      (a) => a.id == applicationId,
+      orElse: () => state.first,
+    );
+    if (app.userId == currentUser.id) {
+      ref.read(authProvider.notifier).approveSellerStatus();
+    }
+  }
+
+  void rejectApplication(String applicationId, {required String reason}) {
+    state = [
+      for (final app in state)
+        if (app.id == applicationId)
+          app.copyWith(
+            status: SellerApplicationStatus.rejected,
+            reviewedAt: DateTime.now(),
+            rejectionReason: reason,
+          )
+        else
+          app,
+    ];
+
+    // Asynchronously sync rejection to Cloud Supabase
+    SupabaseDataService.updateSellerApplicationStatus(
+      applicationId: applicationId,
+      status: SellerApplicationStatus.rejected,
+      reason: reason,
+    );
+
+    // If the rejected application belongs to current user, mark rejected
+    final currentUser = ref.read(authProvider);
+    final app = state.firstWhere(
+      (a) => a.id == applicationId,
+      orElse: () => state.first,
+    );
+    if (app.userId == currentUser.id) {
+      ref.read(authProvider.notifier).rejectSellerStatus(reason: reason);
+    }
+  }
+}
+
+final sellerApplicationsProvider =
+    NotifierProvider<SellerApplicationsNotifier, List<SellerApplication>>(
+  SellerApplicationsNotifier.new,
 );
 
 // --- Location State ---

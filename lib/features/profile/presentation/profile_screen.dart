@@ -231,8 +231,109 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Seller Business Card (Visible when in Trader role)
-          if (userSession.isSeller) ...[
+          // Seller Application Card for Customers (or Pending Status)
+          if (userSession.isCustomer) ...[
+            if (userSession.canApplyForSeller) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00875A), Color(0xFF0052CC)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.storefront_rounded,
+                            color: Colors.white, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Sell on SmartMove',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Are you a commodity trader, market stall vendor, or supermarket store owner? Apply to become a Verified Seller to publish your prices directly to local shoppers.',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.white70, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          _showApplyToBecomeSeller(context, userSession),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.assignment_turned_in_rounded,
+                          size: 16),
+                      label: Text(
+                        userSession.isRejectedSeller
+                            ? 'Reapply as Verified Seller'
+                            : 'Apply to Become a Verified Seller',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ] else if (userSession.isPendingSeller) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFFFE082)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.pending_actions_rounded,
+                        color: Color(0xFFE65100), size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Seller Application Under Review',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFBF360C),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Your application for "${userSession.businessName ?? "your store"}" at ${userSession.marketHub ?? "Bodija Market"} is pending review by platform administrators.',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF795548),
+                                height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ] else if (userSession.isSeller) ...[
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -502,6 +603,208 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  void _showApplyToBecomeSeller(BuildContext context, UserSession session) {
+    final bizController = TextEditingController(text: session.businessName ?? '');
+    final phoneController = TextEditingController(text: session.phone ?? '');
+    final stallController = TextEditingController(text: session.stallLocation ?? '');
+    String selectedHub = session.marketHub ?? 'Bodija Market';
+    String selectedChannel = session.sellerChannel ?? 'Local Market';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Seller Verification Application',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Provide your business credentials. All applications undergo verification by market hub administrators before publishing access is granted.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Store / Stall Business Name',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: bizController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Mama Bello Provisions & Grains',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Market Hub Base',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedHub,
+                      items: const [
+                        'Bodija Market',
+                        'Dugbe Market',
+                        'Oje Market',
+                        'Oja Oba Market',
+                        'Gbagi Market',
+                        'Online Store',
+                      ].map((hub) => DropdownMenuItem(value: hub, child: Text(hub))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => selectedHub = val);
+                      },
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Seller Channel Type',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: ['Local Market', 'SMB Store', 'Online Retailer'].map((ch) {
+                        final isSel = selectedChannel == ch;
+                        return ChoiceChip(
+                          label: Text(ch),
+                          selected: isSel,
+                          selectedColor: AppColors.badgeSuccessBg,
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            color: isSel ? AppColors.primary : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedChannel = ch);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Stall Number / Location Address',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: stallController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Stall B44, Main Grain Section, Bodija',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'WhatsApp / Phone Number',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. +234 803 123 4567',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (bizController.text.trim().isEmpty || phoneController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please provide your business name and contact phone.'),
+                                backgroundColor: AppColors.badgeErrorText,
+                              ),
+                            );
+                            return;
+                          }
+
+                          ref.read(sellerApplicationsProvider.notifier).submitApplication(
+                                user: session,
+                                businessName: bizController.text.trim(),
+                                marketHub: selectedHub,
+                                sellerChannel: selectedChannel,
+                                stallLocation: stallController.text.trim().isNotEmpty
+                                    ? stallController.text.trim()
+                                    : null,
+                                phone: phoneController.text.trim(),
+                              );
+
+                          Navigator.pop(bottomSheetContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Seller verification application submitted! Awaiting administrator approval.'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Submit Seller Application',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

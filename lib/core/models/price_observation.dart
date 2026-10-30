@@ -64,6 +64,8 @@ class PriceObservation {
   final bool inStock;
   final double? standardizedUnitPrice;
   final String baseUnit;
+  final bool isFlaggedAnomaly;
+  final String? anomalyReason;
 
   const PriceObservation({
     required this.id,
@@ -84,7 +86,26 @@ class PriceObservation {
     this.inStock = true,
     this.standardizedUnitPrice,
     this.baseUnit = 'kg',
+    this.isFlaggedAnomaly = false,
+    this.anomalyReason,
   });
+
+  bool get isConfirmed =>
+      isVerified &&
+      (sourceType == ObservationSource.traderConfirmed ||
+          sourceType == ObservationSource.independentlyVerified);
+
+  bool get isOnline => sourceType == ObservationSource.onlineGrounded;
+
+  bool get isSimulatedDemo => sourceType == ObservationSource.simulatedDemo;
+
+  String get verificationBadgeLabel {
+    if (isFlaggedAnomaly) return 'Anomaly Flagged';
+    if (isConfirmed) return 'Verified Confirmed';
+    if (isOnline) return 'Online Verified';
+    if (isSimulatedDemo) return 'Demo Benchmark';
+    return 'Community Reported';
+  }
 
   String get formattedPrice => '₦${price.toStringAsFixed(0).replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -126,6 +147,8 @@ class PriceObservation {
     bool? inStock,
     double? standardizedUnitPrice,
     String? baseUnit,
+    bool? isFlaggedAnomaly,
+    String? anomalyReason,
   }) {
     return PriceObservation(
       id: id ?? this.id,
@@ -147,6 +170,8 @@ class PriceObservation {
       standardizedUnitPrice:
           standardizedUnitPrice ?? this.standardizedUnitPrice,
       baseUnit: baseUnit ?? this.baseUnit,
+      isFlaggedAnomaly: isFlaggedAnomaly ?? this.isFlaggedAnomaly,
+      anomalyReason: anomalyReason ?? this.anomalyReason,
     );
   }
 }

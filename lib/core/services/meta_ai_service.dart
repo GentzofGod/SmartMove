@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../models/errand.dart';
 import '../models/plan_candidate.dart';
@@ -21,6 +22,26 @@ class PriceAnomaly {
     required this.deviationPercentage,
     required this.warningMessage,
     required this.recommendedAction,
+  });
+
+  String get anomalyType => issueType;
+  double get deviationPercent => deviationPercentage;
+}
+
+/// Aggregated result of scanning community candidate listings for outliers
+class PriceAnomalyAuditResult {
+  final bool hasAnomaly;
+  final List<PriceAnomaly> anomalousItems;
+  final double averageMarketPrice;
+  final double priceSpreadPercent;
+  final String explanation;
+
+  const PriceAnomalyAuditResult({
+    required this.hasAnomaly,
+    required this.anomalousItems,
+    required this.averageMarketPrice,
+    required this.priceSpreadPercent,
+    required this.explanation,
   });
 }
 
@@ -1265,5 +1286,70 @@ class MetaAiService {
     }
 
     return anomalies;
+  }
+
+  /// Evaluates an entire collection of candidate observations across markets to detect outliers
+  PriceAnomalyAuditResult auditPriceAnomalies({
+    required List<PriceObservation> candidates,
+  }) {
+    if (candidates.isEmpty) {
+      return const PriceAnomalyAuditResult(
+        hasAnomaly: false,
+        anomalousItems: [],
+        averageMarketPrice: 0.0,
+        priceSpreadPercent: 0.0,
+        explanation: 'No active listings currently available for audit.',
+      );
+    }
+
+    final prices = candidates.map((o) => o.standardizedUnitPrice ?? o.price).toList();
+    final avg = prices.reduce((a, b) => a + b) / prices.length;
+    final minPrice = prices.reduce(min);
+    final maxPrice = prices.reduce(max);
+    final spread = avg > 0 ? ((maxPrice - minPrice) / avg) * 100 : 0.0;
+
+    final anomalous = <PriceAnomaly>[];
+    for (final obs in candidates) {
+      final p = obs.standardizedUnitPrice ?? obs.price;
+      if (avg > 0 && p < avg * 0.50) {
+        final dev = ((avg - p) / avg) * 100;
+        anomalous.add(
+          PriceAnomaly(
+            observation: obs,
+            issueType: 'Unusually Low Price',
+            deviationPercentage: dev,
+            warningMessage:
+                '${obs.sellerName} quote (₦${obs.price.toStringAsFixed(0)}) is ${dev.toStringAsFixed(0)}% below market average.',
+            recommendedAction:
+                'Verify seller authenticity and quality before purchasing.',
+          ),
+        );
+      } else if (avg > 0 && p > avg * 1.60) {
+        final dev = ((p - avg) / avg) * 100;
+        anomalous.add(
+          PriceAnomaly(
+            observation: obs,
+            issueType: 'Surge / Excessive Markup',
+            deviationPercentage: dev,
+            warningMessage:
+                '${obs.sellerName} quote (₦${obs.price.toStringAsFixed(0)}) is ${dev.toStringAsFixed(0)}% above market average.',
+            recommendedAction:
+                'Check competing vendor stalls for fair standard pricing.',
+          ),
+        );
+      }
+    }
+
+    final explanation = anomalous.isNotEmpty
+        ? 'Meta AI identified ${anomalous.length} price outlier(s) exceeding normal variance (>50% deviation from ₦${avg.toStringAsFixed(0)} baseline).'
+        : 'All current prices fall within normal market variance.';
+
+    return PriceAnomalyAuditResult(
+      hasAnomaly: anomalous.isNotEmpty,
+      anomalousItems: anomalous,
+      averageMarketPrice: avg,
+      priceSpreadPercent: spread,
+      explanation: explanation,
+    );
   }
 }

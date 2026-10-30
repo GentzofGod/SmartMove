@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smartmove/core/models/seller_application.dart';
 import 'package:smartmove/core/services/auth_service.dart';
 
 void main() {
@@ -135,32 +136,50 @@ void main() {
       expect(restored.canModerate, isTrue);
     });
 
-    test('8. AuthService signUpWithEmail and fallback correctly captures seller profile details', () async {
+    test('8. AuthService signUpWithEmail defaults to Customer and supports seller application workflow', () async {
       final session = await AuthService.signUpWithEmail(
         email: 'ibadan.oil@gmail.com',
         password: 'secure_password_123',
         displayName: 'Ibadan Pure Oil',
-        role: 'Trader',
+      );
+
+      expect(session.email, equals('ibadan.oil@gmail.com'));
+      expect(session.role, equals('Customer'));
+      expect(session.isCustomer, isTrue);
+      expect(session.isSeller, isFalse);
+      expect(session.canApplyForSeller, isTrue);
+      expect(session.sellerApplicationStatus, equals(SellerApplicationStatus.none));
+
+      // Simulate applying for seller status
+      final pendingSession = session.copyWith(
         businessName: 'Ibadan Pure Oil Mills',
         marketHub: 'Bodija Market',
         sellerChannel: 'Local Market',
         phone: '+234 805 999 8877',
+        stallLocation: 'Stall B44',
+        sellerApplicationStatus: SellerApplicationStatus.pending,
       );
+      await AuthService.persistSession(pendingSession);
 
-      expect(session.email, equals('ibadan.oil@gmail.com'));
-      expect(session.role, equals('Trader'));
-      expect(session.businessName, equals('Ibadan Pure Oil Mills'));
-      expect(session.marketHub, equals('Bodija Market'));
-      expect(session.isSeller, isTrue);
+      final restoredPending = await AuthService.restorePersistedSession();
+      expect(restoredPending.isPendingSeller, isTrue);
+      expect(restoredPending.businessName, equals('Ibadan Pure Oil Mills'));
 
-      // Verify that session was persisted
-      final restored = await AuthService.restorePersistedSession();
-      expect(restored.businessName, equals('Ibadan Pure Oil Mills'));
-      expect(restored.marketHub, equals('Bodija Market'));
+      // Simulate admin approval
+      final approvedSession = restoredPending.copyWith(
+        role: 'Trader',
+        sellerApplicationStatus: SellerApplicationStatus.approved,
+      );
+      await AuthService.persistSession(approvedSession);
+
+      final restoredApproved = await AuthService.restorePersistedSession();
+      expect(restoredApproved.isSeller, isTrue);
+      expect(restoredApproved.isApprovedSeller, isTrue);
+      expect(restoredApproved.canSubmitVerifiedListing, isTrue);
     });
 
     test('9. AuthService signOut removes persisted session and restores to guest', () async {
-      final session = await AuthService.signUpWithEmail(
+      await AuthService.signUpWithEmail(
         email: 'temp@smartmove.app',
         password: 'password',
         displayName: 'Temp User',
@@ -174,3 +193,4 @@ void main() {
     });
   });
 }
+
