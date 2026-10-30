@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS public.errands CASCADE;
 DROP TABLE IF EXISTS public.seller_applications CASCADE;
 DROP TABLE IF EXISTS public.price_observations CASCADE;
 DROP TABLE IF EXISTS public.products CASCADE;
+DROP TABLE IF EXISTS public.commodity_categories CASCADE;
 DROP TABLE IF EXISTS public.markets CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
@@ -124,24 +125,56 @@ CREATE TABLE public.markets (
 );
 
 -- ------------------------------------------------------------------------------
--- 5. PRODUCTS TABLE
+-- 5. COMMODITY CATEGORIES TABLE
+-- ------------------------------------------------------------------------------
+CREATE TABLE public.commodity_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  icon_name TEXT,
+  description TEXT,
+  display_order INT NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX idx_commodity_categories_slug ON public.commodity_categories(slug);
+
+-- ------------------------------------------------------------------------------
+-- 6. PRODUCTS & COMMODITY CATALOG TABLE
 -- ------------------------------------------------------------------------------
 CREATE TABLE public.products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  category TEXT NOT NULL, -- 'Groceries', 'Electronics', 'Pharmacy', 'Others'
+  category TEXT NOT NULL, -- 'Groceries', 'Electronics', 'Pharmacy', 'Others', etc.
+  category_id UUID REFERENCES public.commodity_categories(id) ON DELETE SET NULL,
   standard_unit TEXT NOT NULL DEFAULT '1kg',
   lowest_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
   best_seller_id UUID REFERENCES public.markets(id) ON DELETE SET NULL,
   best_seller_name TEXT,
+  seller_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  brand_or_grade TEXT,
+  base_unit TEXT NOT NULL DEFAULT 'kg',
+  standardized_unit_price NUMERIC(12, 2),
+  channel TEXT NOT NULL DEFAULT 'Local Market',
+  in_stock BOOLEAN NOT NULL DEFAULT true,
+  description TEXT,
+  image_url TEXT,
+  observation_count INT NOT NULL DEFAULT 1,
+  source_type public.observation_source NOT NULL DEFAULT 'trader_provided',
   percentage_change NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
   is_cheapest BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+CREATE INDEX idx_products_category ON public.products(category);
+CREATE INDEX idx_products_created_by ON public.products(created_by);
+CREATE INDEX idx_products_channel ON public.products(channel);
+
 -- ------------------------------------------------------------------------------
--- 6. PRICE OBSERVATIONS TABLE
+-- 7. PRICE OBSERVATIONS TABLE
 -- ------------------------------------------------------------------------------
 CREATE TABLE public.price_observations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,9 +190,49 @@ CREATE TABLE public.price_observations (
   submitter_name TEXT NOT NULL,
   submitter_role public.user_role NOT NULL DEFAULT 'Customer',
   is_verified BOOLEAN NOT NULL DEFAULT false,
+  channel TEXT NOT NULL DEFAULT 'Local Market',
+  brand_or_grade TEXT,
+  in_stock BOOLEAN NOT NULL DEFAULT true,
+  standardized_unit_price NUMERIC(12, 2),
+  base_unit TEXT NOT NULL DEFAULT 'kg',
+  is_flagged_anomaly BOOLEAN NOT NULL DEFAULT false,
+  anomaly_reason TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
+
+CREATE INDEX idx_price_observations_product ON public.price_observations(product_id);
+CREATE INDEX idx_price_observations_submitter ON public.price_observations(submitter_id);
+CREATE INDEX idx_price_observations_channel ON public.price_observations(channel);
+
+-- Trigger to update product lowest price and observation count on new submission
+CREATE OR REPLACE FUNCTION public.handle_observation_inserted_metrics()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.product_id IS NOT NULL THEN
+    UPDATE public.products
+    SET lowest_price = LEAST(public.products.lowest_price, NEW.price),
+        best_seller_name = CASE 
+          WHEN NEW.price <= public.products.lowest_price THEN NEW.seller_name 
+          ELSE public.products.best_seller_name 
+        END,
+        observation_count = public.products.observation_count + 1,
+        updated_at = timezone('utc'::text, now())
+    WHERE id = NEW.product_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_observation_inserted ON public.price_observations;
+CREATE TRIGGER on_observation_inserted
+  AFTER INSERT ON public.price_observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_observation_inserted_metrics();
 
 -- ------------------------------------------------------------------------------
 -- 7. ERRANDS TABLE
@@ -318,6 +391,7 @@ CREATE TRIGGER on_seller_application_status_changed
 -- Enable RLS across all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.markets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.commodity_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.price_observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.seller_applications ENABLE ROW LEVEL SECURITY;
@@ -342,17 +416,83 @@ CREATE POLICY "Users can update their own profile"
 CREATE POLICY "Markets are viewable by everyone" 
   ON public.markets FOR SELECT USING (is_active = true);
 
--- Products: Everyone can browse products
+-- Commodity Categories: Public can view, Admins can manage
+CREATE POLICY "Categories are viewable by everyone" 
+  ON public.commodity_categories FOR SELECT USING (is_active = true OR true);
+
+CREATE POLICY "Admins can manage categories" 
+  ON public.commodity_categories FOR ALL 
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+    )
+  );
+
+-- Products: Everyone can browse, Verified Traders & Admins can upload & manage
 CREATE POLICY "Products are viewable by everyone" 
   ON public.products FOR SELECT USING (true);
 
--- Price Observations: Everyone can view, authenticated users or guests can insert
+CREATE POLICY "Verified sellers and admins can upload products" 
+  ON public.products FOR INSERT 
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p 
+      WHERE p.id = auth.uid() 
+      AND (p.role = 'Trader' OR p.role = 'Admin')
+    )
+  );
+
+CREATE POLICY "Sellers and admins can update products" 
+  ON public.products FOR UPDATE 
+  USING (
+    auth.uid() = created_by OR
+    EXISTS (
+      SELECT 1 FROM public.profiles p 
+      WHERE p.id = auth.uid() 
+      AND p.role = 'Admin'
+    )
+  );
+
+CREATE POLICY "Sellers and admins can delete products" 
+  ON public.products FOR DELETE 
+  USING (
+    auth.uid() = created_by OR
+    EXISTS (
+      SELECT 1 FROM public.profiles p 
+      WHERE p.id = auth.uid() 
+      AND p.role = 'Admin'
+    )
+  );
+
+-- Price Observations: Everyone can view, authenticated users can insert, submitters & admins can update/delete
 CREATE POLICY "Price observations are viewable by everyone" 
   ON public.price_observations FOR SELECT USING (true);
 
 CREATE POLICY "Authenticated users can report price observations" 
   ON public.price_observations FOR INSERT 
   WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon');
+
+CREATE POLICY "Submitters and admins can update observations" 
+  ON public.price_observations FOR UPDATE 
+  USING (
+    auth.uid() = submitter_id OR
+    EXISTS (
+      SELECT 1 FROM public.profiles p 
+      WHERE p.id = auth.uid() 
+      AND p.role = 'Admin'
+    )
+  );
+
+CREATE POLICY "Submitters and admins can delete observations" 
+  ON public.price_observations FOR DELETE 
+  USING (
+    auth.uid() = submitter_id OR
+    EXISTS (
+      SELECT 1 FROM public.profiles p 
+      WHERE p.id = auth.uid() 
+      AND p.role = 'Admin'
+    )
+  );
 
 -- Errands & Shopping Items: Scoped to owner
 CREATE POLICY "Users can manage their own errands" 
@@ -417,8 +557,19 @@ CREATE POLICY "Admins can update seller applications"
   );
 
 -- ------------------------------------------------------------------------------
--- 15. INITIAL SEED DATA (Nigerian Markets & Baseline Prices)
+-- 15. INITIAL SEED DATA (Commodity Categories, Markets & Baseline Products)
 -- ------------------------------------------------------------------------------
+INSERT INTO public.commodity_categories (id, name, slug, icon_name, description, display_order) VALUES
+  ('c0000000-0000-0000-0000-000000000001', 'Groceries', 'groceries', 'local_grocery_store_outlined', 'Fresh food produce, pantry goods, and everyday cooking items.', 1),
+  ('c0000000-0000-0000-0000-000000000002', 'Grains & Flours', 'grains-flours', 'grain_outlined', 'Rice, beans, garri, semovita, wheat, and bulk staple flours.', 2),
+  ('c0000000-0000-0000-0000-000000000003', 'Tubers & Produce', 'tubers-produce', 'eco_outlined', 'Yam, sweet potatoes, plantain, onions, and fresh vegetables.', 3),
+  ('c0000000-0000-0000-0000-000000000004', 'Oils & Seasonings', 'oils-seasonings', 'soup_kitchen_outlined', 'Vegetable cooking oil, pure red palm oil, spices, and cubes.', 4),
+  ('c0000000-0000-0000-0000-000000000005', 'Pharmacy & Health', 'pharmacy', 'local_pharmacy_outlined', 'Over-the-counter medicine, first aid, and personal healthcare.', 5),
+  ('c0000000-0000-0000-0000-000000000006', 'Electronics & Gadgets', 'electronics', 'devices_outlined', 'Mobile cables, power banks, adapters, and home electronics.', 6),
+  ('c0000000-0000-0000-0000-000000000007', 'Household & Provisions', 'household', 'home_work_outlined', 'Toiletries, laundry detergents, canned provisions, and cleaning items.', 7),
+  ('c0000000-0000-0000-0000-000000000008', 'Others', 'others', 'more_horiz_rounded', 'General market merchandise and specialty products.', 8)
+ON CONFLICT (name) DO NOTHING;
+
 INSERT INTO public.markets (id, name, city, state, latitude, longitude, description) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Market A (Oyingbo Market)', 'Lagos', 'Lagos', 6.4950, 3.3780, 'Major wholesale and retail agricultural market on Lagos Mainland.'),
   ('a0000000-0000-0000-0000-000000000002', 'Market B (Tejuosho Market)', 'Lagos', 'Lagos', 6.5150, 3.3640, 'Popular ultra-modern shopping complex with fresh food and general merchandise in Surulere.'),
@@ -429,14 +580,14 @@ INSERT INTO public.markets (id, name, city, state, latitude, longitude, descript
   ('a0000000-0000-0000-0000-000000000007', 'Dugbe Business District', 'Ibadan', 'Oyo', 7.3876, 3.8767, 'Central commercial and goods distribution area in Ibadan.'),
   ('a0000000-0000-0000-0000-000000000008', 'Wuse 2 Market Zone', 'Abuja', 'FCT', 9.0765, 7.3986, 'Central retail market hub in Abuja.');
 
-INSERT INTO public.products (id, name, category, standard_unit, lowest_price, best_seller_id, best_seller_name, percentage_change, is_cheapest) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'Rice (1kg)', 'Groceries', '1kg', 1650.00, 'a0000000-0000-0000-0000-000000000002', 'Market B', 8.0, true),
-  ('b0000000-0000-0000-0000-000000000002', 'Eggs (crate)', 'Groceries', 'crate of 30', 5200.00, 'a0000000-0000-0000-0000-000000000001', 'Market A', -5.0, true),
-  ('b0000000-0000-0000-0000-000000000003', 'Tomatoes (1kg)', 'Groceries', '1kg', 1100.00, 'a0000000-0000-0000-0000-000000000003', 'Market C', 12.0, true),
-  ('b0000000-0000-0000-0000-000000000004', 'Cooking Oil (1L)', 'Groceries', '1L', 2850.00, 'a0000000-0000-0000-0000-000000000002', 'Market B', 0.0, true),
-  ('b0000000-0000-0000-0000-000000000005', 'Paracetamol (Pack of 20)', 'Pharmacy', 'pack', 600.00, 'a0000000-0000-0000-0000-000000000004', 'MedPlus Pharmacy', 0.0, true),
-  ('b0000000-0000-0000-0000-000000000006', 'Onions (Small Basket)', 'Groceries', 'basket', 1800.00, 'a0000000-0000-0000-0000-000000000003', 'Market C', -3.0, true),
-  ('b0000000-0000-0000-0000-000000000007', 'USB-C Cable (Fast Charging)', 'Electronics', 'piece', 1500.00, 'a0000000-0000-0000-0000-000000000002', 'Market B', 0.0, true);
+INSERT INTO public.products (id, name, category, standard_unit, lowest_price, best_seller_id, best_seller_name, brand_or_grade, standardized_unit_price, base_unit, channel, percentage_change, is_cheapest) VALUES
+  ('b0000000-0000-0000-0000-000000000001', 'Rice (1kg)', 'Groceries', '1kg', 1650.00, 'a0000000-0000-0000-0000-000000000002', 'Market B', 'Mama Gold Grade A', 1650.00, 'kg', 'Local Market', 8.0, true),
+  ('b0000000-0000-0000-0000-000000000002', 'Eggs (crate)', 'Groceries', 'crate of 30', 5200.00, 'a0000000-0000-0000-0000-000000000001', 'Market A', 'Fresh Farm Medium-Large', 5200.00, 'crate', 'Local Market', -5.0, true),
+  ('b0000000-0000-0000-0000-000000000003', 'Tomatoes (1kg)', 'Groceries', '1kg', 1100.00, 'a0000000-0000-0000-0000-000000000003', 'Market C', 'Fresh Plum Harvest', 1100.00, 'kg', 'Local Market', 12.0, true),
+  ('b0000000-0000-0000-0000-000000000004', 'Cooking Oil (1L)', 'Groceries', '1L', 2850.00, 'a0000000-0000-0000-0000-000000000002', 'Market B', 'Pure Refined Vegetable Oil', 2850.00, 'L', 'Local Market', 0.0, true),
+  ('b0000000-0000-0000-0000-000000000005', 'Paracetamol (Pack of 20)', 'Pharmacy', 'pack', 600.00, 'a0000000-0000-0000-0000-000000000004', 'MedPlus Pharmacy', 'Emzor OTC Blister Pack', 600.00, 'pack', 'SMB Store', 0.0, true),
+  ('b0000000-0000-0000-0000-000000000006', 'Onions (Small Basket)', 'Groceries', 'basket', 1800.00, 'a0000000-0000-0000-0000-000000000003', 'Market C', 'Dry Season Brown Onions', 1800.00, 'basket', 'Local Market', -3.0, true),
+  ('b0000000-0000-0000-0000-000000000007', 'USB-C Cable (Fast Charging)', 'Electronics', 'piece', 1500.00, 'a0000000-0000-0000-0000-000000000002', 'Market B', 'Braided 65W Fast Charge', 1500.00, 'piece', 'SMB Store', 0.0, true);
 
 INSERT INTO public.price_observations (product_id, product_name, market_id, seller_name, market_location, price, unit, source_type, submitter_name, submitter_role, is_verified, notes) VALUES
   ('b0000000-0000-0000-0000-000000000001', 'Rice (1kg)', 'a0000000-0000-0000-0000-000000000002', 'Mama Ngozi Grains', 'Market B (Tejuosho)', 1650.00, '1kg', 'trader_confirmed', 'Mama Ngozi', 'Trader', true, 'Premium quality short grain rice. Bag price also available.'),

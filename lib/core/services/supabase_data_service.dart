@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
+import '../models/commodity_category.dart';
 import '../models/errand.dart';
 import '../models/seller_application.dart';
 
@@ -30,23 +31,80 @@ class SupabaseDataService {
       if (data.isEmpty) return null;
 
       return data.map((json) {
-        final map = json as Map<String, dynamic>;
-        return Product(
-          id: map['id']?.toString() ?? 'p-unknown',
-          name: map['name']?.toString() ?? '',
-          category: map['category']?.toString() ?? 'Groceries',
-          standardUnit: map['standard_unit']?.toString() ?? '1kg',
-          lowestPrice: (map['lowest_price'] as num?)?.toDouble() ?? 0.0,
-          bestSeller: map['best_seller_name']?.toString() ?? 'Local Market',
-          distanceKm: 1.5,
-          updateTime: 'Updated recently',
-          percentageChange:
-              (map['percentage_change'] as num?)?.toDouble() ?? 0.0,
-          isCheapest: map['is_cheapest'] as bool? ?? false,
-        );
+        return Product.fromJson(json as Map<String, dynamic>);
       }).toList();
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Fetch all active commodity categories from Cloud Supabase
+  static Future<List<CommodityCategory>?> fetchCategories() async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final response = await client
+          .from('commodity_categories')
+          .select()
+          .eq('is_active', true)
+          .order('display_order', ascending: true);
+
+      final List<dynamic> data = response as List<dynamic>;
+      if (data.isEmpty) return null;
+
+      return data.map((json) {
+        return CommodityCategory.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Upload a new commodity or product listing (Verified Sellers & Admins)
+  static Future<bool> insertProduct(Product product) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final user = client.auth.currentUser;
+      final payload = product.toDbMap();
+      if (user != null) {
+        payload['created_by'] = user.id;
+        payload['seller_id'] = user.id;
+      }
+      await client.from('products').insert(payload);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update an existing product listing
+  static Future<bool> updateProduct(Product product) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final payload = product.toDbMap();
+      payload['updated_at'] = DateTime.now().toIso8601String();
+      await client.from('products').update(payload).eq('id', product.id);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete a product listing
+  static Future<bool> deleteProduct(String productId) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      await client.from('products').delete().eq('id', productId);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -75,6 +133,8 @@ class SupabaseDataService {
           source = ObservationSource.traderProvided;
         } else if (sourceStr == 'simulated_demo') {
           source = ObservationSource.simulatedDemo;
+        } else if (sourceStr == 'online_grounded') {
+          source = ObservationSource.onlineGrounded;
         } else {
           source = ObservationSource.communityReported;
         }
@@ -83,6 +143,14 @@ class SupabaseDataService {
         if (map['created_at'] != null) {
           timestamp = DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now();
         }
+
+        final rawChannel = map['channel']?.toString() ?? 'Local Market';
+        final brandOrGrade = map['brand_or_grade']?.toString();
+        final inStock = map['in_stock'] as bool? ?? true;
+        final standardizedUnitPrice = (map['standardized_unit_price'] as num?)?.toDouble();
+        final baseUnit = map['base_unit']?.toString() ?? 'kg';
+        final isFlagged = map['is_flagged_anomaly'] as bool? ?? false;
+        final anomalyReason = map['anomaly_reason']?.toString();
 
         return PriceObservation(
           id: map['id']?.toString() ?? 'obs-unknown',
@@ -98,6 +166,13 @@ class SupabaseDataService {
           submitterRole: map['submitter_role']?.toString() ?? 'Customer',
           isVerified: map['is_verified'] as bool? ?? false,
           notes: map['notes']?.toString(),
+          channel: rawChannel,
+          brandOrGrade: brandOrGrade,
+          inStock: inStock,
+          standardizedUnitPrice: standardizedUnitPrice,
+          baseUnit: baseUnit,
+          isFlaggedAnomaly: isFlagged,
+          anomalyReason: anomalyReason,
         );
       }).toList();
     } catch (_) {
@@ -113,29 +188,43 @@ class SupabaseDataService {
     required String unit,
     required String submitterName,
     required String submitterRole,
+    String channel = 'Local Market',
+    String? brandOrGrade,
+    bool inStock = true,
+    double? standardizedUnitPrice,
+    String baseUnit = 'kg',
+    String? marketLocation,
+    String? notes,
   }) async {
     final client = _client;
     if (client == null) return false;
 
     try {
-      final source = submitterRole == 'Trader'
+      final isTrader = submitterRole == 'Trader' || submitterRole == 'Seller';
+      final isAdmin = submitterRole == 'Admin' || submitterRole == 'Administrator';
+      final source = isTrader
           ? 'trader_confirmed'
-          : 'community_reported';
+          : (isAdmin ? 'independently_verified' : 'community_reported');
 
       final user = client.auth.currentUser;
 
       await client.from('price_observations').insert({
         'product_name': productName,
         'seller_name': sellerName,
-        'market_location': sellerName,
+        'market_location': marketLocation ?? sellerName,
         'price': price,
         'unit': unit,
         'source_type': source,
         'submitter_id': user?.id,
         'submitter_name': submitterName,
         'submitter_role': submitterRole,
-        'is_verified': submitterRole == 'Trader',
-        'notes': 'Submitted via SmartMove app.',
+        'is_verified': isTrader || isAdmin,
+        'notes': notes ?? 'Submitted via SmartMove app.',
+        'channel': channel,
+        'brand_or_grade': brandOrGrade,
+        'in_stock': inStock,
+        'standardized_unit_price': standardizedUnitPrice,
+        'base_unit': baseUnit,
       });
       return true;
     } catch (_) {

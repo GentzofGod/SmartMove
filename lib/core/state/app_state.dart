@@ -52,6 +52,27 @@ class ProductsNotifier extends Notifier<List<Product>> {
           .toList();
     }
   }
+
+  void addProduct(Product product) {
+    _allProducts = [product, ..._allProducts];
+    state = _allProducts;
+    SupabaseDataService.insertProduct(product);
+  }
+
+  void updateProduct(Product updated) {
+    _allProducts = [
+      for (final p in _allProducts)
+        if (p.id == updated.id) updated else p,
+    ];
+    state = _allProducts;
+    SupabaseDataService.updateProduct(updated);
+  }
+
+  void deleteProduct(String productId) {
+    _allProducts = _allProducts.where((p) => p.id != productId).toList();
+    state = _allProducts;
+    SupabaseDataService.deleteProduct(productId);
+  }
 }
 
 final productsProvider =
@@ -508,6 +529,13 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       unit: unit,
       submitterName: submitterName,
       submitterRole: submitterRole,
+      channel: channel,
+      brandOrGrade: brandOrGrade,
+      inStock: inStock,
+      standardizedUnitPrice: computedUnitPrice,
+      baseUnit: baseUnit,
+      marketLocation: marketLocation,
+      notes: notes,
     );
   }
 
