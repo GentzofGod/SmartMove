@@ -2372,12 +2372,12 @@ class MetaAiService {
     UserDecisionPriority priority = UserDecisionPriority.balancedValue,
     GeoPoint? userLocation,
   }) {
-    // If no observations provided, synthesize benchmarks from product base rate
+    // If no observations provided, use the product listing rate
     final effectiveObservations = observations.isNotEmpty
         ? observations
         : [
             PriceObservation(
-              id: 'local-${product.id}',
+              id: 'listing-${product.id}',
               productId: product.id,
               productName: product.name,
               sellerName: product.bestSeller,
@@ -2386,49 +2386,13 @@ class MetaAiService {
               unit: product.standardUnit,
               timestamp: DateTime.now(),
               sourceType: product.sourceType,
-              submitterName: 'Market Trader',
+              submitterName: product.bestSeller,
               submitterRole: 'Trader',
               isVerified: true,
-              channel: 'Local Market',
+              channel: product.channel.isNotEmpty ? product.channel : 'Local Market',
               brandOrGrade: product.brandOrGrade ?? 'Grade A / Market Benchmark',
               standardizedUnitPrice:
                   product.standardizedUnitPrice ?? product.lowestPrice,
-              baseUnit: product.baseUnit,
-            ),
-            PriceObservation(
-              id: 'smb-${product.id}',
-              productId: product.id,
-              productName: product.name,
-              sellerName: 'Neighborhood Supermarket',
-              marketLocation: 'Local Commercial Strip',
-              price: (product.lowestPrice * 1.12 / 50).round() * 50.0,
-              unit: product.standardUnit,
-              timestamp: DateTime.now(),
-              sourceType: ObservationSource.communityReported,
-              submitterName: 'Local Shopper',
-              isVerified: true,
-              channel: 'SMB Store',
-              brandOrGrade: 'Packaged Shelf Standard',
-              standardizedUnitPrice:
-                  (product.lowestPrice * 1.12 / 50).round() * 50.0,
-              baseUnit: product.baseUnit,
-            ),
-            PriceObservation(
-              id: 'online-${product.id}',
-              productId: product.id,
-              productName: product.name,
-              sellerName: 'Jumia Food Mart',
-              marketLocation: 'Online Platform',
-              price: (product.lowestPrice * 1.20 / 50).round() * 50.0,
-              unit: product.standardUnit,
-              timestamp: DateTime.now(),
-              sourceType: ObservationSource.onlineGrounded,
-              submitterName: 'Web Engine',
-              isVerified: true,
-              channel: 'Online Retailer',
-              brandOrGrade: 'Premium Sealed Delivery Grade',
-              standardizedUnitPrice:
-                  (product.lowestPrice * 1.20 / 50).round() * 50.0,
               baseUnit: product.baseUnit,
             ),
           ];
