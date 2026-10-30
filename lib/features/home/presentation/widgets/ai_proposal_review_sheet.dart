@@ -494,6 +494,22 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                                   color: AppColors.textPrimary,
                                 ),
                               ),
+                              if (_items[i].brandOrGrade != null || _items[i].specification != null || (_items[i].preferredSellerType != null && _items[i].preferredSellerType != 'Any')) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  [
+                                    if (_items[i].brandOrGrade != null) 'Grade: ${_items[i].brandOrGrade}',
+                                    if (_items[i].specification != null) _items[i].specification!,
+                                    if (_items[i].preferredSellerType != null && _items[i].preferredSellerType != 'Any')
+                                      'Pref: ${_items[i].preferredSellerType}',
+                                  ].join(' • '),
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryDark,
+                                  ),
+                                ),
+                              ],
                               Text(
                                 '₦${_items[i].estimatedUnitPrice.toStringAsFixed(0)} / ${_items[i].unit}  •  Subtotal: ₦${(_items[i].quantity * _items[i].estimatedUnitPrice).toStringAsFixed(0)}',
                                 style: const TextStyle(

@@ -270,6 +270,138 @@ void main() {
       // Explains calculated ₦450 savings
       expect(explanation.contains('450'), true);
     });
+
+    test('12. Muse Spark extracts brand, specifications, and preferred seller channels', () async {
+      final proposal = await aiService.parseToProposal(
+        'I need 5kg of Mama Gold parboiled destoned rice and 2L of Kings cooking oil from Bodija market with ₦25,000 budget.',
+      );
+
+      expect(proposal.budget, 25000.0);
+      final rice = proposal.shoppingItems.firstWhere((i) => i.productName == 'Rice');
+      expect(rice.brandOrGrade, 'Mama Gold (Grade A)');
+      expect(rice.specification?.contains('Parboiled'), isTrue);
+      expect(rice.specification?.contains('De-stoned'), isTrue);
+      expect(rice.preferredSellerType, 'Local Market');
+      expect(rice.acceptableAlternatives.contains('Royal Stallion'), isTrue);
+
+      final oil = proposal.shoppingItems.firstWhere((i) => i.productName == 'Cooking Oil');
+      expect(oil.brandOrGrade, 'Kings Pure Vegetable Oil');
+      expect(oil.acceptableAlternatives.contains('Golden Penny'), isTrue);
+    });
+
+    test('13. Muse Spark coordinates price research across diverse commodities', () {
+      final garriPlan = aiService.coordinatePriceResearch('Ijebu Garri');
+      expect(garriPlan.category, 'Grains & Flours');
+      expect(garriPlan.standardizedUnit, 'paint bucket');
+      expect(garriPlan.estimatedBenchmarkMin, 3200.0);
+      expect(garriPlan.targetPlatforms.contains('PriceCheck Nigeria (Verified Crawl)'), isTrue);
+
+      final drugPlan = aiService.coordinatePriceResearch('Paracetamol 500mg');
+      expect(drugPlan.category, 'Pharmacy & Health');
+      expect(drugPlan.standardizedUnit, 'pack');
+    });
+
+    test('14. Enhanced duplicate listing detection evaluates brand match & vendor repeats', () {
+      const product = Product(
+        id: 'p-rice',
+        name: 'Rice (50kg)',
+        category: 'Groceries',
+        standardUnit: '50kg',
+        lowestPrice: 78000,
+        bestSeller: 'Bodija Grain Stalls',
+        distanceKm: 1.5,
+        updateTime: '1h ago',
+        brandOrGrade: 'Mama Gold (Grade A)',
+      );
+
+      final candidateObs = [
+        PriceObservation(
+          id: 'dup-vendor',
+          productId: 'p-rice-alt',
+          productName: 'Rice (50kg)',
+          sellerName: 'Bodija Grain Stalls',
+          marketLocation: 'Bodija Market Hub',
+          price: 78500,
+          unit: '50kg',
+          timestamp: DateTime.now(),
+          sourceType: ObservationSource.traderConfirmed,
+          submitterName: 'Mallam',
+          brandOrGrade: 'Mama Gold (Grade A)',
+        ),
+      ];
+
+      final results = aiService.detectDuplicateListings(
+        product: product,
+        candidates: candidateObs,
+      );
+
+      expect(results.first.isLikelyDuplicate, isTrue);
+      expect(results.first.similarityScore >= 0.95, isTrue);
+      expect(results.first.reasoning.contains('repeated listing from same vendor'), isTrue);
+    });
+
+    test('15. Meta AI detects price anomalies with structured warnings and guidance', () {
+      const product = Product(
+        id: 'p-rice',
+        name: 'Rice (1kg)',
+        category: 'Groceries',
+        standardUnit: '1kg',
+        lowestPrice: 1650,
+        bestSeller: 'Bodija Market',
+        distanceKm: 1.5,
+        updateTime: '1h ago',
+      );
+
+      final now = DateTime.now();
+      final observations = [
+        PriceObservation(
+          id: 'o1',
+          productId: 'p-rice',
+          productName: 'Rice (1kg)',
+          sellerName: 'Bodija Market',
+          marketLocation: 'Bodija',
+          price: 1650,
+          unit: '1kg',
+          timestamp: now,
+          sourceType: ObservationSource.traderConfirmed,
+          submitterName: 'Trader',
+        ),
+        PriceObservation(
+          id: 'o2',
+          productId: 'p-rice',
+          productName: 'Rice (1kg)',
+          sellerName: 'Foodco',
+          marketLocation: 'Bodija',
+          price: 1850,
+          unit: '1kg',
+          timestamp: now,
+          sourceType: ObservationSource.communityReported,
+          submitterName: 'Customer',
+        ),
+        PriceObservation(
+          id: 'o-fake',
+          productId: 'p-rice',
+          productName: 'Rice (1kg)',
+          sellerName: 'FlyByNight Stall',
+          marketLocation: 'Unknown',
+          price: 450, // >50% below average
+          unit: '1kg',
+          timestamp: now,
+          sourceType: ObservationSource.communityReported,
+          submitterName: 'Anon',
+        ),
+      ];
+
+      final anomalies = aiService.detectPriceAnomalies(
+        product: product,
+        observations: observations,
+      );
+
+      expect(anomalies.isNotEmpty, isTrue);
+      expect(anomalies.first.issueType, 'Unusually Low Price');
+      expect(anomalies.first.observation.sellerName, 'FlyByNight Stall');
+      expect(anomalies.first.recommendedAction.contains('Verify product authenticity'), isTrue);
+    });
   });
 }
 

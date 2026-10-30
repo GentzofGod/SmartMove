@@ -5,6 +5,24 @@ import '../models/plan_candidate.dart';
 import '../models/ai_proposal.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
+import 'commodity_comparison_service.dart';
+
+/// Detected price anomaly in community or web listings
+class PriceAnomaly {
+  final PriceObservation observation;
+  final String issueType;
+  final double deviationPercentage;
+  final String warningMessage;
+  final String recommendedAction;
+
+  const PriceAnomaly({
+    required this.observation,
+    required this.issueType,
+    required this.deviationPercentage,
+    required this.warningMessage,
+    required this.recommendedAction,
+  });
+}
 
 /// Plan for conducting coordinated online price research
 class OnlinePriceResearchPlan {
@@ -394,20 +412,23 @@ class MetaAiService {
 
     // 1. Extract Budget
     double budget = 15000.0;
-    final budgetMatch = RegExp(
-      r'(?:₦|ngn|naira|\b)?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:naira|budget|k\b)?',
-    ).firstMatch(lower);
+    // 1a. Explicit Naira symbol: ₦25,000 or ₦ 15000 or NGN 20,000
+    final nairaMatch = RegExp(r'(?:₦|ngn)\s*(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower);
+    // 1b. Explicit keyword: budget of 20000 or 25000 budget or 25000 naira
+    final keywordMatch = RegExp(r'(?:budget(?:\s*(?:of|is|:))?\s*|spending\s*)(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower) ??
+        RegExp(r'(\d{1,3}(?:,\d{3})*|\d+)\s*(?:naira|budget)').firstMatch(lower);
+    // 1c. Shorthand "15k" or "20k" (ensuring it's not "5kg")
+    final kMatch = RegExp(r'\b(\d+)k\b(?!\s*g)').firstMatch(lower);
 
-    if (budgetMatch != null) {
-      final valStr = budgetMatch.group(1)?.replaceAll(',', '');
-      final parsed = double.tryParse(valStr ?? '');
-      if (parsed != null) {
-        if (lower.contains('${parsed.toInt()}k')) {
-          budget = parsed * 1000;
-        } else if (parsed >= 1000) {
-          budget = parsed;
-        }
-      }
+    if (nairaMatch != null) {
+      final val = double.tryParse(nairaMatch.group(1)!.replaceAll(',', ''));
+      if (val != null && val >= 500) budget = val;
+    } else if (keywordMatch != null) {
+      final val = double.tryParse(keywordMatch.group(1)!.replaceAll(',', ''));
+      if (val != null && val >= 500) budget = val;
+    } else if (kMatch != null) {
+      final val = double.tryParse(kMatch.group(1)!);
+      if (val != null) budget = val * 1000;
     }
 
     // 2. Extract Shopping Items with contextual units & quantities
@@ -453,13 +474,105 @@ class MetaAiService {
           qty = double.tryParse(match.group(1)!) ?? entry.value.defaultQty;
         }
 
+        // Extract Brand or Grade scoped by commodity
+        String? extractedBrand;
+        if (entry.key == 'rice') {
+          if (lower.contains('mama gold')) {
+            extractedBrand = 'Mama Gold (Grade A)';
+          } else if (lower.contains('royal stallion')) {
+            extractedBrand = 'Royal Stallion';
+          } else if (lower.contains('caprice')) {
+            extractedBrand = 'Caprice Premium';
+          } else if (lower.contains('grade a')) {
+            extractedBrand = 'Grade A';
+          }
+        } else if (entry.key == 'oil' || entry.key == 'palm oil') {
+          if (lower.contains('kings')) {
+            extractedBrand = 'Kings Pure Vegetable Oil';
+          } else if (lower.contains('golden penny')) {
+            extractedBrand = 'Golden Penny';
+          } else if (lower.contains('mamador')) {
+            extractedBrand = 'Mamador';
+          }
+        } else if (entry.key == 'bean') {
+          if (lower.contains('oloyin')) {
+            extractedBrand = 'Sweet Honey Brown (Oloyin)';
+          }
+        } else if (entry.key == 'garri') {
+          if (lower.contains('ijebu')) {
+            extractedBrand = 'Ijebu Crispy White';
+          }
+        } else if (entry.key == 'yam') {
+          if (lower.contains('benue')) {
+            extractedBrand = 'Benue Medium-Large';
+          }
+        } else if (entry.key == 'tomato') {
+          if (lower.contains('jos')) {
+            extractedBrand = 'Jos Round Fresh';
+          }
+        } else if (entry.key == 'paracetamol' || entry.key == 'panadol') {
+          if (lower.contains('emzor')) {
+            extractedBrand = 'Emzor BP';
+          }
+        } else if (entry.key == 'cable') {
+          if (lower.contains('oraimo')) {
+            extractedBrand = 'Oraimo Fast Charge';
+          }
+        }
+
+        // Extract Specifications
+        String? spec;
+        if (lower.contains('parboiled')) spec = 'Parboiled';
+        if (lower.contains('destoned') || lower.contains('de-stoned')) {
+          spec = spec != null ? '$spec, De-stoned' : 'De-stoned';
+        }
+        if (lower.contains('fresh')) {
+          spec = spec != null ? '$spec, Fresh' : 'Fresh';
+        }
+
+        // Extract preferred seller channel
+        String preferredSeller = 'Any';
+        if (lower.contains('online') || lower.contains('jumia') || lower.contains('konga')) {
+          preferredSeller = 'Online Retailer';
+        } else if (lower.contains('supermarket') || lower.contains('store') || lower.contains('foodco') || lower.contains('mart')) {
+          preferredSeller = 'SMB Store';
+        } else if (lower.contains('market') || lower.contains('bodija') || lower.contains('open market') || lower.contains('stall')) {
+          preferredSeller = 'Local Market';
+        }
+
+        // Extract acceptable alternatives
+        List<String> alternatives = const [];
+        if (entry.key == 'rice') {
+          alternatives = const ['Mama Gold', 'Royal Stallion', 'Caprice', 'Local De-stoned'];
+        } else if (entry.key == 'oil' || entry.key == 'palm oil') {
+          alternatives = const ['Kings Pure Vegetable Oil', 'Golden Penny', 'Mamador'];
+        } else if (entry.key == 'bean') {
+          alternatives = const ['Sweet Honey Brown (Oloyin)', 'Sokoto White Beans'];
+        } else if (entry.key == 'garri') {
+          alternatives = const ['Ijebu Crispy White', 'Yellow Bendel Garri'];
+        } else if (entry.key == 'egg') {
+          alternatives = const ['Farm Fresh Medium', 'Premium Large Brown'];
+        } else if (entry.key == 'yam') {
+          alternatives = const ['Benue Medium-Large', 'Abuja Yam'];
+        }
+
+        final stdUnit = CommodityComparisonService.resolveBaseUnit(
+          entry.value.unit,
+          commodityName: entry.value.name,
+        );
+
         items.add(
           ShoppingItem(
             id: 'si-${entry.key.replaceAll(' ', '-')}',
             productName: entry.value.name,
+            brandOrGrade: extractedBrand,
             quantity: qty,
             unit: entry.value.unit,
+            standardizedUnit: stdUnit,
             estimatedUnitPrice: entry.value.price,
+            specification: spec,
+            preferredSellerType: preferredSeller,
+            acceptableAlternatives: alternatives,
           ),
         );
       }
@@ -940,6 +1053,33 @@ class MetaAiService {
       stdUnit = 'tuber';
       minPrice = 1800;
       maxPrice = 3500;
+    } else if (lower.contains('garri')) {
+      category = 'Grains & Flours';
+      stdUnit = 'paint bucket';
+      minPrice = 3200;
+      maxPrice = 4800;
+    } else if (lower.contains('tomato') || lower.contains('pepper') || lower.contains('onion')) {
+      category = 'Fresh Produce';
+      stdUnit = '1kg';
+      minPrice = 1000;
+      maxPrice = 2000;
+    } else if (lower.contains('chicken') || lower.contains('beef') || lower.contains('fish')) {
+      category = 'Meat & Poultry';
+      stdUnit = '1kg';
+      minPrice = 3200;
+      maxPrice = 5500;
+    } else if (lower.contains('paracetamol') || lower.contains('panadol') || lower.contains('pharmacy')) {
+      category = 'Pharmacy & Health';
+      stdUnit = 'pack';
+      minPrice = 600;
+      maxPrice = 1500;
+    } else if (lower.contains('cable') || lower.contains('charger') || lower.contains('electronics')) {
+      category = 'Electronics & Gadgets';
+      stdUnit = 'piece';
+      minPrice = 2000;
+      maxPrice = 4500;
+    } else {
+      stdUnit = CommodityComparisonService.resolveBaseUnit(clean, commodityName: clean);
     }
 
     return OnlinePriceResearchPlan(
@@ -951,12 +1091,15 @@ class MetaAiService {
         '$clean price Nigeria',
         'buy $clean online Lagos Ibadan',
         '$clean $stdUnit wholesale',
+        'Jumia $clean',
+        'Konga $clean',
       ],
       targetPlatforms: const [
         'Jumia Supermarket',
         'Konga Food & Groceries',
         'Supermart.ng',
         'Local Market Community Submissions',
+        'PriceCheck Nigeria (Verified Crawl)',
       ],
       estimatedBenchmarkMin: minPrice,
       estimatedBenchmarkMax: maxPrice,
@@ -981,16 +1124,33 @@ class MetaAiService {
         score = 0.95;
         reason = 'Exact commodity name match across seller reports';
       } else if (prodLower.contains(candLower) || candLower.contains(prodLower)) {
-        score = 0.80;
-        reason = 'Close variant or packaging difference';
+        score = 0.85;
+        reason = 'Close variant, pack size or packaging difference';
       } else {
-        final prodTokens = prodLower.split(RegExp(r'\s+'));
-        final candTokens = candLower.split(RegExp(r'\s+'));
+        final prodTokens = prodLower.replaceAll(RegExp(r'[^\w\s]'), '').split(RegExp(r'\s+'));
+        final candTokens = candLower.replaceAll(RegExp(r'[^\w\s]'), '').split(RegExp(r'\s+'));
         final intersection = prodTokens.where((t) => candTokens.contains(t)).length;
         if (intersection > 0) {
           score = (intersection / prodTokens.length).clamp(0.0, 0.75);
-          reason = 'Partial keyword overlap in description';
+          reason = 'Partial keyword overlap in description ($intersection matching tokens)';
         }
+      }
+
+      // Check brand / grade match
+      if (product.brandOrGrade != null &&
+          candidate.brandOrGrade != null &&
+          product.brandOrGrade!.isNotEmpty &&
+          candidate.brandOrGrade!.isNotEmpty) {
+        if (product.brandOrGrade!.toLowerCase() == candidate.brandOrGrade!.toLowerCase()) {
+          score = (score + 0.12).clamp(0.0, 0.98);
+          reason = '$reason; identical brand/grade specification (${product.brandOrGrade})';
+        }
+      }
+
+      // Check seller match
+      if (candidate.sellerName.toLowerCase() == product.bestSeller.toLowerCase() && score >= 0.5) {
+        score = (score + 0.10).clamp(0.0, 0.99);
+        reason = '$reason; repeated listing from same vendor (${candidate.sellerName})';
       }
 
       results.add(
@@ -1017,23 +1177,93 @@ class MetaAiService {
     }
 
     final localQuotes = observations.where((o) => o.channel == 'Local Market').toList();
+    final smbQuotes = observations.where((o) => o.channel == 'SMB Store').toList();
     final onlineQuotes = observations.where((o) => o.channel == 'Online Retailer').toList();
 
     final lowest = observations.reduce((a, b) => a.price < b.price ? a : b);
     final highest = observations.reduce((a, b) => a.price > b.price ? a : b);
     final diff = highest.price - lowest.price;
 
+    final baseUnit = CommodityComparisonService.resolveBaseUnit(product.standardUnit, commodityName: product.name);
+    final lowestStdRate = CommodityComparisonService.calculateStandardizedUnitPrice(
+      price: lowest.price,
+      rawUnit: lowest.unit,
+      commodityName: lowest.productName,
+    );
+    final highestStdRate = CommodityComparisonService.calculateStandardizedUnitPrice(
+      price: highest.price,
+      rawUnit: highest.unit,
+      commodityName: highest.productName,
+    );
+    final unitSavings = highestStdRate - lowestStdRate;
+
     final buffer = StringBuffer();
     buffer.write('Meta Muse Spark Price Intelligence: ');
     buffer.write('Comparing ${observations.length} quotes for "${product.name}". ');
-    buffer.write('Best deal is at ${lowest.sellerName} (${lowest.formattedPrice}/${lowest.unit}), saving ₦${diff.toStringAsFixed(0)} compared to ${highest.sellerName} (${highest.formattedPrice}/${highest.unit}). ');
+    buffer.write(
+      'Best deal is at ${lowest.sellerName} (${lowest.formattedPrice}/${lowest.unit}), saving ₦${diff.toStringAsFixed(0)} compared to ${highest.sellerName} (${highest.formattedPrice}/${highest.unit}). ',
+    );
 
-    if (onlineQuotes.isNotEmpty && localQuotes.isNotEmpty) {
-      buffer.write('Local open markets offer ~12% lower unit prices than online retailers, though online ordering eliminates transit time.');
+    if (unitSavings > 0) {
+      buffer.write('Standardized unit savings: ₦${unitSavings.toStringAsFixed(0)} / $baseUnit. ');
+    }
+
+    if (localQuotes.isNotEmpty && (onlineQuotes.isNotEmpty || smbQuotes.isNotEmpty)) {
+      buffer.write(
+        'Local open markets offer ~12% lower unit prices than online retailers, though online ordering eliminates transit time.',
+      );
     } else {
       buffer.write('Prices are verified by community and trader observations.');
     }
 
     return buffer.toString();
+  }
+
+  /// Detects abnormal price spikes or suspiciously low quotes
+  List<PriceAnomaly> detectPriceAnomalies({
+    required Product product,
+    required List<PriceObservation> observations,
+  }) {
+    if (observations.length < 2) return const [];
+
+    final baseRates = observations.map((o) => CommodityComparisonService.calculateStandardizedUnitPrice(
+      price: o.price,
+      rawUnit: o.unit,
+      commodityName: o.productName,
+    )).toList();
+
+    final avgRate = baseRates.reduce((a, b) => a + b) / baseRates.length;
+    final anomalies = <PriceAnomaly>[];
+
+    for (int i = 0; i < observations.length; i++) {
+      final obs = observations[i];
+      final rate = baseRates[i];
+
+      if (rate < avgRate * 0.50) {
+        final dev = ((avgRate - rate) / avgRate) * 100;
+        anomalies.add(
+          PriceAnomaly(
+            observation: obs,
+            issueType: 'Unusually Low Price',
+            deviationPercentage: dev,
+            warningMessage: '${obs.sellerName} quote (₦${obs.price.toStringAsFixed(0)}/${obs.unit}) is ${dev.toStringAsFixed(0)}% below market median.',
+            recommendedAction: 'Verify product authenticity, expiration date, and packaging grade before buying.',
+          ),
+        );
+      } else if (rate > avgRate * 1.60) {
+        final dev = ((rate - avgRate) / avgRate) * 100;
+        anomalies.add(
+          PriceAnomaly(
+            observation: obs,
+            issueType: 'Surge / High Markup',
+            deviationPercentage: dev,
+            warningMessage: '${obs.sellerName} quote (₦${obs.price.toStringAsFixed(0)}/${obs.unit}) is ${dev.toStringAsFixed(0)}% above market median.',
+            recommendedAction: 'Compare nearby open market stalls or neighborhood SMB alternatives to avoid excessive markup.',
+          ),
+        );
+      }
+    }
+
+    return anomalies;
   }
 }
