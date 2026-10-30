@@ -5,16 +5,7 @@
 -- ==============================================================================
 
 -- 1. Upgrade user_role enum to include Admin if not present
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_type t 
-    JOIN pg_enum e ON t.oid = e.enumtypid 
-    WHERE t.typname = 'user_role' AND e.enumlabel = 'Admin'
-  ) THEN
-    ALTER TYPE public.user_role ADD VALUE 'Admin';
-  END IF;
-END $$;
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'Admin';
 
 -- 2. Create seller_application_status enum
 DO $$
@@ -112,7 +103,7 @@ CREATE POLICY "Users and admins can view seller applications"
   USING (
     auth.uid() = user_id OR
     EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role::text = 'Admin'
     )
   );
 
@@ -122,7 +113,7 @@ CREATE POLICY "Admins can update seller applications"
   ON public.seller_applications FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role::text = 'Admin'
     )
   );
 

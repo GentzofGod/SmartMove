@@ -424,7 +424,7 @@ CREATE POLICY "Admins can manage categories"
   ON public.commodity_categories FOR ALL 
   USING (
     EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role::text = 'Admin'
     )
   );
 
@@ -438,7 +438,7 @@ CREATE POLICY "Verified sellers and admins can upload products"
     EXISTS (
       SELECT 1 FROM public.profiles p 
       WHERE p.id = auth.uid() 
-      AND (p.role = 'Trader' OR p.role = 'Admin')
+      AND (p.role::text = 'Trader' OR p.role::text = 'Admin')
     )
   );
 
@@ -449,7 +449,7 @@ CREATE POLICY "Sellers and admins can update products"
     EXISTS (
       SELECT 1 FROM public.profiles p 
       WHERE p.id = auth.uid() 
-      AND p.role = 'Admin'
+      AND p.role::text = 'Admin'
     )
   );
 
@@ -460,7 +460,7 @@ CREATE POLICY "Sellers and admins can delete products"
     EXISTS (
       SELECT 1 FROM public.profiles p 
       WHERE p.id = auth.uid() 
-      AND p.role = 'Admin'
+      AND p.role::text = 'Admin'
     )
   );
 
@@ -479,7 +479,7 @@ CREATE POLICY "Submitters and admins can update observations"
     EXISTS (
       SELECT 1 FROM public.profiles p 
       WHERE p.id = auth.uid() 
-      AND p.role = 'Admin'
+      AND p.role::text = 'Admin'
     )
   );
 
@@ -490,7 +490,7 @@ CREATE POLICY "Submitters and admins can delete observations"
     EXISTS (
       SELECT 1 FROM public.profiles p 
       WHERE p.id = auth.uid() 
-      AND p.role = 'Admin'
+      AND p.role::text = 'Admin'
     )
   );
 
@@ -544,7 +544,7 @@ CREATE POLICY "Users and admins can view seller applications"
   USING (
     auth.uid() = user_id OR
     EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role::text = 'Admin'
     )
   );
 
@@ -552,7 +552,7 @@ CREATE POLICY "Admins can update seller applications"
   ON public.seller_applications FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
+      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role::text = 'Admin'
     )
   );
 
