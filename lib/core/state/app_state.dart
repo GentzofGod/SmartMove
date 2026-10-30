@@ -233,7 +233,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     final initialErrands = DemoSeedData.getInitialErrands();
     final initialItems = initialErrands.isNotEmpty ? initialErrands.first.shoppingItems : <ShoppingItem>[];
     return _calculateState(
-      budget: 15000.0,
+      budget: initialItems.isNotEmpty ? 15000.0 : 0.0,
       transportCost: 1200,
       timeHours: 3.0,
       maxStops: 4,

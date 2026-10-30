@@ -20,13 +20,14 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 }
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
-  String _selectedCategory = 'Groceries';
+  String _selectedCategory = 'All';
   String _selectedSourceFilter = 'All'; // 'All', 'Trader', 'Community', 'Verified'
   String _selectedChannelFilter = 'All'; // 'All', 'Local Market', 'SMB Store', 'Online Retailer'
   ComparisonSortPreference _sortPreference = ComparisonSortPreference.cheapestUnitPrice;
   final TextEditingController _searchController = TextEditingController();
 
   final List<Map<String, dynamic>> _categories = [
+    {'name': 'All', 'icon': Icons.grid_view_rounded},
     {'name': 'Groceries', 'icon': Icons.local_grocery_store_outlined},
     {'name': 'Electronics', 'icon': Icons.devices_outlined},
     {'name': 'Pharmacy', 'icon': Icons.local_pharmacy_outlined},
@@ -59,11 +60,84 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     );
   }
 
-  void _showAiResearchDialog(BuildContext context, String commodityName) {
-    const aiService = MetaAiService();
-    final plan = aiService.coordinatePriceResearch(
-      commodityName.isNotEmpty ? commodityName : 'Rice (50kg)',
+  void _promptForCommodityResearch(BuildContext context) {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.auto_awesome, color: AppColors.primary, size: 22),
+            SizedBox(width: 8),
+            Text('Meta AI Price Research', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a commodity or product to research current prices across open markets, neighborhood stores, and online platforms.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: textController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'e.g. Rice, Beans, Palm Oil, Cement...',
+                hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.cardBorder),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+              onSubmitted: (val) {
+                final trimmed = val.trim();
+                if (trimmed.isNotEmpty) {
+                  Navigator.pop(ctx);
+                  _showAiResearchDialog(context, trimmed);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final trimmed = textController.text.trim();
+              if (trimmed.isNotEmpty) {
+                Navigator.pop(ctx);
+                _showAiResearchDialog(context, trimmed);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a commodity name to research.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Research Prices'),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _showAiResearchDialog(BuildContext context, String commodityName) {
+    final query = commodityName.trim();
+    if (query.isEmpty) return;
+    const aiService = MetaAiService();
+    final plan = aiService.coordinatePriceResearch(query);
 
     showModalBottomSheet(
       context: context,
@@ -394,10 +468,14 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         color: AppColors.primaryDark,
                       ),
                     ),
-                    onPressed: () => _showAiResearchDialog(
-                      context,
-                      _searchController.text.isNotEmpty ? _searchController.text.trim() : 'Rice (50kg)',
-                    ),
+                    onPressed: () {
+                      final query = _searchController.text.trim();
+                      if (query.isNotEmpty) {
+                        _showAiResearchDialog(context, query);
+                      } else {
+                        _promptForCommodityResearch(context);
+                      }
+                    },
                   ),
                 ],
               ),

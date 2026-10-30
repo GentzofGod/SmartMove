@@ -177,86 +177,42 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
             widget.product.name.toLowerCase().contains(o.productName.toLowerCase()))
         .toList();
 
-    // Synthesize multi-channel benchmark quotes across Local Market, SMB Store, Online Retailer
     final basePrice = widget.product.lowestPrice;
-    final now = DateTime.now();
 
-    final benchmarks = [
-      PriceObservation(
-        id: 'quote-local-${widget.product.id}',
-        productId: widget.product.id,
-        productName: widget.product.name,
-        sellerName: widget.product.bestSeller,
-        marketLocation: '${widget.product.bestSeller} (Open Market)',
-        price: basePrice,
-        unit: widget.product.standardUnit,
-        timestamp: now.subtract(const Duration(hours: 2)),
-        sourceType: widget.product.sourceType,
-        submitterName: 'Market Trader',
-        submitterRole: 'Trader',
-        isVerified: true,
-        channel: 'Local Market',
-        brandOrGrade: widget.product.brandOrGrade ?? 'Grade A / Market Benchmark',
-        standardizedUnitPrice: widget.product.standardizedUnitPrice ?? basePrice,
-        baseUnit: widget.product.baseUnit,
-        inStock: true,
-        notes: 'Direct distributor and local market price.',
-      ),
-      PriceObservation(
-        id: 'quote-smb-${widget.product.id}',
-        productId: widget.product.id,
-        productName: widget.product.name,
-        sellerName: 'Foodco Supermarket',
-        marketLocation: 'Bodija SMB Grocer',
-        price: (basePrice * 1.12 / 50).round() * 50.0,
-        unit: widget.product.standardUnit,
-        timestamp: now.subtract(const Duration(hours: 4)),
-        sourceType: ObservationSource.communityReported,
-        submitterName: 'Local Shopper',
-        submitterRole: 'Customer',
-        isVerified: true,
-        channel: 'SMB Store',
-        brandOrGrade: 'Packaged Shelf Standard',
-        standardizedUnitPrice: (basePrice * 1.12 / 50).round() * 50.0,
-        baseUnit: widget.product.baseUnit,
-        inStock: true,
-        notes: 'Convenient neighborhood store with packaged goods.',
-      ),
-      PriceObservation(
-        id: 'quote-online-${widget.product.id}',
-        productId: widget.product.id,
-        productName: widget.product.name,
-        sellerName: 'Jumia Food Mart',
-        marketLocation: 'Online Retail Platform',
-        price: (basePrice * 1.20 / 50).round() * 50.0,
-        unit: widget.product.standardUnit,
-        timestamp: now.subtract(const Duration(hours: 1)),
-        sourceType: ObservationSource.onlineGrounded,
-        submitterName: 'Web Grounding Engine',
-        submitterRole: 'System',
-        isVerified: true,
-        channel: 'Online Retailer',
-        brandOrGrade: 'Premium Express Delivery Grade',
-        standardizedUnitPrice: (basePrice * 1.20 / 50).round() * 50.0,
-        baseUnit: widget.product.baseUnit,
-        inStock: true,
-        notes: 'Online listing with home delivery option.',
-      ),
-    ];
+    // Genuine product listing observation from catalog
+    final productQuote = PriceObservation(
+      id: 'listing-${widget.product.id}',
+      productId: widget.product.id,
+      productName: widget.product.name,
+      sellerName: widget.product.bestSeller,
+      marketLocation: '${widget.product.bestSeller} (Open Market)',
+      price: basePrice,
+      unit: widget.product.standardUnit,
+      timestamp: DateTime.now(),
+      sourceType: widget.product.sourceType,
+      submitterName: widget.product.bestSeller,
+      submitterRole: 'Trader',
+      isVerified: widget.product.sourceType == ObservationSource.independentlyVerified ||
+          widget.product.sourceType == ObservationSource.traderConfirmed,
+      channel: widget.product.channel.isNotEmpty ? widget.product.channel : 'Local Market',
+      brandOrGrade: widget.product.brandOrGrade ?? 'Grade A / Market Benchmark',
+      standardizedUnitPrice: widget.product.standardizedUnitPrice ?? basePrice,
+      baseUnit: widget.product.baseUnit,
+      inStock: true,
+      notes: 'Direct listing price.',
+    );
 
-    if (matching.isEmpty) {
-      return benchmarks;
-    }
-
-    final combined = <PriceObservation>[...matching];
-    for (final b in benchmarks) {
-      if (!combined.any((c) =>
-          c.channel.toLowerCase() == b.channel.toLowerCase() ||
-          c.sellerName.toLowerCase() == b.sellerName.toLowerCase())) {
-        combined.add(b);
+    final quotes = <PriceObservation>[productQuote];
+    for (final obs in matching) {
+      final isDuplicate = quotes.any((q) =>
+          q.id == obs.id ||
+          (q.sellerName.toLowerCase() == obs.sellerName.toLowerCase() &&
+              (q.price - obs.price).abs() < 0.01));
+      if (!isDuplicate) {
+        quotes.add(obs);
       }
     }
-    return combined;
+    return quotes;
   }
 
   @override
@@ -300,6 +256,18 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
       priority: _decisionPriority,
       userLocation: currentLocation,
     );
+
+    // Price History Trend: Only when genuine historical observations exist across time
+    final historyQuotes = observations
+        .where((o) =>
+            (o.productId == widget.product.id ||
+                o.productName.toLowerCase() == widget.product.name.toLowerCase() ||
+                widget.product.name.toLowerCase().contains(o.productName.toLowerCase())) &&
+            o.isVerified)
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    final hasHistoricalTrend = historyQuotes.length >= 3;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -848,8 +816,8 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
             _buildMultiCriteriaAnalysisSection(multiCriteriaResult),
             const SizedBox(height: 14),
 
-            // Price History Section (Section 5.2: Only where sufficient observations exist)
-            if (comparisonQuotes.length >= 2 || (widget.product.sourceType != ObservationSource.simulatedDemo && widget.product.observationCount >= 3)) ...[
+            // Price History Section: Only rendered when genuine historical observations exist across time
+            if (hasHistoricalTrend) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -878,7 +846,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                       height: 40,
                       width: double.infinity,
                       child: CustomPaint(
-                        painter: _PriceHistoryLinePainter(),
+                        painter: _PriceHistoryLinePainter(
+                          prices: historyQuotes.map((q) => q.price).toList(),
+                        ),
                       ),
                     ),
                   ],
@@ -1637,27 +1607,49 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
 }
 
 class _PriceHistoryLinePainter extends CustomPainter {
+  final List<double> prices;
+
+  const _PriceHistoryLinePainter({required this.prices});
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (prices.length < 3) return;
+
     final linePaint = Paint()
       ..color = AppColors.primary
       ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
 
     final dotPaint = Paint()
       ..color = AppColors.primary
       ..style = PaintingStyle.fill;
 
-    final path = Path()
-      ..moveTo(0, size.height * 0.6)
-      ..lineTo(size.width * 0.35, size.height * 0.45)
-      ..lineTo(size.width * 0.7, size.height * 0.5)
-      ..lineTo(size.width, size.height * 0.25);
+    final minPrice = prices.reduce((a, b) => a < b ? a : b);
+    final maxPrice = prices.reduce((a, b) => a > b ? a : b);
+    final priceRange = maxPrice - minPrice;
+
+    final path = Path();
+    for (int i = 0; i < prices.length; i++) {
+      final x = (i / (prices.length - 1)) * (size.width - 8) + 4;
+      final normalized = priceRange > 0
+          ? (prices[i] - minPrice) / priceRange
+          : 0.5;
+      final y = size.height - (normalized * (size.height - 12) + 6);
+
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+      canvas.drawCircle(Offset(x, y), 2.5, dotPaint);
+    }
 
     canvas.drawPath(path, linePaint);
-    canvas.drawCircle(Offset(size.width, size.height * 0.25), 3.5, dotPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PriceHistoryLinePainter oldDelegate) =>
+      oldDelegate.prices != prices;
 }

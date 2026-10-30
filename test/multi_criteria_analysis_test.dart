@@ -4,7 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smartmove/core/models/product.dart';
 import 'package:smartmove/core/models/price_observation.dart';
 import 'package:smartmove/core/services/meta_ai_service.dart';
+import 'package:smartmove/core/state/app_state.dart';
 import 'package:smartmove/features/discover/presentation/product_detail_sheet.dart';
+
+class _MockCommunityNotifier extends CommunityNotifier {
+  final List<PriceObservation> _observations;
+  _MockCommunityNotifier(this._observations);
+
+  @override
+  List<PriceObservation> build() => _observations;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -183,8 +192,11 @@ void main() {
       });
 
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: [
+            communityProvider.overrideWith(() => _MockCommunityNotifier(testObservations)),
+          ],
+          child: const MaterialApp(
             home: Scaffold(
               body: ProductDetailSheet(product: testProduct),
             ),
