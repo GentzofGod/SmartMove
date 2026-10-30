@@ -274,6 +274,64 @@ class ParsedPromptResult {
   });
 }
 
+/// Supported regional dialects and commercial languages for Meta Muse Voice Transcribe
+enum VoiceDialect {
+  autoDetect(
+    label: 'Auto-Detect',
+    nativeLabel: 'Any Dialect / Auto',
+    languageCode: 'auto',
+    samplePrompt:
+        'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. I also need to collect a package before 2 PM. Help me plan everything.',
+  ),
+  nigerianPidgin(
+    label: 'Nigerian Pidgin',
+    nativeLabel: 'Naija Pidgin',
+    languageCode: 'pcm',
+    samplePrompt:
+        'I get ₦15,000. I wan buy two paint rubber of garri, one bag of rice, and cooking oil for Bodija market make e no pass my budget.',
+  ),
+  yoruba(
+    label: 'Yorùbá',
+    nativeLabel: 'Èdè Yorùbá',
+    languageCode: 'yo',
+    samplePrompt:
+        'Mo ní ẹgbẹ̀rún mẹ́ẹ̀ẹ́dógún náírà. Mo fẹ́ ra àpò ìrẹsì kan, ẹyin, àti epo pupa ní ọjà Bodija kí n tó gba ẹrù mi ní aago méjì.',
+  ),
+  hausa(
+    label: 'Hausa',
+    nativeLabel: 'Harshen Hausa',
+    languageCode: 'ha',
+    samplePrompt:
+        'Ina da naira dubu goma sha biyar. Ina son in sayi buhun shinkafa da kwai da manja a kasuwar Wuse kafin karfe biyu.',
+  ),
+  igbo(
+    label: 'Asụsụ Igbo',
+    nativeLabel: 'Asụsụ Igbo',
+    languageCode: 'ig',
+    samplePrompt:
+        'Enwere m puku naira iri na ise. Achọrọ m ịzụ akpa osikapa na àkwá na mmanụ nri na ahịa tupu elekere abụọ nke ehihie.',
+  ),
+  nigerianEnglish(
+    label: 'Nigerian English',
+    nativeLabel: 'West African English',
+    languageCode: 'en-NG',
+    samplePrompt:
+        'I have ₦15,000 budget for 2 paint rubber garri, rice, eggs, and vegetable oil in Bodija. Collect package before 2 PM.',
+  );
+
+  final String label;
+  final String nativeLabel;
+  final String languageCode;
+  final String samplePrompt;
+
+  const VoiceDialect({
+    required this.label,
+    required this.nativeLabel,
+    required this.languageCode,
+    required this.samplePrompt,
+  });
+}
+
 /// Result of Muse Voice Transcribe speech-to-text
 class VoiceTranscriptionResult {
   final String text;
@@ -281,6 +339,9 @@ class VoiceTranscriptionResult {
   final String modelName;
   final bool isFallback;
   final String? note;
+  final VoiceDialect detectedDialect;
+  final String? englishTranslation;
+  final bool isDialectTranslated;
 
   const VoiceTranscriptionResult({
     required this.text,
@@ -288,6 +349,9 @@ class VoiceTranscriptionResult {
     this.modelName = 'Meta Muse Voice Transcribe 1.0',
     this.isFallback = false,
     this.note,
+    this.detectedDialect = VoiceDialect.autoDetect,
+    this.englishTranslation,
+    this.isDialectTranslated = false,
   });
 }
 
@@ -316,10 +380,12 @@ class MetaAiService {
   // --- 1. Muse Voice Transcribe (Speech-to-Text) ---
 
   /// Transcribe spoken audio or voice notes into text using Muse Voice Transcribe
+  /// Supports Nigerian Pidgin, Yorùbá, Hausa, Asụsụ Igbo, Nigerian English, and Auto-detection.
   /// Clearly reports whether live cloud speech API succeeded or fallback was used.
   Future<VoiceTranscriptionResult> transcribeAudio({
     List<int>? audioBytes,
     String? simulatedVoiceSample,
+    VoiceDialect dialect = VoiceDialect.autoDetect,
   }) async {
     // If a remote server proxy with Muse Voice Transcribe is configured:
     if (apiKey != null && apiKey!.isNotEmpty && endpoint != null && endpoint!.isNotEmpty) {
@@ -333,8 +399,10 @@ class MetaAiService {
               },
               body: jsonEncode({
                 'model': 'muse-voice-transcribe-1.0',
-                'language': 'en',
+                'language': dialect.languageCode,
                 'task': 'transcribe',
+                'prompt':
+                    'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
               }),
             )
             .timeout(const Duration(seconds: 4));
@@ -342,12 +410,26 @@ class MetaAiService {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data is Map && data['text'] != null) {
+            final transcribedText = data['text'].toString();
+            final resolvedDialect = (dialect == VoiceDialect.autoDetect)
+                ? detectDialect(transcribedText)
+                : dialect;
+            final translation = (resolvedDialect != VoiceDialect.nigerianEnglish &&
+                    resolvedDialect != VoiceDialect.autoDetect)
+                ? (data['translation']?.toString() ??
+                    translateDialectToEnglish(transcribedText, dialect: resolvedDialect))
+                : null;
+
             return VoiceTranscriptionResult(
-              text: data['text'].toString(),
+              text: transcribedText,
               confidence: (data['confidence'] as num?)?.toDouble() ?? 0.96,
               modelName: 'Meta Muse Voice Transcribe 1.0',
               isFallback: false,
-              note: 'Meta AI Live Cloud: Speech transcribed directly via Meta Muse Voice Transcribe (Success)',
+              note:
+                  'Meta AI Live Cloud: Speech transcribed in ${resolvedDialect.label} via Meta Muse Voice Transcribe (Success)',
+              detectedDialect: resolvedDialect,
+              englishTranslation: translation,
+              isDialectTranslated: translation != null && translation.isNotEmpty,
             );
           }
         }
@@ -356,8 +438,14 @@ class MetaAiService {
       }
     }
 
-    final sample = simulatedVoiceSample ??
-        'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. I also need to collect a package before 2 PM. Help me plan everything.';
+    final sample = simulatedVoiceSample ?? dialect.samplePrompt;
+    final resolvedDialect = (dialect == VoiceDialect.autoDetect)
+        ? detectDialect(sample)
+        : dialect;
+    final translation = (resolvedDialect != VoiceDialect.nigerianEnglish &&
+            resolvedDialect != VoiceDialect.autoDetect)
+        ? translateDialectToEnglish(sample, dialect: resolvedDialect)
+        : null;
 
     final reason = (apiKey == null || apiKey!.isEmpty)
         ? 'Cloud Voice API key unconfigured'
@@ -368,8 +456,217 @@ class MetaAiService {
       confidence: 0.98,
       modelName: 'Meta Muse Voice Transcribe 1.0',
       isFallback: true,
-      note: 'Meta AI Fallback Active: $reason',
+      note: 'Meta AI Fallback Active (${resolvedDialect.label}): $reason',
+      detectedDialect: resolvedDialect,
+      englishTranslation: translation,
+      isDialectTranslated: translation != null && translation.isNotEmpty,
     );
+  }
+
+  /// Detects the regional Nigerian dialect or language from spoken / transcribed text
+  VoiceDialect detectDialect(String text) {
+    final lower = text.toLowerCase();
+
+    // 1. Yorùbá markers
+    if (lower.contains('ẹgbẹ̀rún') ||
+        lower.contains('egberun') ||
+        lower.contains('mẹ́ẹ̀ẹ́dógún') ||
+        lower.contains('meedogun') ||
+        lower.contains('mẹ́wàá') ||
+        lower.contains('mewaa') ||
+        lower.contains('fẹ́ ra') ||
+        lower.contains('fe ra') ||
+        lower.contains('ìrẹsì') ||
+        lower.contains('iresi') ||
+        lower.contains('àpò') ||
+        lower.contains('ẹyin') ||
+        lower.contains('eyin') ||
+        lower.contains('epo pupa') ||
+        lower.contains('ọjà') ||
+        lower.contains('oja') ||
+        lower.contains('ẹwà') ||
+        lower.contains('ewa') ||
+        lower.contains('ororo') ||
+        lower.contains('aago méjì') ||
+        lower.contains('aago meji') ||
+        lower.contains('ẹrù') ||
+        lower.contains('kí n tó') ||
+        lower.contains('ki n to')) {
+      return VoiceDialect.yoruba;
+    }
+
+    // 2. Hausa markers
+    if (lower.contains('ina da') ||
+        lower.contains('ina son') ||
+        lower.contains('in sayi') ||
+        lower.contains('buhun') ||
+        lower.contains('shinkafa') ||
+        lower.contains('masara') ||
+        lower.contains('kasuwar') ||
+        lower.contains('kasuwa') ||
+        lower.contains('dubu goma') ||
+        lower.contains('sha biyar') ||
+        lower.contains('karfe biyu') ||
+        lower.contains('wake') ||
+        lower.contains('manja') ||
+        lower.contains('albasa')) {
+      return VoiceDialect.hausa;
+    }
+
+    // 3. Asụsụ Igbo markers
+    if (lower.contains('enwere m') ||
+        lower.contains('achọrọ m') ||
+        lower.contains('achoro m') ||
+        lower.contains('ịzụ') ||
+        lower.contains('izu') ||
+        lower.contains('akpa osikapa') ||
+        lower.contains('osikapa') ||
+        lower.contains('àkwá') ||
+        lower.contains('akwa') ||
+        lower.contains('mmanụ') ||
+        lower.contains('mmanu') ||
+        lower.contains('puku iri') ||
+        lower.contains('ahịa') ||
+        lower.contains('ahia') ||
+        lower.contains('elekere abụọ') ||
+        lower.contains('elekere abuo') ||
+        lower.contains('ehihie') ||
+        lower.contains('azụ') ||
+        lower.contains('anụ') ||
+        lower.contains('tupu')) {
+      return VoiceDialect.igbo;
+    }
+
+    // 4. Nigerian Pidgin markers
+    if (lower.contains('wan buy') ||
+        lower.contains('i get') ||
+        lower.contains('make e no pass') ||
+        lower.contains('paint rubber') ||
+        lower.contains('derica') ||
+        lower.contains('congo') ||
+        lower.contains('kongo') ||
+        lower.contains('mudu') ||
+        lower.contains('wetin') ||
+        lower.contains('dey ') ||
+        lower.contains('no pass') ||
+        lower.contains('abeg') ||
+        lower.contains('how much be')) {
+      return VoiceDialect.nigerianPidgin;
+    }
+
+    return VoiceDialect.nigerianEnglish;
+  }
+
+  /// Translates regional dialect or vernacular commodity prompt into normalized English
+  String translateDialectToEnglish(String prompt, {VoiceDialect? dialect}) {
+    final activeDialect = dialect == null || dialect == VoiceDialect.autoDetect
+        ? detectDialect(prompt)
+        : dialect;
+
+    if (activeDialect == VoiceDialect.nigerianEnglish) {
+      return prompt;
+    }
+
+    if (activeDialect == VoiceDialect.yoruba) {
+      var result = prompt;
+      result = result.replaceAll(
+          RegExp(r'mo ní ẹgbẹ̀rún mẹ́ẹ̀ẹ́dógún náírà|mo ni egberun meedogun naira', caseSensitive: false),
+          'I have ₦15,000');
+      result = result.replaceAll(
+          RegExp(r'mo ní ẹgbẹ̀rún mẹ́wàá náírà|mo ni egberun mewaa naira', caseSensitive: false),
+          'I have ₦10,000');
+      result = result.replaceAll(
+          RegExp(r'mo ní ẹgbẹ̀rún ogún náírà|mo ni egberun ogun naira', caseSensitive: false),
+          'I have ₦20,000');
+      result = result.replaceAll(RegExp(r'mo ní|mo ni', caseSensitive: false), 'I have');
+      result = result.replaceAll(RegExp(r'mo fẹ́ ra|mo fe ra', caseSensitive: false), 'I want to buy');
+      result = result.replaceAll(RegExp(r'àpò ìrẹsì kan|apo iresi kan', caseSensitive: false), '1 bag of rice');
+      result = result.replaceAll(RegExp(r'àpò ìrẹsì|apo iresi', caseSensitive: false), 'bag of rice');
+      result = result.replaceAll(RegExp(r'ìrẹsì|iresi', caseSensitive: false), 'rice');
+      result = result.replaceAll(RegExp(r'ẹyin|eyin', caseSensitive: false), 'eggs');
+      result = result.replaceAll(RegExp(r'epo pupa', caseSensitive: false), 'palm oil');
+      result = result.replaceAll(RegExp(r'ororo', caseSensitive: false), 'cooking oil');
+      result = result.replaceAll(RegExp(r'ẹwà|ewa', caseSensitive: false), 'beans');
+      result = result.replaceAll(RegExp(r'ata', caseSensitive: false), 'pepper');
+      result = result.replaceAll(RegExp(r'isu', caseSensitive: false), 'yam');
+      result = result.replaceAll(RegExp(r'ẹran|eran', caseSensitive: false), 'meat');
+      result = result.replaceAll(RegExp(r'ẹja|eja', caseSensitive: false), 'fish');
+      result = result.replaceAll(RegExp(r'àti|ati', caseSensitive: false), 'and');
+      result = result.replaceAll(RegExp(r'ní ọjà Bodija|ni oja Bodija', caseSensitive: false), 'at Bodija market');
+      result = result.replaceAll(RegExp(r'ní ọjà|ni oja', caseSensitive: false), 'at the market');
+      result = result.replaceAll(
+          RegExp(r'kí n tó gba ẹrù mi ní aago méjì|ki n to gba eru mi ni aago meji', caseSensitive: false),
+          'before collecting my package at 2:00 PM');
+      result = result.replaceAll(RegExp(r'ní aago méjì|ni aago meji', caseSensitive: false), 'before 2:00 PM');
+      return result;
+    }
+
+    if (activeDialect == VoiceDialect.hausa) {
+      var result = prompt;
+      result = result.replaceAll(
+          RegExp(r'ina da naira dubu goma sha biyar', caseSensitive: false), 'I have ₦15,000');
+      result = result.replaceAll(
+          RegExp(r'ina da naira dubu goma', caseSensitive: false), 'I have ₦10,000');
+      result = result.replaceAll(
+          RegExp(r'ina da naira dubu ashirin', caseSensitive: false), 'I have ₦20,000');
+      result = result.replaceAll(RegExp(r'ina da', caseSensitive: false), 'I have');
+      result = result.replaceAll(RegExp(r'ina son in sayi|ina son sayan', caseSensitive: false), 'I want to buy');
+      result = result.replaceAll(RegExp(r'buhun shinkafa', caseSensitive: false), '1 bag of rice');
+      result = result.replaceAll(RegExp(r'shinkafa', caseSensitive: false), 'rice');
+      result = result.replaceAll(RegExp(r'kwai', caseSensitive: false), 'eggs');
+      result = result.replaceAll(RegExp(r'manja', caseSensitive: false), 'palm oil');
+      result = result.replaceAll(RegExp(r'mai', caseSensitive: false), 'cooking oil');
+      result = result.replaceAll(RegExp(r'wake', caseSensitive: false), 'beans');
+      result = result.replaceAll(RegExp(r'masara', caseSensitive: false), 'maize');
+      result = result.replaceAll(RegExp(r'albasa', caseSensitive: false), 'onions');
+      result = result.replaceAll(RegExp(r'da', caseSensitive: false), 'and');
+      result = result.replaceAll(RegExp(r'a kasuwar Wuse', caseSensitive: false), 'at Wuse market');
+      result = result.replaceAll(RegExp(r'a kasuwa', caseSensitive: false), 'at the market');
+      result = result.replaceAll(RegExp(r'kafin karfe biyu', caseSensitive: false), 'before 2:00 PM');
+      return result;
+    }
+
+    if (activeDialect == VoiceDialect.igbo) {
+      var result = prompt;
+      result = result.replaceAll(
+          RegExp(r'enwere m puku naira iri na ise', caseSensitive: false), 'I have ₦15,000');
+      result = result.replaceAll(
+          RegExp(r'enwere m puku naira iri', caseSensitive: false), 'I have ₦10,000');
+      result = result.replaceAll(
+          RegExp(r'enwere m puku naira iri abụọ|enwere m puku naira iri abuo', caseSensitive: false),
+          'I have ₦20,000');
+      result = result.replaceAll(RegExp(r'enwere m', caseSensitive: false), 'I have');
+      result = result.replaceAll(RegExp(r'achọrọ m ịzụ|achoro m izu', caseSensitive: false), 'I want to buy');
+      result = result.replaceAll(RegExp(r'akpa osikapa', caseSensitive: false), '1 bag of rice');
+      result = result.replaceAll(RegExp(r'osikapa', caseSensitive: false), 'rice');
+      result = result.replaceAll(RegExp(r'àkwá|akwa', caseSensitive: false), 'eggs');
+      result = result.replaceAll(RegExp(r'mmanụ nri|mmanu nri', caseSensitive: false), 'cooking oil');
+      result = result.replaceAll(RegExp(r'mmanụ|mmanu', caseSensitive: false), 'palm oil');
+      result = result.replaceAll(RegExp(r'agwa', caseSensitive: false), 'beans');
+      result = result.replaceAll(RegExp(r'ji', caseSensitive: false), 'yam');
+      result = result.replaceAll(RegExp(r'azụ|azu', caseSensitive: false), 'fish');
+      result = result.replaceAll(RegExp(r'anụ|anu', caseSensitive: false), 'meat');
+      result = result.replaceAll(RegExp(r'na ahịa Oyingbo|na ahia Oyingbo', caseSensitive: false), 'at Oyingbo market');
+      result = result.replaceAll(RegExp(r'na ahịa|na ahia', caseSensitive: false), 'at the market');
+      result = result.replaceAll(
+          RegExp(r'tupu elekere abụọ nke ehihie|tupu elekere abuo nke ehihie', caseSensitive: false),
+          'before 2:00 PM');
+      return result;
+    }
+
+    if (activeDialect == VoiceDialect.nigerianPidgin) {
+      var result = prompt;
+      result = result.replaceAll(RegExp(r'i get ₦', caseSensitive: false), 'I have ₦');
+      result = result.replaceAll(RegExp(r'i get', caseSensitive: false), 'I have');
+      result = result.replaceAll(RegExp(r'i wan buy', caseSensitive: false), 'I want to buy');
+      result = result.replaceAll(
+          RegExp(r'make e no pass my budget|make e no pass', caseSensitive: false), 'within budget');
+      result = result.replaceAll(RegExp(r'for bodija market', caseSensitive: false), 'at Bodija market');
+      result = result.replaceAll(RegExp(r'for market', caseSensitive: false), 'at the market');
+      return result;
+    }
+
+    return prompt;
   }
 
   // --- 2. Privacy & PII Sanitization ---
@@ -592,72 +889,398 @@ class MetaAiService {
     return questions;
   }
 
+  /// Parse number words in English, Yoruba, Hausa, or Igbo, or numeric digit strings
+  static double _parseWordOrNumber(String? raw, double fallback) {
+    if (raw == null || raw.trim().isEmpty) return fallback;
+    final clean = raw.trim().toLowerCase();
+    final numVal = double.tryParse(clean);
+    if (numVal != null) return numVal;
+    switch (clean) {
+      case 'one':
+      case 'kan':
+      case 'daya':
+      case 'ɗaya':
+      case 'otu':
+        return 1.0;
+      case 'two':
+      case 'méjì':
+      case 'meji':
+      case 'biyu':
+      case 'abụọ':
+      case 'abuo':
+        return 2.0;
+      case 'three':
+      case 'mẹ́ta':
+      case 'meta':
+      case 'uku':
+      case 'atọ':
+      case 'ato':
+        return 3.0;
+      case 'four':
+      case 'mẹ́rin':
+      case 'merin':
+      case 'hudu':
+      case 'huɗu':
+      case 'anọ':
+      case 'ano':
+        return 4.0;
+      case 'five':
+      case 'márùn-ún':
+      case 'marun':
+      case 'biyar':
+      case 'ise':
+        return 5.0;
+      default:
+        return fallback;
+    }
+  }
+
   /// Local Muse Spark Extractor with accurate domain understanding
   AiPlanProposal _extractLocalProposal(String prompt, {String? fallbackReason}) {
     final lower = prompt.toLowerCase();
 
     // 1. Extract Budget
     double budget = 15000.0;
-    // 1a. Explicit Naira symbol: ₦25,000 or ₦ 15000 or NGN 20,000
-    final nairaMatch = RegExp(r'(?:₦|ngn)\s*(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower);
-    // 1b. Explicit keyword: budget of 20000 or 25000 budget or 25000 naira
-    final keywordMatch = RegExp(r'(?:budget(?:\s*(?:of|is|:))?\s*|spending\s*)(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower) ??
-        RegExp(r'(\d{1,3}(?:,\d{3})*|\d+)\s*(?:naira|budget)').firstMatch(lower);
-    // 1c. Shorthand "15k" or "20k" (ensuring it's not "5kg")
-    final kMatch = RegExp(r'\b(\d+)k\b(?!\s*g)').firstMatch(lower);
+    // 1a. Regional dialect numeral markers
+    if (lower.contains('ẹgbẹ̀rún mẹ́ẹ̀ẹ́dógún') ||
+        lower.contains('egberun meedogun') ||
+        lower.contains('dubu goma sha biyar') ||
+        lower.contains('puku iri na ise') ||
+        lower.contains('fifteen thousand')) {
+      budget = 15000.0;
+    } else if (lower.contains('ẹgbẹ̀rún mẹ́wàá') ||
+        lower.contains('egberun mewaa') ||
+        lower.contains('dubu goma') ||
+        lower.contains('puku iri') ||
+        lower.contains('ten thousand')) {
+      budget = 10000.0;
+    } else if (lower.contains('ẹgbẹ̀rún ogún') ||
+        lower.contains('egberun ogun') ||
+        lower.contains('dubu ashirin') ||
+        lower.contains('puku iri abụọ') ||
+        lower.contains('puku iri abuo') ||
+        lower.contains('twenty thousand')) {
+      budget = 20000.0;
+    } else {
+      // 1b. Explicit Naira symbol: ₦25,000 or ₦ 15000 or NGN 20,000
+      final nairaMatch = RegExp(r'(?:₦|ngn)\s*(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower);
+      // 1c. Explicit keyword: budget of 20000 or 25000 budget or 25000 naira
+      final keywordMatch = RegExp(r'(?:budget(?:\s*(?:of|is|:))?\s*|spending\s*)(\d{1,3}(?:,\d{3})*|\d+)').firstMatch(lower) ??
+          RegExp(r'(\d{1,3}(?:,\d{3})*|\d+)\s*(?:naira|budget)').firstMatch(lower);
+      // 1d. Shorthand "15k" or "20k" (ensuring it's not "5kg")
+      final kMatch = RegExp(r'\b(\d+)k\b(?!\s*g)').firstMatch(lower);
 
-    if (nairaMatch != null) {
-      final val = double.tryParse(nairaMatch.group(1)!.replaceAll(',', ''));
-      if (val != null && val >= 500) budget = val;
-    } else if (keywordMatch != null) {
-      final val = double.tryParse(keywordMatch.group(1)!.replaceAll(',', ''));
-      if (val != null && val >= 500) budget = val;
-    } else if (kMatch != null) {
-      final val = double.tryParse(kMatch.group(1)!);
-      if (val != null) budget = val * 1000;
+      if (nairaMatch != null) {
+        final val = double.tryParse(nairaMatch.group(1)!.replaceAll(',', ''));
+        if (val != null && val >= 500) budget = val;
+      } else if (keywordMatch != null) {
+        final val = double.tryParse(keywordMatch.group(1)!.replaceAll(',', ''));
+        if (val != null && val >= 500) budget = val;
+      } else if (kMatch != null) {
+        final val = double.tryParse(kMatch.group(1)!);
+        if (val != null) budget = val * 1000;
+      }
     }
 
     // 2. Extract Shopping Items with contextual units & quantities
     final List<ShoppingItem> items = [];
 
-    // Dictionary of recognized regional commodities with benchmark prices and standard units
-    final knownCommodities = <String, ({String name, String unit, double defaultQty, double price, String regex})>{
-      'rice': (name: 'Rice', unit: 'kg', defaultQty: 2.0, price: 1650.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos|bag)?\s*(?:of\s*)?rice'),
-      'egg': (name: 'Eggs', unit: 'crate', defaultQty: 1.0, price: 5200.0, regex: r'(\d+(?:\.\d+)?)\s*(?:crate|crates|dozen)?\s*(?:of\s*)?egg'),
-      'tomato': (name: 'Tomatoes', unit: 'kg', defaultQty: 2.0, price: 1100.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos|basket)?\s*(?:of\s*)?tomato'),
-      'oil': (name: 'Cooking Oil', unit: 'L', defaultQty: 1.0, price: 2850.0, regex: r'(\d+(?:\.\d+)?)\s*(?:l|liter|litres)?\s*(?:of\s*)?(?:cooking\s*)?oil'),
-      'palm oil': (name: 'Palm Oil', unit: 'L', defaultQty: 1.0, price: 2400.0, regex: r'(\d+(?:\.\d+)?)\s*(?:l|liter|litres|bottle)?\s*(?:of\s*)?palm\s*oil'),
-      'yam': (name: 'Yam', unit: 'tuber', defaultQty: 2.0, price: 2200.0, regex: r'(\d+(?:\.\d+)?)\s*(?:tuber|tubers)?\s*(?:of\s*)?yam'),
-      'bean': (name: 'Beans', unit: 'kg', defaultQty: 2.0, price: 2400.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos|bag)?\s*(?:of\s*)?bean'),
-      'garri': (name: 'Garri', unit: 'kg', defaultQty: 3.0, price: 1800.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos|bag|paint)?\s*(?:of\s*)?garri'),
-      'bread': (name: 'Sliced Bread', unit: 'loaf', defaultQty: 1.0, price: 1400.0, regex: r'(\d+(?:\.\d+)?)\s*(?:loaf|loaves)?\s*(?:of\s*)?bread'),
-      'milk': (name: 'Evaporated Milk', unit: 'tin', defaultQty: 2.0, price: 1200.0, regex: r'(\d+(?:\.\d+)?)\s*(?:tin|tins|carton)?\s*(?:of\s*)?milk'),
-      'onion': (name: 'Onions', unit: 'kg', defaultQty: 1.0, price: 1500.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos|basket)?\s*(?:of\s*)?onion'),
-      'pepper': (name: 'Pepper', unit: 'kg', defaultQty: 1.0, price: 1200.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos|basket)?\s*(?:of\s*)?pepper'),
-      'plantain': (name: 'Plantain', unit: 'bunch', defaultQty: 1.0, price: 2500.0, regex: r'(\d+(?:\.\d+)?)\s*(?:bunch|bunches)?\s*(?:of\s*)?plantain'),
-      'chicken': (name: 'Chicken', unit: 'kg', defaultQty: 1.0, price: 4200.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos)?\s*(?:of\s*)?chicken'),
-      'beef': (name: 'Beef', unit: 'kg', defaultQty: 1.0, price: 4500.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos)?\s*(?:of\s*)?beef'),
-      'fish': (name: 'Fish', unit: 'kg', defaultQty: 1.0, price: 3200.0, regex: r'(\d+(?:\.\d+)?)\s*(?:kg|kilos)?\s*(?:of\s*)?fish'),
-      'paracetamol': (name: 'Paracetamol', unit: 'pack', defaultQty: 1.0, price: 800.0, regex: r'(\d+(?:\.\d+)?)\s*(?:pack|packs)?\s*(?:of\s*)?paracetamol'),
-      'panadol': (name: 'Panadol', unit: 'pack', defaultQty: 1.0, price: 900.0, regex: r'(\d+(?:\.\d+)?)\s*(?:pack|packs)?\s*(?:of\s*)?panadol'),
-      'detergent': (name: 'Detergent', unit: 'pack', defaultQty: 1.0, price: 950.0, regex: r'(\d+(?:\.\d+)?)\s*(?:pack|packs|kg)?\s*(?:of\s*)?detergent'),
-      'soap': (name: 'Soap', unit: 'bar', defaultQty: 2.0, price: 650.0, regex: r'(\d+(?:\.\d+)?)\s*(?:bar|bars|pack)?\s*(?:of\s*)?soap'),
-      'spaghetti': (name: 'Spaghetti', unit: 'pack', defaultQty: 2.0, price: 850.0, regex: r'(\d+(?:\.\d+)?)\s*(?:pack|packs)?\s*(?:of\s*)?spaghetti'),
-      'indomie': (name: 'Indomie Noodles', unit: 'carton', defaultQty: 1.0, price: 7800.0, regex: r'(\d+(?:\.\d+)?)\s*(?:carton|cartons|pack)?\s*(?:of\s*)?indomie'),
-      'sugar': (name: 'Granulated Sugar', unit: 'pack', defaultQty: 1.0, price: 1300.0, regex: r'(\d+(?:\.\d+)?)\s*(?:pack|kg)?\s*(?:of\s*)?sugar'),
-      'salt': (name: 'Table Salt', unit: 'pack', defaultQty: 1.0, price: 400.0, regex: r'(\d+(?:\.\d+)?)\s*(?:pack|kg)?\s*(?:of\s*)?salt'),
-      'cable': (name: 'USB Cable', unit: 'piece', defaultQty: 1.0, price: 2500.0, regex: r'(\d+(?:\.\d+)?)\s*(?:piece|pieces)?\s*(?:of\s*)?cable'),
-      'cement': (name: 'Cement', unit: 'bag', defaultQty: 2.0, price: 8500.0, regex: r'(\d+(?:\.\d+)?)\s*(?:bag|bags)?\s*(?:of\s*)?cement'),
-      'paint': (name: 'Paint', unit: 'tin', defaultQty: 1.0, price: 12000.0, regex: r'(\d+(?:\.\d+)?)\s*(?:tin|bucket)?\s*(?:of\s*)?paint'),
+    // Dictionary of recognized regional commodities with benchmark prices, aliases, and standard units
+    final knownCommodities = <String, ({
+      String name,
+      String unit,
+      double defaultQty,
+      double price,
+      List<String> aliases,
+      String regex,
+    })>{
+      'rice': (
+        name: 'Rice',
+        unit: 'kg',
+        defaultQty: 2.0,
+        price: 1650.0,
+        aliases: ['rice', 'iresi', 'ìrẹsì', 'shinkafa', 'osikapa'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:kg|kilos|bag|apo|àpò|buhu|akpa|derica)?\s*(?:of\s*)?(?:rice|iresi|ìrẹsì|shinkafa|osikapa)',
+      ),
+      'garri': (
+        name: 'Garri',
+        unit: 'kg',
+        defaultQty: 3.0,
+        price: 1800.0,
+        aliases: ['garri', 'gari'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:paint rubber|paint|rubber|kg|kilos|bag)?\s*(?:of\s*)?(?:garri|gari)',
+      ),
+      'egg': (
+        name: 'Eggs',
+        unit: 'crate',
+        defaultQty: 1.0,
+        price: 5200.0,
+        aliases: ['egg', 'eggs', 'eyin', 'ẹyin', 'kwai', 'akwa', 'àkwá'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:crate|crates|dozen)?\s*(?:of\s*)?(?:egg|eggs|eyin|ẹyin|kwai|akwa|àkwá)',
+      ),
+      'palm oil': (
+        name: 'Palm Oil',
+        unit: 'L',
+        defaultQty: 1.0,
+        price: 2400.0,
+        aliases: ['palm oil', 'epo pupa', 'manja', 'mmanụ nri', 'mmanu nri', 'mmanụ', 'mmanu'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:l|liter|litres|bottle)?\s*(?:of\s*)?(?:palm\s*oil|epo pupa|manja|mmanụ nri|mmanu nri|mmanụ|mmanu)',
+      ),
+      'oil': (
+        name: 'Cooking Oil',
+        unit: 'L',
+        defaultQty: 1.0,
+        price: 2850.0,
+        aliases: ['cooking oil', 'vegetable oil', 'oil', 'ororo', 'mai'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:l|liter|litres)?\s*(?:of\s*)?(?:cooking\s*oil|vegetable\s*oil|oil|ororo|mai)',
+      ),
+      'tomato': (
+        name: 'Tomatoes',
+        unit: 'kg',
+        defaultQty: 2.0,
+        price: 1100.0,
+        aliases: ['tomato', 'tomatoes', 'tumatir'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:kg|kilos|basket)?\s*(?:of\s*)?(?:tomato|tomatoes|tumatir)',
+      ),
+      'yam': (
+        name: 'Yam',
+        unit: 'tuber',
+        defaultQty: 2.0,
+        price: 2200.0,
+        aliases: ['yam', 'isu', 'doya', 'ji'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:tuber|tubers)?\s*(?:of\s*)?(?:yam|isu|doya|ji)',
+      ),
+      'bean': (
+        name: 'Beans',
+        unit: 'kg',
+        defaultQty: 2.0,
+        price: 2400.0,
+        aliases: ['bean', 'beans', 'ewa', 'ẹwà', 'wake', 'agwa'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five|kan|méjì|meji|mẹ́ta|meta|daya|biyu|uku|otu|abụọ|abuo)?\s*(?:kg|kilos|bag|derica|congo|kongo|mudu)?\s*(?:of\s*)?(?:bean|beans|ewa|ẹwà|wake|agwa)',
+      ),
+      'bread': (
+        name: 'Sliced Bread',
+        unit: 'loaf',
+        defaultQty: 1.0,
+        price: 1400.0,
+        aliases: ['bread', 'buredi'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:loaf|loaves)?\s*(?:of\s*)?(?:bread|buredi)',
+      ),
+      'milk': (
+        name: 'Evaporated Milk',
+        unit: 'tin',
+        defaultQty: 2.0,
+        price: 1200.0,
+        aliases: ['milk'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:tin|tins|carton)?\s*(?:of\s*)?milk',
+      ),
+      'onion': (
+        name: 'Onions',
+        unit: 'kg',
+        defaultQty: 1.0,
+        price: 1500.0,
+        aliases: ['onion', 'onions', 'alubosa', 'àlubọ́sà', 'albasa', 'yabas'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:kg|kilos|basket)?\s*(?:of\s*)?(?:onion|onions|alubosa|àlubọ́sà|albasa|yabas)',
+      ),
+      'pepper': (
+        name: 'Pepper',
+        unit: 'kg',
+        defaultQty: 1.0,
+        price: 1200.0,
+        aliases: ['pepper', 'ata', 'barkono', 'ose'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:kg|kilos|basket)?\s*(?:of\s*)?(?:pepper|ata|barkono|ose)',
+      ),
+      'plantain': (
+        name: 'Plantain',
+        unit: 'bunch',
+        defaultQty: 1.0,
+        price: 2500.0,
+        aliases: ['plantain', 'ogede agbagba'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:bunch|bunches)?\s*(?:of\s*)?plantain',
+      ),
+      'chicken': (
+        name: 'Chicken',
+        unit: 'kg',
+        defaultQty: 1.0,
+        price: 4200.0,
+        aliases: ['chicken', 'adie', 'adìyẹ', 'kaza', 'okuko', 'ọkụkọ'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:kg|kilos)?\s*(?:of\s*)?(?:chicken|adie|adìyẹ|kaza|okuko|ọkụkọ)',
+      ),
+      'beef': (
+        name: 'Beef',
+        unit: 'kg',
+        defaultQty: 1.0,
+        price: 4500.0,
+        aliases: ['beef', 'meat', 'eran', 'ẹran', 'nama', 'anu', 'anụ'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:kg|kilos)?\s*(?:of\s*)?(?:beef|meat|eran|ẹran|nama|anu|anụ)',
+      ),
+      'fish': (
+        name: 'Fish',
+        unit: 'kg',
+        defaultQty: 1.0,
+        price: 3200.0,
+        aliases: ['fish', 'eja', 'ẹja', 'kifi', 'azu', 'azụ'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:kg|kilos)?\s*(?:of\s*)?(?:fish|eja|ẹja|kifi|azu|azụ)',
+      ),
+      'paracetamol': (
+        name: 'Paracetamol',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 800.0,
+        aliases: ['paracetamol'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:pack|packs)?\s*(?:of\s*)?paracetamol',
+      ),
+      'panadol': (
+        name: 'Panadol',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 900.0,
+        aliases: ['panadol'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:pack|packs)?\s*(?:of\s*)?panadol',
+      ),
+      'detergent': (
+        name: 'Detergent',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 950.0,
+        aliases: ['detergent', 'omo'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:pack|packs|kg)?\s*(?:of\s*)?(?:detergent|omo)',
+      ),
+      'soap': (
+        name: 'Soap',
+        unit: 'bar',
+        defaultQty: 2.0,
+        price: 650.0,
+        aliases: ['soap', 'ose'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:bar|bars|pack)?\s*(?:of\s*)?(?:soap|ose)',
+      ),
+      'spaghetti': (
+        name: 'Spaghetti',
+        unit: 'pack',
+        defaultQty: 2.0,
+        price: 850.0,
+        aliases: ['spaghetti'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:pack|packs)?\s*(?:of\s*)?spaghetti',
+      ),
+      'indomie': (
+        name: 'Indomie Noodles',
+        unit: 'carton',
+        defaultQty: 1.0,
+        price: 7800.0,
+        aliases: ['indomie', 'noodles'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:carton|cartons|pack)?\s*(?:of\s*)?(?:indomie|noodles)',
+      ),
+      'sugar': (
+        name: 'Granulated Sugar',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 1300.0,
+        aliases: ['sugar'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:pack|kg)?\s*(?:of\s*)?sugar',
+      ),
+      'salt': (
+        name: 'Table Salt',
+        unit: 'pack',
+        defaultQty: 1.0,
+        price: 400.0,
+        aliases: ['salt'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:pack|kg)?\s*(?:of\s*)?salt',
+      ),
+      'cable': (
+        name: 'USB Cable',
+        unit: 'piece',
+        defaultQty: 1.0,
+        price: 2500.0,
+        aliases: ['cable'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:piece|pieces)?\s*(?:of\s*)?cable',
+      ),
+      'cement': (
+        name: 'Cement',
+        unit: 'bag',
+        defaultQty: 2.0,
+        price: 8500.0,
+        aliases: ['cement', 'siminti'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:bag|bags)?\s*(?:of\s*)?(?:cement|siminti)',
+      ),
+      'paint': (
+        name: 'Paint',
+        unit: 'tin',
+        defaultQty: 1.0,
+        price: 12000.0,
+        aliases: ['paint'],
+        regex: r'(\d+(?:\.\d+)?|one|two|three|four|five)?\s*(?:tin|bucket)?\s*(?:of\s*)?paint',
+      ),
     };
 
-    // First, scan for known commodities
+    // First, scan for known commodities (recognizing English and regional dialect aliases)
+    final Set<String> matchedCommodityNames = {};
     for (final entry in knownCommodities.entries) {
-      if (lower.contains(entry.key)) {
+      final isMatched = lower.contains(entry.key) ||
+          entry.value.aliases.any((alias) => lower.contains(alias));
+
+      if (isMatched) {
+        // Prevent generic cooking oil from duplicating when palm oil is explicitly detected
+        if (entry.key == 'oil' && matchedCommodityNames.contains('Palm Oil')) {
+          if (!lower.contains('cooking oil') &&
+              !lower.contains('vegetable oil') &&
+              !lower.contains('ororo') &&
+              !lower.contains('mai')) {
+            continue;
+          }
+        }
+
         double qty = entry.value.defaultQty;
         final match = RegExp(entry.value.regex).firstMatch(lower);
         if (match != null && match.group(1) != null) {
-          qty = double.tryParse(match.group(1)!) ?? entry.value.defaultQty;
+          qty = _parseWordOrNumber(match.group(1), entry.value.defaultQty);
+        }
+
+        // Contextual unit resolution for West African containers & regional measures:
+        String determinedUnit = entry.value.unit;
+        if (entry.key == 'garri' &&
+            (lower.contains('paint rubber') ||
+                lower.contains('paint') ||
+                lower.contains('rubber'))) {
+          determinedUnit = 'paint rubber';
+        } else if (entry.key == 'rice' &&
+            (lower.contains('bag') ||
+                lower.contains('apo') ||
+                lower.contains('àpò') ||
+                lower.contains('buhu') ||
+                lower.contains('buhun') ||
+                lower.contains('akpa'))) {
+          determinedUnit = 'bag';
+          if (match == null || match.group(1) == null) {
+            qty = 1.0;
+          }
+        } else if (entry.key == 'bean' &&
+            (lower.contains('derica') || lower.contains('derika'))) {
+          determinedUnit = 'derica';
+        } else if (entry.key == 'bean' &&
+            (lower.contains('congo') || lower.contains('kongo'))) {
+          determinedUnit = 'congo';
+        } else if (entry.key == 'bean' &&
+            (lower.contains('mudu') || lower.contains('mudus'))) {
+          determinedUnit = 'mudu';
+        } else if (entry.key == 'egg' &&
+            (lower.contains('crate') ||
+                lower.contains('crates') ||
+                lower.contains('eyin') ||
+                lower.contains('ẹyin') ||
+                lower.contains('kwai') ||
+                lower.contains('akwa') ||
+                lower.contains('àkwá'))) {
+          determinedUnit = 'crate';
+        }
+
+        // Post-noun Yoruba / dialect quantity modifier (e.g. "àpò ìrẹsì kan" -> 1, "méjì" -> 2)
+        if (lower.contains('${entry.key} kan') ||
+            entry.value.aliases.any((a) => lower.contains('$a kan'))) {
+          qty = 1.0;
+        } else if (lower.contains('${entry.key} méjì') ||
+            lower.contains('${entry.key} meji') ||
+            entry.value.aliases.any((a) => lower.contains('$a méjì') || lower.contains('$a meji'))) {
+          qty = 2.0;
         }
 
         // Extract Brand or Grade scoped by commodity
@@ -743,7 +1366,7 @@ class MetaAiService {
         }
 
         final stdUnit = CommodityComparisonService.resolveBaseUnit(
-          entry.value.unit,
+          determinedUnit,
           commodityName: entry.value.name,
         );
 
@@ -753,7 +1376,7 @@ class MetaAiService {
             productName: entry.value.name,
             brandOrGrade: extractedBrand,
             quantity: qty,
-            unit: entry.value.unit,
+            unit: determinedUnit,
             standardizedUnit: stdUnit,
             estimatedUnitPrice: entry.value.price,
             specification: spec,
@@ -761,6 +1384,8 @@ class MetaAiService {
             acceptableAlternatives: alternatives,
           ),
         );
+
+        matchedCommodityNames.add(entry.value.name);
       }
     }
 
@@ -772,7 +1397,13 @@ class MetaAiService {
       'mechanic', 'car repair', 'repair', 'tailor', 'salon', 'barber',
       'pharmacy', 'chemist', 'hospital', 'clinic', 'dentist',
       'electricity', 'electric', 'phcn', 'utility', 'deliver', 'delivery',
-      'drop off', 'drop'
+      'drop off', 'drop',
+      'ẹrù', 'eru', 'gba ẹrù', 'gba eru', // Yoruba
+      'kayan', 'kaya', // Hausa
+      'ngwongwo', // Igbo
+      'kafin', 'karfe', // Hausa deadline / time
+      'tupu', 'elekere', // Igbo deadline / time
+      'aago', // Yoruba deadline / time
     ];
 
     if (errandKeywords.any((kw) => lower.contains(kw))) {
@@ -795,7 +1426,12 @@ class MetaAiService {
       } else {
         if (lower.contains('12 pm') || lower.contains('12:00')) deadline = '12:00 PM';
         if (lower.contains('1 pm') || lower.contains('1:00')) deadline = '1:00 PM';
-        if (lower.contains('2 pm') || lower.contains('2:00')) deadline = '2:00 PM';
+        if (lower.contains('2 pm') || lower.contains('2:00') ||
+            lower.contains('aago méjì') || lower.contains('aago meji') ||
+            lower.contains('karfe biyu') ||
+            lower.contains('elekere abụọ') || lower.contains('elekere abuo')) {
+          deadline = '2:00 PM';
+        }
         if (lower.contains('3 pm') || lower.contains('3:00')) deadline = '3:00 PM';
         if (lower.contains('4 pm') || lower.contains('4:00')) deadline = '4:00 PM';
       }
