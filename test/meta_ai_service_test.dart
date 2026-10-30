@@ -110,9 +110,10 @@ void main() {
       final proposal = aiService.validateProposal(invalidJson, 'test input');
 
       expect(proposal, isNotNull);
-      // Fallback defaults are used safely without crashing
-      expect(proposal!.budget, 15000.0);
-      expect(proposal.shoppingItems.isNotEmpty, true);
+      // Malformed model output reports user-friendly error without inventing fallback mock commodities
+      expect(proposal!.hasError, isTrue);
+      expect(proposal.errorMessage, isNotNull);
+      expect(proposal.shoppingItems, isEmpty);
     });
 
     test('8. Transparently reports when Live Cloud Meta AI succeeds vs when Fallback is used', () async {
@@ -401,6 +402,35 @@ void main() {
       expect(anomalies.first.issueType, 'Unusually Low Price');
       expect(anomalies.first.observation.sellerName, 'FlyByNight Stall');
       expect(anomalies.first.recommendedAction.contains('Verify product authenticity'), isTrue);
+    });
+
+    test('16. parseToProposal with prompt lacking commodities reports friendly error without mock foodstuffs', () async {
+      final proposal = await aiService.parseToProposal('Hello, I am heading to the market now.');
+      expect(proposal.hasError, isTrue);
+      expect(proposal.errorMessage, isNotNull);
+      expect(proposal.errorMessage!.contains('could not identify any shopping commodities'), isTrue);
+      expect(proposal.shoppingItems, isEmpty);
+    });
+
+    test('17. transcribeAudio with audio recording failure reports friendly error instead of coded sample', () async {
+      final voiceResult = await aiService.transcribeAudio(
+        audioBytes: const [0, 1, 2, 3],
+      );
+      expect(voiceResult.hasError, isTrue);
+      expect(voiceResult.errorMessage, isNotNull);
+      expect(voiceResult.errorMessage!.contains('currently unavailable'), isTrue);
+      expect(voiceResult.text, isEmpty);
+    });
+
+    test('18. parsePaperNoteImage with photo failure reports friendly error instead of coded note', () async {
+      final scanResult = await aiService.parsePaperNoteImage(
+        imageBytes: const [0xFF, 0xD8, 0xFF, 0xE0],
+      );
+      expect(scanResult.hasError, isTrue);
+      expect(scanResult.errorMessage, isNotNull);
+      expect(scanResult.errorMessage!.contains('currently unavailable'), isTrue);
+      expect(scanResult.proposal.hasError, isTrue);
+      expect(scanResult.proposal.shoppingItems, isEmpty);
     });
   });
 }

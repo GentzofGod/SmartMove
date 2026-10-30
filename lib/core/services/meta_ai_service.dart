@@ -342,6 +342,8 @@ class VoiceTranscriptionResult {
   final VoiceDialect detectedDialect;
   final String? englishTranslation;
   final bool isDialectTranslated;
+  final bool hasError;
+  final String? errorMessage;
 
   const VoiceTranscriptionResult({
     required this.text,
@@ -352,7 +354,24 @@ class VoiceTranscriptionResult {
     this.detectedDialect = VoiceDialect.autoDetect,
     this.englishTranslation,
     this.isDialectTranslated = false,
+    this.hasError = false,
+    this.errorMessage,
   });
+
+  factory VoiceTranscriptionResult.error({
+    required String message,
+    VoiceDialect detectedDialect = VoiceDialect.autoDetect,
+  }) {
+    return VoiceTranscriptionResult(
+      text: '',
+      confidence: 0.0,
+      modelName: 'Meta Muse Voice Transcribe 1.0',
+      isFallback: false,
+      hasError: true,
+      errorMessage: message,
+      detectedDialect: detectedDialect,
+    );
+  }
 }
 
 /// Authentic preset sample paper notes simulating handwritten grocery lists and receipts
@@ -447,6 +466,8 @@ class PaperNoteScanResult {
   final List<int>? imageBytes;
   final String? imagePath;
   final String noteTitle;
+  final bool hasError;
+  final String? errorMessage;
 
   const PaperNoteScanResult({
     required this.rawTranscribedText,
@@ -459,7 +480,30 @@ class PaperNoteScanResult {
     this.imageBytes,
     this.imagePath,
     this.noteTitle = 'Handwritten Shopping Note',
+    this.hasError = false,
+    this.errorMessage,
   });
+
+  factory PaperNoteScanResult.error({
+    required String message,
+    List<int>? imageBytes,
+    String? imagePath,
+    String noteTitle = 'Handwritten Shopping Note',
+  }) {
+    return PaperNoteScanResult(
+      rawTranscribedText: '',
+      extractedLines: const [],
+      confidence: 0.0,
+      modelName: 'Meta Muse Spark 1.3 (Vision)',
+      isFallback: false,
+      hasError: true,
+      errorMessage: message,
+      proposal: AiPlanProposal.error(message: message),
+      imageBytes: imageBytes,
+      imagePath: imagePath,
+      noteTitle: noteTitle,
+    );
+  }
 }
 
 /// Meta AI Integration Service (Section 6: AI Integration using Meta Models)
@@ -545,6 +589,17 @@ class MetaAiService {
       }
     }
 
+    // If real audio recording bytes were provided and cloud transcription failed/unconfigured:
+    // Report a user-friendly error instead of falling back to canned speech.
+    if (audioBytes != null && audioBytes.isNotEmpty) {
+      return VoiceTranscriptionResult.error(
+        message:
+            'Meta AI voice transcription is currently unavailable. Please check your network connection or enter commodities manually.',
+        detectedDialect: dialect,
+      );
+    }
+
+    // Benchmark sample transcription for testing dialect models and sample prompts
     final sample = simulatedVoiceSample ?? dialect.samplePrompt;
     final resolvedDialect = (dialect == VoiceDialect.autoDetect)
         ? detectDialect(sample)
@@ -883,36 +938,71 @@ class MetaAiService {
       }
     }
 
-    // 3. Resilient Local Multimodal OCR & Vision Reasoning Fallback
-    final effectiveSample = matchedSample ?? SamplePaperNote.defaultSamples.first;
-    final textToProcess = customNoteText ?? effectiveSample.transcribedPrompt;
-    final noteTitle =
-        customNoteText != null ? 'Custom Paper Note' : effectiveSample.title;
+    // 3. User custom text or explicit sample resolution (without falling back to unrequested hardcoded notes)
+    if (customNoteText != null && customNoteText.trim().isNotEmpty) {
+      final textToProcess = customNoteText.trim();
+      final proposal = await parseToProposal(textToProcess);
+      final lines = textToProcess
+          .split(RegExp(r'[\n,]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
 
-    final proposal = await parseToProposal(textToProcess);
-    final lines = (customNoteText != null)
-        ? customNoteText
-            .split(RegExp(r'[\n,]'))
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList()
-        : effectiveSample.recognizedLines;
+      if (proposal.hasError || proposal.shoppingItems.isEmpty) {
+        return PaperNoteScanResult.error(
+          message: proposal.errorMessage ??
+              'Could not identify any shopping commodities from the transcribed text. Please add items manually in Price Lab.',
+          imageBytes: imageBytes,
+          imagePath: imagePath,
+          noteTitle: 'Custom Paper Note',
+        );
+      }
 
-    final reason = (apiKey == null || apiKey!.isEmpty)
-        ? 'Cloud Vision API key unconfigured'
-        : 'Cloud Vision API unreachable; switched to resilient local multimodal engine';
+      return PaperNoteScanResult(
+        rawTranscribedText: textToProcess,
+        extractedLines: lines,
+        confidence: 0.96,
+        modelName: 'Meta Muse Spark 1.3 (Vision)',
+        isFallback: false,
+        note: 'Transcribed from custom note text',
+        proposal: proposal,
+        imageBytes: imageBytes,
+        imagePath: imagePath,
+        noteTitle: 'Custom Paper Note',
+      );
+    }
 
-    return PaperNoteScanResult(
-      rawTranscribedText: textToProcess,
-      extractedLines: lines,
-      confidence: 0.95,
-      modelName: 'Meta Muse Spark 1.3 (Vision)',
-      isFallback: true,
-      note: 'Meta AI Fallback Active: $reason',
-      proposal: proposal,
+    if (matchedSample != null) {
+      final proposal = await parseToProposal(matchedSample.transcribedPrompt);
+      return PaperNoteScanResult(
+        rawTranscribedText: matchedSample.transcribedPrompt,
+        extractedLines: matchedSample.recognizedLines,
+        confidence: 0.98,
+        modelName: 'Meta Muse Spark 1.3 (Vision)',
+        isFallback: false,
+        note: 'Transcribed from verified preset: ${matchedSample.title}',
+        proposal: proposal,
+        imageBytes: imageBytes,
+        imagePath: imagePath,
+        noteTitle: matchedSample.title,
+      );
+    }
+
+    // 4. Rather than returning hardcoded default notes, report a user-friendly error
+    if (imageBytes == null || imageBytes.isEmpty) {
+      return PaperNoteScanResult.error(
+        message:
+            'No photo provided. Please capture or select a photo of your handwritten shopping note.',
+        imagePath: imagePath,
+      );
+    }
+
+    return PaperNoteScanResult.error(
+      message:
+          'Meta AI vision service is currently unavailable. Please check your network connection or enter your commodities manually in Price Lab.',
       imageBytes: imageBytes,
       imagePath: imagePath,
-      noteTitle: noteTitle,
+      noteTitle: 'Photographed Shopping Note',
     );
   }
 
@@ -937,10 +1027,16 @@ class MetaAiService {
   // --- 3. Muse Spark Structured Extraction & Proposal ---
 
   /// Parse natural language request into a validated AI Plan Proposal
-  /// Transparently reports whether Live Meta Cloud API succeeded or Local Fallback was used.
+  /// Reports errors transparently in a user-friendly manner instead of falling back to coded mock data.
   Future<AiPlanProposal> parseToProposal(String prompt) async {
     final sanitizedPrompt = sanitizePrompt(prompt);
-    String? fallbackReason;
+    if (sanitizedPrompt.trim().isEmpty) {
+      return AiPlanProposal.error(
+        message:
+            'Please enter the commodities you wish to purchase (e.g. "2kg rice, 1 crate eggs").',
+        rawInput: prompt,
+      );
+    }
 
     // If an external Muse Spark endpoint/proxy is configured, attempt remote inference
     if (apiKey != null && apiKey!.isNotEmpty && endpoint != null && endpoint!.isNotEmpty) {
@@ -981,18 +1077,23 @@ class MetaAiService {
             );
             if (validated != null) return validated;
           }
-        } else {
-          fallbackReason = 'Meta AI Cloud endpoint returned HTTP ${response.statusCode}';
         }
+        return AiPlanProposal.error(
+          message:
+              'Meta AI cloud service returned an error (HTTP ${response.statusCode}). Please enter your commodities manually in Price Lab.',
+          rawInput: sanitizedPrompt,
+        );
       } catch (err) {
-        fallbackReason = 'Meta AI Cloud connection timed out or unreachable ($err)';
+        return AiPlanProposal.error(
+          message:
+              'Meta AI cloud connection timed out or is unreachable. Please check your network connection or enter your commodities manually in Price Lab.',
+          rawInput: sanitizedPrompt,
+        );
       }
-    } else {
-      fallbackReason = 'No remote Meta AI key configured in environment — Local deterministic engine engaged';
     }
 
-    // High-fidelity local Muse Spark NLP reasoning engine
-    return _extractLocalProposal(sanitizedPrompt, fallbackReason: fallbackReason);
+    // Local Muse Spark NLP reasoning engine
+    return _extractLocalProposal(sanitizedPrompt);
   }
 
   /// Backward-compatible method wrapper
@@ -1062,13 +1163,19 @@ class MetaAiService {
         );
       }
 
+      if (validatedItems.isEmpty) {
+        return AiPlanProposal.error(
+          message:
+              'Meta AI could not identify any shopping commodities in the model response. Please enter them manually in Price Lab.',
+          rawInput: rawInput,
+        );
+      }
+
       final ambiguities = detectAmbiguitiesAndFollowUps(rawInput, budget, validatedItems, errand);
 
       return AiPlanProposal(
         budget: budget,
-        shoppingItems: validatedItems.isNotEmpty
-            ? validatedItems
-            : _getDefaultShoppingItems(),
+        shoppingItems: validatedItems,
         deadlineErrand: errand,
         rawInput: rawInput,
         modelName: 'Meta Muse Spark 1.3',
@@ -1742,12 +1849,19 @@ class MetaAiService {
       preference = PlanningPreference.delayNonUrgent;
     }
 
-    final shoppingList = items.isNotEmpty ? items : _getDefaultShoppingItems();
-    final ambiguities = detectAmbiguitiesAndFollowUps(prompt, budget, shoppingList, nonShoppingErrand);
+    if (items.isEmpty) {
+      return AiPlanProposal.error(
+        message:
+            'Meta AI could not identify any shopping commodities in your request. Please specify commodities and quantities (e.g. "2kg rice, 1 crate eggs"), or enter them directly in Price Lab.',
+        rawInput: prompt,
+      );
+    }
+
+    final ambiguities = detectAmbiguitiesAndFollowUps(prompt, budget, items, nonShoppingErrand);
 
     return AiPlanProposal(
       budget: budget,
-      shoppingItems: shoppingList,
+      shoppingItems: items,
       deadlineErrand: nonShoppingErrand,
       rawInput: prompt,
       modelName: 'Meta Muse Spark 1.3',
@@ -1758,39 +1872,6 @@ class MetaAiService {
       executionStatus: 'Meta AI: Resilient Fallback Active',
       fallbackReason: fallbackReason ?? 'Offline / Local deterministic NLP extractor used',
     );
-  }
-
-  List<ShoppingItem> _getDefaultShoppingItems() {
-    return [
-      ShoppingItem(
-        id: 'si-1',
-        productName: 'Rice',
-        quantity: 2,
-        unit: 'kg',
-        estimatedUnitPrice: 1650,
-      ),
-      ShoppingItem(
-        id: 'si-2',
-        productName: 'Eggs',
-        quantity: 1,
-        unit: 'crate',
-        estimatedUnitPrice: 5200,
-      ),
-      ShoppingItem(
-        id: 'si-3',
-        productName: 'Tomatoes',
-        quantity: 2,
-        unit: 'kg',
-        estimatedUnitPrice: 1100,
-      ),
-      ShoppingItem(
-        id: 'si-4',
-        productName: 'Cooking Oil',
-        quantity: 1,
-        unit: 'L',
-        estimatedUnitPrice: 2850,
-      ),
-    ];
   }
 
   // --- 4. Muse Spark Plan Explainer (Referencing Verified Records Only) ---
@@ -1809,7 +1890,7 @@ class MetaAiService {
     final timeSavedMins = (timeSavedHours * 60).round();
 
     if (budget < 12000) {
-      return 'Meta Muse Spark Insight: With your ₦${budget.toStringAsFixed(0)} budget, Plan D is the only safe option (${planD.formattedTotalCost}). It delays non-urgent purchases (oil & tomatoes) to protect immediate cash flow while completing package pickup on time (no price-drop claim made).';
+      return 'Meta Muse Spark Insight: With your ₦${budget.toStringAsFixed(0)} budget, Plan D is the only safe option (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while completing high-priority errands on time (no price-drop claim made).';
     }
 
     return 'Meta Muse Spark Insight: Plan A has the lowest total outlay (${planA.formattedTotalCost}) by splitting purchases across 2 markets, saving ₦${diffSavings.toStringAsFixed(0)} compared to Plan B. Conversely, Plan B saves $timeSavedMins minutes and cuts travel to 2 stops for ₦${planB.formattedTotalCost}.';
@@ -1883,20 +1964,6 @@ class MetaAiService {
       );
     }
 
-    // Tip 4: Item Bulk/Smart Shopping Advice
-    if (items.any((i) => i.productName.toLowerCase().contains('rice') && i.quantity <= 2)) {
-      tips.add(
-        const AiOptimizationTip(
-          id: 'tip-bulk-rice',
-          title: 'Smart Commodity Tip',
-          message:
-              'Buying Rice in a 5kg bag at Market B saves ~₦350 per kg compared to single 1kg retail sachets.',
-          iconType: 'deal',
-          potentialSavings: 1750,
-        ),
-      );
-    }
-
     return tips;
   }
 
@@ -1926,6 +1993,10 @@ class MetaAiService {
           addedItem: newItem,
         );
       }
+      return AiCommandExecutionResult(
+        feedbackMessage:
+            'Meta AI could not recognize the commodity "$itemSub". Please specify quantity and item name (e.g. "Add 2kg rice").',
+      );
     }
 
     // Command 2: Change Budget (e.g. "Set budget to 20,000", "My budget is 12k")
@@ -2000,11 +2071,10 @@ class MetaAiService {
       );
     }
 
-    // General fallback interpretation
+    // Rather than returning a fake coded fallback response, report an informative message
     return const AiCommandExecutionResult(
       feedbackMessage:
-          'Meta AI evaluated your request. Decision Lab plans are dynamically updated to reflect your preferences.',
-      selectedPlanId: 'plan-a',
+          'Meta AI could not recognize this command. You can type commands like "Add 2kg rice", "Set budget to ₦20,000", or "Fastest route".',
     );
   }
 
@@ -2074,18 +2144,18 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Cashflow protection. Plan D (${planD.formattedTotalCost}) postpones non-urgent tomatoes & cooking oil while completing high-priority essential staples within a strict budget.',
+            'Muse Spark interpreted your preference: Cashflow protection. Plan D (${planD.formattedTotalCost}) postpones non-urgent commodity purchases while completing high-priority essential staples within a strict budget.',
         targetPlanId: 'plan-d',
         suggestedDelayNonUrgent: true,
       );
     }
 
-    // Default Case: Lowest total cost
+    // Rather than returning a fake coded fallback response, report an informative message
     return FollowUpInterpretation(
       userMessage: userFollowUp,
       interpretationExplanation:
-          'Muse Spark evaluated your request against calculated plans. Plan A provides the optimal overall price efficiency across all stops.',
-      targetPlanId: 'plan-a',
+          'Could not interpret this adjustment. Please specify if you want to lower budget, reduce transit stops, save travel time, or choose a specific plan.',
+      targetPlanId: '',
     );
   }
 

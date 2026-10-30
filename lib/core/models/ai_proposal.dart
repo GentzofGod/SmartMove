@@ -37,6 +37,8 @@ class AiPlanProposal {
   final bool isFallback;
   final String executionStatus;
   final String? fallbackReason;
+  final bool hasError;
+  final String? errorMessage;
 
   const AiPlanProposal({
     required this.budget,
@@ -51,9 +53,29 @@ class AiPlanProposal {
     this.isFallback = true,
     this.executionStatus = 'Local Heuristic Fallback',
     this.fallbackReason,
+    this.hasError = false,
+    this.errorMessage,
   });
 
-  bool get isLiveCloud => !isFallback;
+  /// Factory for user-friendly error reporting instead of falling back to coded responses
+  factory AiPlanProposal.error({
+    required String message,
+    String rawInput = '',
+    String? modelName,
+  }) {
+    return AiPlanProposal(
+      budget: 0,
+      shoppingItems: const [],
+      rawInput: rawInput,
+      modelName: modelName ?? 'Meta Muse Spark 1.3',
+      hasError: true,
+      errorMessage: message,
+      isFallback: false,
+      executionStatus: 'Meta AI Error',
+    );
+  }
+
+  bool get isLiveCloud => !isFallback && !hasError;
 
   AiPlanProposal copyWith({
     double? budget,
@@ -68,6 +90,8 @@ class AiPlanProposal {
     bool? isFallback,
     String? executionStatus,
     String? fallbackReason,
+    bool? hasError,
+    String? errorMessage,
   }) {
     return AiPlanProposal(
       budget: budget ?? this.budget,
@@ -84,6 +108,8 @@ class AiPlanProposal {
       isFallback: isFallback ?? this.isFallback,
       executionStatus: executionStatus ?? this.executionStatus,
       fallbackReason: fallbackReason ?? this.fallbackReason,
+      hasError: hasError ?? this.hasError,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

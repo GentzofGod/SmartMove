@@ -121,9 +121,13 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
         _scanResult = result;
         _transcriptController.text = result.rawTranscribedText;
         _isFallback = result.isFallback;
-        _statusMessage = result.isFallback
-            ? 'Meta AI Fallback Active: Local Multimodal Engine'
-            : 'Meta AI Live Cloud: Muse Spark Vision (Success)';
+        if (result.hasError) {
+          _statusMessage = result.errorMessage ?? 'Could not scan paper note';
+        } else {
+          _statusMessage = result.isFallback
+              ? 'Meta AI Local Multimodal Engine'
+              : 'Meta AI Live Cloud: Muse Spark Vision (Success)';
+        }
       });
     }
   }
@@ -431,26 +435,34 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
-                  color: _isFallback
-                      ? const Color(0xFFFFF8E1)
-                      : const Color(0xFFE8F5E9),
+                  color: _scanResult?.hasError == true
+                      ? const Color(0xFFFFEBEE)
+                      : _isFallback
+                          ? const Color(0xFFFFF8E1)
+                          : const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _isFallback
-                        ? const Color(0xFFFFE082)
-                        : const Color(0xFFA5D6A7),
+                    color: _scanResult?.hasError == true
+                        ? const Color(0xFFFFCDD2)
+                        : _isFallback
+                            ? const Color(0xFFFFE082)
+                            : const Color(0xFFA5D6A7),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      _isFallback
-                          ? Icons.offline_bolt_rounded
-                          : Icons.cloud_done_rounded,
+                      _scanResult?.hasError == true
+                          ? Icons.error_outline_rounded
+                          : _isFallback
+                              ? Icons.offline_bolt_rounded
+                              : Icons.cloud_done_rounded,
                       size: 14,
-                      color: _isFallback
-                          ? const Color(0xFFE65100)
-                          : const Color(0xFF2E7D32),
+                      color: _scanResult?.hasError == true
+                          ? AppColors.errorText
+                          : _isFallback
+                              ? const Color(0xFFE65100)
+                              : const Color(0xFF2E7D32),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -459,9 +471,11 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
-                          color: _isFallback
-                              ? const Color(0xFFBF360C)
-                              : const Color(0xFF1B5E20),
+                          color: _scanResult?.hasError == true
+                              ? AppColors.errorText
+                              : _isFallback
+                                  ? const Color(0xFFBF360C)
+                                  : const Color(0xFF1B5E20),
                         ),
                       ),
                     ),
@@ -471,7 +485,35 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
             ],
 
             // Extracted Items Matrix
-            if (_scanResult != null) ...[
+            if (_scanResult != null && _scanResult!.hasError) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEE),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFFCDD2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        color: AppColors.errorText, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _scanResult!.errorMessage ??
+                            'Could not scan paper note. Please enter commodities manually.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.errorText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (_scanResult != null) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),

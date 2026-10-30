@@ -38,20 +38,40 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
       if (!mounted) return;
       setState(() => _isProcessing = false);
 
+      if (proposal.hasError) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFC62828),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    proposal.errorMessage ??
+                        'Meta AI could not process your request. Please enter items directly in Price Lab.',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
+                  ),
+                ),
+              ],
+            ),
+            action: SnackBarAction(
+              label: 'Price Lab',
+              textColor: Colors.white,
+              onPressed: () => context.push('/decision-lab'),
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
       if (proposal.isLiveCloud) {
         messenger.showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF2E7D32),
             content: Text('✓ Meta AI Live Cloud: Proposal generated successfully!'),
             duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        messenger.showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFE65100),
-            content: Text('⚡ Meta AI Fallback Active: ${proposal.fallbackReason ?? "Local deterministic engine used"}'),
-            duration: const Duration(seconds: 3),
           ),
         );
       }

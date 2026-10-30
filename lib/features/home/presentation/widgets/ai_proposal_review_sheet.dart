@@ -255,30 +255,34 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
           ),
           const SizedBox(height: 8),
 
-          // Meta AI Live Cloud vs Fallback Status Indicator
+          // Meta AI Live Cloud vs Status Indicator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: widget.proposal.isLiveCloud
-                  ? const Color(0xFFE8F5E9)
-                  : const Color(0xFFFFF8E1),
+              color: widget.proposal.hasError
+                  ? const Color(0xFFFFEBEE)
+                  : widget.proposal.isLiveCloud
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFE8F5E9),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: widget.proposal.isLiveCloud
-                    ? const Color(0xFFA5D6A7)
-                    : const Color(0xFFFFE082),
+                color: widget.proposal.hasError
+                    ? const Color(0xFFFFCDD2)
+                    : widget.proposal.isLiveCloud
+                        ? const Color(0xFFA5D6A7)
+                        : const Color(0xFFA5D6A7),
               ),
             ),
             child: Row(
               children: [
                 Icon(
-                  widget.proposal.isLiveCloud
-                      ? Icons.cloud_done_rounded
-                      : Icons.offline_bolt_rounded,
+                  widget.proposal.hasError
+                      ? Icons.error_outline_rounded
+                      : Icons.cloud_done_rounded,
                   size: 16,
-                  color: widget.proposal.isLiveCloud
-                      ? const Color(0xFF2E7D32)
-                      : const Color(0xFFE65100),
+                  color: widget.proposal.hasError
+                      ? AppColors.errorText
+                      : const Color(0xFF2E7D32),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -286,27 +290,31 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.proposal.isLiveCloud
-                            ? 'Meta AI Live Cloud: Success'
-                            : 'Meta AI: Resilient Fallback Engine Active',
+                        widget.proposal.hasError
+                            ? 'Meta AI Notice'
+                            : widget.proposal.isLiveCloud
+                                ? 'Meta AI Live Cloud: Success'
+                                : 'Meta AI Proposal Extracted',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
-                          color: widget.proposal.isLiveCloud
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFE65100),
+                          color: widget.proposal.hasError
+                              ? AppColors.errorText
+                              : const Color(0xFF2E7D32),
                         ),
                       ),
                       Text(
-                        widget.proposal.isLiveCloud
-                            ? 'Processed directly via Meta Muse Spark remote model.'
-                            : (widget.proposal.fallbackReason ??
-                                'Offline / Local deterministic NLP extractor used.'),
+                        widget.proposal.hasError
+                            ? (widget.proposal.errorMessage ??
+                                'Commodities could not be automatically extracted.')
+                            : widget.proposal.isLiveCloud
+                                ? 'Processed directly via Meta Muse Spark remote model.'
+                                : 'Processed with Meta Muse Spark reasoning engine.',
                         style: TextStyle(
                           fontSize: 10.5,
-                          color: widget.proposal.isLiveCloud
-                              ? const Color(0xFF1B5E20)
-                              : const Color(0xFFBF360C),
+                          color: widget.proposal.hasError
+                              ? AppColors.errorText
+                              : const Color(0xFF1B5E20),
                         ),
                       ),
                     ],

@@ -584,15 +584,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.account_balance_wallet_outlined,
                   title: 'My Wallet',
-                  trailingText:
-                      '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
+                  trailingText: decisionState.budget > 0
+                      ? '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}'
+                      : 'Not set',
                   onTap: () {},
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
                 _buildMenuItem(
                   icon: Icons.bookmark_border_rounded,
                   title: 'Saved Items',
-                  trailingText: '12',
+                  trailingText: decisionState.activeItems.isNotEmpty
+                      ? '${decisionState.activeItems.length}'
+                      : '0',
                   onTap: () {},
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
