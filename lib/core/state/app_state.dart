@@ -180,7 +180,6 @@ class DecisionLabState {
         itemCost: 0,
         transportCost: 0,
         otherCost: 0,
-        totalCost: 0,
         estimatedHours: 0,
         stopCount: 0,
         isFeasibleBudget: true,
@@ -188,6 +187,7 @@ class DecisionLabState {
         isRecommended: true,
         satisfiedConstraints: [],
         violatedConstraints: [],
+        tradeOffExplanation: 'Default plan',
         stops: [],
       );
     }
