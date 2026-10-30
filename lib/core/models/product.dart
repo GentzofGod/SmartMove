@@ -50,4 +50,46 @@ class Product {
     final unitPrice = standardizedUnitPrice ?? lowestPrice;
     return '₦${unitPrice.toStringAsFixed(0)} / $baseUnit';
   }
+
+  Product copyWith({
+    String? id,
+    String? name,
+    String? category,
+    String? standardUnit,
+    double? lowestPrice,
+    String? bestSeller,
+    double? distanceKm,
+    String? updateTime,
+    double? percentageChange,
+    bool? isCheapest,
+    ObservationSource? sourceType,
+    int? observationCount,
+    String? description,
+    String? imageUrl,
+    String? brandOrGrade,
+    double? standardizedUnitPrice,
+    String? baseUnit,
+    String? channel,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      standardUnit: standardUnit ?? this.standardUnit,
+      lowestPrice: lowestPrice ?? this.lowestPrice,
+      bestSeller: bestSeller ?? this.bestSeller,
+      distanceKm: distanceKm ?? this.distanceKm,
+      updateTime: updateTime ?? this.updateTime,
+      percentageChange: percentageChange ?? this.percentageChange,
+      isCheapest: isCheapest ?? this.isCheapest,
+      sourceType: sourceType ?? this.sourceType,
+      observationCount: observationCount ?? this.observationCount,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      brandOrGrade: brandOrGrade ?? this.brandOrGrade,
+      standardizedUnitPrice: standardizedUnitPrice ?? this.standardizedUnitPrice,
+      baseUnit: baseUnit ?? this.baseUnit,
+      channel: channel ?? this.channel,
+    );
+  }
 }

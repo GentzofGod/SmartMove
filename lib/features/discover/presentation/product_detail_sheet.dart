@@ -6,6 +6,7 @@ import '../../../core/models/price_observation.dart';
 import '../../../core/models/commodity_item.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
+import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/state/app_state.dart';
 
 class ProductDetailSheet extends ConsumerStatefulWidget {
@@ -20,6 +21,7 @@ class ProductDetailSheet extends ConsumerStatefulWidget {
 class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
   double _quantity = 1.0;
   String? _selectedChannelFilter;
+  ComparisonSortPreference _sortPreference = ComparisonSortPreference.cheapestUnitPrice;
   bool _showAiAnalysis = false;
   final MetaAiService _metaAiService = const MetaAiService();
 
@@ -247,11 +249,29 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
   Widget build(BuildContext context) {
     final observations = ref.watch(communityProvider);
     final comparisonQuotes = _getComparisonQuotes(observations);
-    final filteredQuotes = _selectedChannelFilter == null
-        ? comparisonQuotes
-        : comparisonQuotes
-            .where((q) => q.channel.toLowerCase() == _selectedChannelFilter!.toLowerCase())
+    final currentLocation = ref.watch(locationProvider);
+
+    final standardizedQuotes = CommodityComparisonService.standardizeQuotes(
+      quotes: comparisonQuotes,
+      userLocation: currentLocation,
+      commodityName: widget.product.name,
+    );
+
+    final comparisonSummary = CommodityComparisonService.generateSummary(
+      quotes: standardizedQuotes,
+      commodityName: widget.product.name,
+    );
+
+    var filteredQuotes = _selectedChannelFilter == null
+        ? standardizedQuotes
+        : standardizedQuotes
+            .where((q) => q.observation.channel.toLowerCase() == _selectedChannelFilter!.toLowerCase())
             .toList();
+
+    filteredQuotes = CommodityComparisonService.rankQuotes(
+      quotes: filteredQuotes,
+      preference: _sortPreference,
+    );
 
     final lowestQuotePrice = comparisonQuotes.isNotEmpty
         ? comparisonQuotes.map((q) => q.price).reduce((a, b) => a < b ? a : b)
@@ -477,6 +497,120 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
             ),
             const SizedBox(height: 10),
 
+            // Comparison Summary Card
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F8E9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.badgeSuccessBg,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Price Spread: ${comparisonSummary.priceSpreadPercentage.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.badgeSuccessText,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Lowest: ₦${comparisonSummary.lowestUnitPrice.toStringAsFixed(0)} / ${comparisonSummary.baseUnit}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    comparisonSummary.keySavingsInsight,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (comparisonSummary.anomalies.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFFB74D)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE65100)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              comparisonSummary.anomalies.first,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFBF360C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Sort Preference Selector
+            Row(
+              children: [
+                const Text(
+                  'Sort by:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ComparisonSortPreference.values.map((pref) {
+                        final isSelected = _sortPreference == pref;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: ChoiceChip(
+                            label: Text(pref.label, style: const TextStyle(fontSize: 11)),
+                            selected: isSelected,
+                            selectedColor: AppColors.primaryTint,
+                            onSelected: (val) {
+                              if (val) setState(() => _sortPreference = pref);
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
             // Channel Filter Chips
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -496,9 +630,10 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
 
             // Multi-Seller Quote Cards
             if (filteredQuotes.isNotEmpty) ...[
-              ...filteredQuotes.map((obs) {
-                final isLowest = obs.price <= lowestQuotePrice;
-                final diff = obs.price - lowestQuotePrice;
+              ...filteredQuotes.map((sq) {
+                final obs = sq.observation;
+                final isLowest = sq.isLowestPrice;
+                final diff = sq.priceDifferenceVsLowest;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
@@ -570,7 +705,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${obs.marketLocation} • ${obs.sourceType.displayLabel}',
+                                  '${obs.marketLocation} • ${sq.dynamicDistanceKm.toStringAsFixed(1)} km away • ${obs.sourceType.displayLabel}',
                                   style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                 ),
                                 if (obs.brandOrGrade != null && obs.brandOrGrade!.isNotEmpty) ...[
@@ -599,9 +734,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 ),
                               ),
                               Text(
-                                obs.standardizedUnitPrice != null
-                                    ? '₦${obs.standardizedUnitPrice!.toStringAsFixed(0)} / ${obs.baseUnit}'
-                                    : 'per ${obs.unit}',
+                                sq.displayStandardizedRate,
                                 style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                               ),
                               const SizedBox(height: 2),
@@ -623,7 +756,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 )
                               else
                                 Text(
-                                  '+₦${diff.toStringAsFixed(0)} (+${((diff / lowestQuotePrice) * 100).toStringAsFixed(0)}%)',
+                                  '+₦${diff.toStringAsFixed(0)} (+${sq.percentDifferenceVsLowest.toStringAsFixed(0)}%)',
                                   style: const TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
@@ -633,6 +766,35 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             ],
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Outlay for selected quantity
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Outlay for ${_quantity.toInt()} ${widget.product.standardUnit}:',
+                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            ),
+                            Text(
+                              '₦${(obs.price * _quantity).toStringAsFixed(0).replaceAllMapped(
+                                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                    (Match m) => '${m[1]},',
+                                  )}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

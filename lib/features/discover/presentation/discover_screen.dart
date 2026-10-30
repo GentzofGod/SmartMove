@@ -4,8 +4,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/errand.dart';
 import '../../../core/models/price_observation.dart';
+import '../../../core/models/product.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
+import '../../../core/services/commodity_comparison_service.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 import 'product_detail_sheet.dart';
 
@@ -18,7 +20,9 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   String _selectedCategory = 'Groceries';
-  String _selectedSourceFilter = 'All'; // 'All', 'Trader', 'Community', 'Demo'
+  String _selectedSourceFilter = 'All'; // 'All', 'Trader', 'Community', 'Verified'
+  String _selectedChannelFilter = 'All'; // 'All', 'Local Market', 'SMB Store', 'Online Retailer'
+  ComparisonSortPreference _sortPreference = ComparisonSortPreference.cheapestUnitPrice;
   final TextEditingController _searchController = TextEditingController();
 
   final List<Map<String, dynamic>> _categories = [
@@ -193,6 +197,66 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               p.sourceType == ObservationSource.independentlyVerified ||
               p.sourceType == ObservationSource.traderConfirmed)
           .toList();
+    }
+
+    if (_selectedChannelFilter != 'All') {
+      displayedProducts = displayedProducts
+          .where((p) => p.channel.toLowerCase() == _selectedChannelFilter.toLowerCase())
+          .toList();
+    }
+
+    displayedProducts = List<Product>.from(displayedProducts);
+    switch (_sortPreference) {
+      case ComparisonSortPreference.cheapestUnitPrice:
+        displayedProducts.sort((a, b) {
+          final unitA = a.standardizedUnitPrice ?? a.lowestPrice;
+          final unitB = b.standardizedUnitPrice ?? b.lowestPrice;
+          return unitA.compareTo(unitB);
+        });
+        break;
+      case ComparisonSortPreference.lowestPrice:
+        displayedProducts.sort((a, b) => a.lowestPrice.compareTo(b.lowestPrice));
+        break;
+      case ComparisonSortPreference.closestDistance:
+        displayedProducts.sort((a, b) {
+          final distA = (currentLocation.isSet && LocationService.knownMarketCoordinates.containsKey(a.bestSeller))
+              ? LocationService.calculateDistanceKm(
+                  lat1: currentLocation.latitude,
+                  lon1: currentLocation.longitude,
+                  lat2: LocationService.knownMarketCoordinates[a.bestSeller]!.latitude,
+                  lon2: LocationService.knownMarketCoordinates[a.bestSeller]!.longitude,
+                )
+              : a.distanceKm;
+          final distB = (currentLocation.isSet && LocationService.knownMarketCoordinates.containsKey(b.bestSeller))
+              ? LocationService.calculateDistanceKm(
+                  lat1: currentLocation.latitude,
+                  lon1: currentLocation.longitude,
+                  lat2: LocationService.knownMarketCoordinates[b.bestSeller]!.latitude,
+                  lon2: LocationService.knownMarketCoordinates[b.bestSeller]!.longitude,
+                )
+              : b.distanceKm;
+          return distA.compareTo(distB);
+        });
+        break;
+      case ComparisonSortPreference.highestTrust:
+        displayedProducts.sort((a, b) {
+          final scoreA = a.sourceType == ObservationSource.independentlyVerified
+              ? 3
+              : (a.sourceType == ObservationSource.traderConfirmed ? 2 : 1);
+          final scoreB = b.sourceType == ObservationSource.independentlyVerified
+              ? 3
+              : (b.sourceType == ObservationSource.traderConfirmed ? 2 : 1);
+          if (scoreA != scoreB) return scoreB.compareTo(scoreA);
+          return a.lowestPrice.compareTo(b.lowestPrice);
+        });
+        break;
+      case ComparisonSortPreference.bestValue:
+        displayedProducts.sort((a, b) {
+          final unitA = a.standardizedUnitPrice ?? a.lowestPrice;
+          final unitB = b.standardizedUnitPrice ?? b.lowestPrice;
+          return unitA.compareTo(unitB);
+        });
+        break;
     }
 
     return Scaffold(
@@ -383,7 +447,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         const SizedBox(width: 8),
                         InkWell(
                           onTap: () {
-                            // Cycle through sources: All -> Trader -> Community -> Demo -> All
+                            // Cycle through sources: All -> Trader -> Community -> Verified -> All
                             setState(() {
                               if (_selectedSourceFilter == 'All') {
                                 _selectedSourceFilter = 'Trader';
@@ -423,6 +487,96 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   ),
                                 ),
                                 const Icon(Icons.tune_rounded, size: 14, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () {
+                            // Cycle through channels: All -> Local Market -> SMB Store -> Online Retailer -> All
+                            setState(() {
+                              if (_selectedChannelFilter == 'All') {
+                                _selectedChannelFilter = 'Local Market';
+                              } else if (_selectedChannelFilter == 'Local Market') {
+                                _selectedChannelFilter = 'SMB Store';
+                              } else if (_selectedChannelFilter == 'SMB Store') {
+                                _selectedChannelFilter = 'Online Retailer';
+                              } else {
+                                _selectedChannelFilter = 'All';
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: _selectedChannelFilter != 'All'
+                                  ? AppColors.primaryTint
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _selectedChannelFilter != 'All'
+                                    ? AppColors.primary
+                                    : AppColors.cardBorder,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedChannelFilter == 'Online Retailer'
+                                      ? Icons.language
+                                      : (_selectedChannelFilter == 'SMB Store'
+                                          ? Icons.store
+                                          : Icons.storefront),
+                                  size: 13,
+                                  color: _selectedChannelFilter != 'All' ? AppColors.primaryDark : AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Channel: ${_selectedChannelFilter == 'All' ? 'All Channels' : _selectedChannelFilter}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _selectedChannelFilter != 'All'
+                                        ? AppColors.primaryDark
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              final nextIndex = (_sortPreference.index + 1) % ComparisonSortPreference.values.length;
+                              _sortPreference = ComparisonSortPreference.values[nextIndex];
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.sort_rounded, size: 14, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Sort: ${_sortPreference.label}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
                               ],
                             ),
                           ),
@@ -562,19 +716,56 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              p.formattedPrice,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  p.formattedPrice,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryTint,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    p.formattedStandardizedPrice,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primaryDark,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                            if (p.brandOrGrade != null && p.brandOrGrade!.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                'Grade: ${p.brandOrGrade}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryDark,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(
-                                  Icons.store_outlined,
+                                Icon(
+                                  p.channel.toLowerCase().contains('online')
+                                      ? Icons.language
+                                      : (p.channel.toLowerCase().contains('smb') || p.channel.toLowerCase().contains('store')
+                                          ? Icons.store
+                                          : Icons.storefront),
                                   size: 13,
                                   color: AppColors.textSecondary,
                                 ),
@@ -594,7 +785,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                           : p.distanceKm;
 
                                       return Text(
-                                        '${p.bestSeller} • $dynamicDistance km',
+                                        '${p.bestSeller} • ${p.channel} • $dynamicDistance km',
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 12,
@@ -654,9 +845,36 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         ),
                       ),
 
-                      // Add to comparison basket button
-                      IconButton(
-                        onPressed: () {
+                      // Compare and Add buttons column
+                      Column(
+                        children: [
+                          IconButton(
+                            tooltip: 'Compare Across Sellers',
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => ProductDetailSheet(product: p),
+                              );
+                            },
+                            icon: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: const Icon(
+                                Icons.compare_arrows_rounded,
+                                color: AppColors.textPrimary,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Add to Comparison Basket',
+                            onPressed: () {
                           // Quick add to comparison basket
                           final item = ShoppingItem(
                             id: 'item-${p.id}-${DateTime.now().millisecondsSinceEpoch}',
@@ -691,11 +909,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                       ),
                     ],
                   ),
-                ),
-              );
-            },
+                ],
+              ),
             ),
-          ),
+          );
+        },
+        ),
+      ),
 
           // Honest Data Disclosure Banner
           Container(
