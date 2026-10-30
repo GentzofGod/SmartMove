@@ -192,3 +192,4 @@ INSERT INTO public.commodity_categories (id, name, slug, icon_name, description,
   ('c0000000-0000-0000-0000-000000000007', 'Household & Provisions', 'household', 'home_work_outlined', 'Toiletries, laundry detergents, canned provisions, and cleaning items.', 7),
   ('c0000000-0000-0000-0000-000000000008', 'Others', 'others', 'more_horiz_rounded', 'General market merchandise and specialty products.', 8)
 ON CONFLICT (name) DO NOTHING;
+
