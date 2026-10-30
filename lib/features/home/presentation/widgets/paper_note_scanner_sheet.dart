@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
@@ -7,13 +8,11 @@ import '../../../../core/services/meta_ai_service.dart';
 /// Modal bottom sheet for scanning and parsing handwritten paper shopping lists
 /// and receipts using Meta Muse Spark Vision (`muse-spark-1.3`).
 ///
-/// Features:
+/// Clean, photo-first implementation:
 /// - Real Camera photo capture and Gallery image picker via `image_picker`
-/// - Built-in authentic Nigerian market handwritten paper note presets
-/// - Realistic lined notebook paper visualization
-/// - Extraction of commodities, quantities, units, and budget
-/// - Immediate manual text editing fallback for OCR corrections
-/// - Transparent model indicators & error handling
+/// - No hardcoded preset foodstuffs or mock lists
+/// - Transparent error reporting without synthetic fallback mock data
+/// - User can directly edit or type commodities into the transcribed field
 class PaperNoteScannerSheet extends StatefulWidget {
   final Function(String transcribedText) onTranscriptConfirmed;
 
@@ -31,12 +30,8 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
   final MetaAiService _aiService = const MetaAiService();
 
   bool _isAnalyzing = false;
-  bool _isFallback = false;
-  String? _statusMessage;
   Uint8List? _capturedImageBytes;
   String? _capturedImageName;
-
-  SamplePaperNote _selectedSample = SamplePaperNote.defaultSamples.first;
   PaperNoteScanResult? _scanResult;
   late TextEditingController _transcriptController;
 
@@ -44,29 +39,12 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
   void initState() {
     super.initState();
     _transcriptController = TextEditingController();
-    // Pre-populate with initial sample note for immediate testability
-    _loadSampleNote(_selectedSample, autoAnalyze: false);
   }
 
   @override
   void dispose() {
     _transcriptController.dispose();
     super.dispose();
-  }
-
-  void _loadSampleNote(SamplePaperNote sample, {bool autoAnalyze = true}) {
-    setState(() {
-      _selectedSample = sample;
-      _capturedImageBytes = null;
-      _capturedImageName = null;
-      _transcriptController.text = sample.transcribedPrompt;
-      _statusMessage = null;
-      _scanResult = null;
-    });
-
-    if (autoAnalyze) {
-      _analyzeCurrentNote();
-    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -83,7 +61,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
         setState(() {
           _capturedImageBytes = bytes;
           _capturedImageName = picked.name;
-          _statusMessage = 'Photo selected: ${picked.name}. Ready for Meta AI analysis.';
+          _scanResult = null;
         });
         await _analyzeCurrentNote();
       }
@@ -100,33 +78,25 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
   }
 
   Future<void> _analyzeCurrentNote() async {
+    if (_capturedImageBytes == null && _transcriptController.text.trim().isEmpty) {
+      return;
+    }
+
     setState(() {
       _isAnalyzing = true;
-      _statusMessage =
-          'Analyzing handwritten note with Meta Muse Spark Vision (muse-spark-1.3)...';
     });
-
-    // Simulate realistic low-latency multimodal reasoning
-    await Future.delayed(const Duration(milliseconds: 600));
 
     final result = await _aiService.parsePaperNoteImage(
       imageBytes: _capturedImageBytes,
-      simulatedNoteId: _capturedImageBytes == null ? _selectedSample.id : null,
-      customNoteText: _capturedImageBytes == null ? _selectedSample.transcribedPrompt : null,
+      customNoteText: _capturedImageBytes == null ? _transcriptController.text.trim() : null,
     );
 
     if (mounted) {
       setState(() {
         _isAnalyzing = false;
         _scanResult = result;
-        _transcriptController.text = result.rawTranscribedText;
-        _isFallback = result.isFallback;
-        if (result.hasError) {
-          _statusMessage = result.errorMessage ?? 'Could not scan paper note';
-        } else {
-          _statusMessage = result.isFallback
-              ? 'Meta AI Local Multimodal Engine'
-              : 'Meta AI Live Cloud: Muse Spark Vision (Success)';
+        if (!result.hasError && result.rawTranscribedText.isNotEmpty) {
+          _transcriptController.text = result.rawTranscribedText;
         }
       });
     }
@@ -226,7 +196,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
                     ),
                     icon: const Icon(Icons.camera_alt_rounded, size: 16),
                     label: const Text(
@@ -246,7 +216,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
                     ),
                     icon: const Icon(Icons.photo_library_outlined, size: 16, color: AppColors.primary),
                     label: const Text(
@@ -259,261 +229,170 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
             ),
             const SizedBox(height: 14),
 
-            // Preset Sample Notes Bar
-            Row(
-              children: const [
-                Icon(Icons.auto_awesome, size: 13, color: AppColors.primary),
-                SizedBox(width: 4),
-                Text(
-                  'Or Try a Handwritten Market Note Preset:',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: SamplePaperNote.defaultSamples.map((sample) {
-                  final isSelected =
-                      _capturedImageBytes == null && _selectedSample.id == sample.id;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      key: ValueKey('chip_sample_${sample.id}'),
-                      label: Text(
-                        sample.title,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary,
-                      backgroundColor: AppColors.surface,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : AppColors.cardBorder,
-                        ),
-                      ),
-                      showCheckmark: false,
-                      onSelected: (selected) {
-                        if (selected) {
-                          _loadSampleNote(sample);
-                        }
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Visual Note Preview Card (Lined paper simulation)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFDE7), // Light notebook paper yellow
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFFEE58), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Paper Top Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.edit_note_rounded,
-                              size: 18, color: Color(0xFFF57F17)),
-                          const SizedBox(width: 6),
-                          Text(
-                            _capturedImageName != null
-                                ? 'Photographed Note (${_capturedImageName!})'
-                                : _selectedSample.title,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFFE65100),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFFD54F)),
-                        ),
-                        child: Text(
-                          _capturedImageBytes != null ? 'Camera Scan' : 'Paper Scrap',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFE65100),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(color: Color(0xFFFFE082), thickness: 1, height: 16),
-
-                  // Handwritten text presentation
-                  Text(
-                    _capturedImageBytes != null
-                        ? 'Handwritten paper list captured from camera. Meta Muse Spark Vision has extracted the commodities below.'
-                        : _selectedSample.handwrittenContent,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.45,
-                      fontFamily: 'Courier',
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blueGrey.shade900,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Action to Trigger Analysis
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                      key: const ValueKey('btn_analyze_paper_note'),
-                      onPressed: _isAnalyzing ? null : _analyzeCurrentNote,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF57F17),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      ),
-                      icon: _isAnalyzing
-                          ? const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.psychology_rounded, size: 14),
-                      label: Text(
-                        _isAnalyzing ? 'Extracting with AI...' : 'Parse with Meta AI',
-                        style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Status message
-            if (_statusMessage != null) ...[
+            // Captured Image Card or Empty State
+            if (_capturedImageBytes == null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                margin: const EdgeInsets.only(bottom: 10),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                 decoration: BoxDecoration(
-                  color: _scanResult?.hasError == true
-                      ? const Color(0xFFFFEBEE)
-                      : _isFallback
-                          ? const Color(0xFFFFF8E1)
-                          : const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _scanResult?.hasError == true
-                        ? const Color(0xFFFFCDD2)
-                        : _isFallback
-                            ? const Color(0xFFFFE082)
-                            : const Color(0xFFA5D6A7),
-                  ),
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Icon(
-                      _scanResult?.hasError == true
-                          ? Icons.error_outline_rounded
-                          : _isFallback
-                              ? Icons.offline_bolt_rounded
-                              : Icons.cloud_done_rounded,
-                      size: 14,
-                      color: _scanResult?.hasError == true
-                          ? AppColors.errorText
-                          : _isFallback
-                              ? const Color(0xFFE65100)
-                              : const Color(0xFF2E7D32),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryTint,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.document_scanner_outlined,
+                        size: 26,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _statusMessage!,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: _scanResult?.hasError == true
-                              ? AppColors.errorText
-                              : _isFallback
-                                  ? const Color(0xFFBF360C)
-                                  : const Color(0xFF1B5E20),
-                        ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'No Paper Note Captured Yet',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Take a photo of your handwritten paper shopping list or select an image to extract commodities with Meta AI.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primaryTint, width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryTint,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.image_outlined, size: 20, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _capturedImageName ?? 'Photographed Note',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            _isAnalyzing ? 'Extracting commodities with Meta AI...' : 'Photo loaded',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _isAnalyzing ? AppColors.primary : AppColors.textSecondary,
+                              fontWeight: _isAnalyzing ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_isAnalyzing)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                      )
+                    else
+                      TextButton(
+                        onPressed: () => _pickImage(ImageSource.camera),
+                        child: const Text('Retake', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      ),
+                  ],
+                ),
               ),
-            ],
+            const SizedBox(height: 14),
 
-            // Extracted Items Matrix
+            // Error Display (User-Friendly Error Reporting)
             if (_scanResult != null && _scanResult!.hasError) ...[
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
+                width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFEBEE),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFFFCDD2)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: AppColors.errorText, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _scanResult!.errorMessage ??
-                            'Could not scan paper note. Please enter commodities manually.',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.errorText,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: AppColors.errorText, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _scanResult!.errorMessage ??
+                                'Meta AI vision is currently unavailable. Please enter your commodities manually in the box below.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.errorText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.push('/decision-lab');
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.primary),
+                        label: const Text(
+                          'Open Price Lab Directly',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ] else if (_scanResult != null) ...[
+              const SizedBox(height: 12),
+            ] else if (_scanResult != null &&
+                !_scanResult!.hasError &&
+                _scanResult!.proposal.shoppingItems.isNotEmpty) ...[
+              // Extracted Commodities Matrix
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
@@ -543,22 +422,23 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                             ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryTint,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Budget: ₦${_scanResult!.proposal.budget.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
+                        if (_scanResult!.proposal.budget > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryTint,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Budget: ₦${_scanResult!.proposal.budget.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -628,7 +508,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                   ),
                 ),
                 Text(
-                  'OCR Cleaned',
+                  'Manual Edit Available',
                   style: TextStyle(
                     fontSize: 11,
                     color: AppColors.primary,
@@ -643,7 +523,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
               maxLines: 3,
               decoration: InputDecoration(
                 hintText:
-                    'Or edit the transcribed shopping list commodities and budget...',
+                    'Or type/paste your handwritten shopping list items here (e.g. 5kg rice, 2 crates eggs)...',
                 hintStyle: const TextStyle(fontSize: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),

@@ -144,7 +144,7 @@ void main() {
   });
 
   group('PaperNoteScannerSheet Widget Tests', () {
-    testWidgets('6. Renders paper scanner sheet, switches samples, and parses note', (tester) async {
+    testWidgets('6. Renders paper scanner sheet with clean capture options and allows editing commodities', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -171,30 +171,17 @@ void main() {
       expect(find.byKey(const ValueKey('btn_take_camera_photo')), findsOneWidget);
       expect(find.byKey(const ValueKey('btn_choose_gallery_photo')), findsOneWidget);
 
-      // Verify Preset Sample Note Chips
-      expect(find.byKey(const ValueKey('chip_sample_sample_bodija')), findsOneWidget);
-      expect(find.byKey(const ValueKey('chip_sample_sample_pantry')), findsOneWidget);
-      expect(find.byKey(const ValueKey('chip_sample_sample_vernacular')), findsOneWidget);
+      // Verify empty state is shown (no hardcoded sample presets or mock foodstuffs)
+      expect(find.text('No Paper Note Captured Yet'), findsOneWidget);
+      expect(find.text('Bodija Market Foodstuffs'), findsNothing);
+      expect(find.text('Household Pantry Restock'), findsNothing);
+      expect(find.text('Mama Gold Rice 5kg'), findsNothing);
 
-      // Select Household Pantry Restock Note
-      await tester.tap(find.byKey(const ValueKey('chip_sample_sample_pantry')));
-      await tester.pump(const Duration(milliseconds: 700));
+      // Enter manual commodities in the text field
+      final textField = find.byType(TextField);
+      expect(textField, findsOneWidget);
+      await tester.enterText(textField, '5kg Rice, 2 crates Eggs, ₦25,000 budget');
       await tester.pumpAndSettle();
-
-      // Verify note content preview
-      expect(find.textContaining('Pantry Restock'), findsWidgets);
-
-      // Verify parse button and tap it
-      final parseBtn = find.byKey(const ValueKey('btn_analyze_paper_note'));
-      await tester.ensureVisible(parseBtn);
-      await tester.tap(parseBtn);
-      await tester.pump(const Duration(milliseconds: 700));
-      await tester.pumpAndSettle();
-
-      // Verify Recognized Commodities list is shown
-      expect(find.textContaining('Recognized Commodities'), findsOneWidget);
-      expect(find.text('Indomie Noodles'), findsOneWidget);
-      expect(find.text('Sliced Bread'), findsOneWidget);
 
       // Scroll and Tap "Generate Plan Proposal from Note"
       final generateBtn = find.byKey(const ValueKey('btn_generate_plan_from_paper'));
@@ -203,8 +190,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(confirmedTranscript, isNotNull);
-      expect(confirmedTranscript!.toLowerCase().contains('indomie'), true);
-      expect(confirmedTranscript!.contains('₦18,000'), true);
+      expect(confirmedTranscript!.toLowerCase().contains('rice'), true);
+      expect(confirmedTranscript!.contains('₦25,000'), true);
     });
 
     testWidgets('7. MetaAiScenarioCard opens paper note scanner from scan button', (tester) async {
