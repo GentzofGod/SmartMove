@@ -381,60 +381,66 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            widget.product.formattedPrice,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'per ${widget.product.standardUnit}',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Builder(
-                        builder: (context) {
-                          final currentLocation = ref.watch(locationProvider);
-                          final marketCoord = LocationService.knownMarketCoordinates[widget.product.bestSeller];
-                          final dynamicDistance = (currentLocation.isSet && marketCoord != null)
-                              ? LocationService.calculateDistanceKm(
-                                  lat1: currentLocation.latitude,
-                                  lon1: currentLocation.longitude,
-                                  lat2: marketCoord.latitude,
-                                  lon2: marketCoord.longitude,
-                                )
-                              : (currentLocation.isSet ? widget.product.distanceKm : null);
-
-                          return Row(
-                            children: [
-                              const Icon(Icons.store_outlined, size: 14, color: AppColors.textSecondary),
-                              const SizedBox(width: 4),
-                              Text(
-                                dynamicDistance != null
-                                    ? '${widget.product.bestSeller} • $dynamicDistance km away'
-                                    : '${widget.product.bestSeller} • Open Market',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              widget.product.formattedPrice,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
                               ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'per ${widget.product.standardUnit}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Builder(
+                          builder: (context) {
+                            final currentLocation = ref.watch(locationProvider);
+                            final marketCoord = LocationService.knownMarketCoordinates[widget.product.bestSeller];
+                            final dynamicDistance = (currentLocation.isSet && marketCoord != null)
+                                ? LocationService.calculateDistanceKm(
+                                    lat1: currentLocation.latitude,
+                                    lon1: currentLocation.longitude,
+                                    lat2: marketCoord.latitude,
+                                    lon2: marketCoord.longitude,
+                                  )
+                                : (currentLocation.isSet ? widget.product.distanceKm : null);
+
+                            return Row(
+                              children: [
+                                const Icon(Icons.store_outlined, size: 14, color: AppColors.textSecondary),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    dynamicDistance != null
+                                        ? '${widget.product.bestSeller} • $dynamicDistance km away'
+                                        : '${widget.product.bestSeller} • Open Market',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(

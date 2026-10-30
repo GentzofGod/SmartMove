@@ -171,9 +171,29 @@ class DecisionLabState {
     this.optimizationTips = const [],
   });
 
-  PlanCandidate get selectedPlan =>
-      candidates.firstWhere((p) => p.id == selectedPlanId,
-          orElse: () => candidates.first);
+  PlanCandidate get selectedPlan {
+    if (candidates.isEmpty) {
+      return const PlanCandidate(
+        id: 'plan-default',
+        name: 'Default Plan',
+        tag: 'Balanced',
+        itemCost: 0,
+        transportCost: 0,
+        otherCost: 0,
+        totalCost: 0,
+        estimatedHours: 0,
+        stopCount: 0,
+        isFeasibleBudget: true,
+        isFeasibleDeadline: true,
+        isRecommended: true,
+        satisfiedConstraints: [],
+        violatedConstraints: [],
+        stops: [],
+      );
+    }
+    return candidates.firstWhere((p) => p.id == selectedPlanId,
+        orElse: () => candidates.first);
+  }
 
   DecisionLabState copyWith({
     double? budget,
@@ -213,7 +233,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     final initialErrands = DemoSeedData.getInitialErrands();
     final initialItems = initialErrands.isNotEmpty ? initialErrands.first.shoppingItems : <ShoppingItem>[];
     return _calculateState(
-      budget: initialItems.isNotEmpty ? 15000.0 : 0.0,
+      budget: 15000.0,
       transportCost: 1200,
       timeHours: 3.0,
       maxStops: 4,

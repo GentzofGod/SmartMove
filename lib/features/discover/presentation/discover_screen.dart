@@ -126,7 +126,14 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Estimated Benchmark Range:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const Expanded(
+                    child: Text(
+                      'Estimated Benchmark Range:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
                     plan.estimatedPriceRange,
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary),
@@ -369,28 +376,31 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           // Meta AI Quick Research Chip Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 2.0),
-            child: Row(
-              children: [
-                ActionChip(
-                  avatar: const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
-                  backgroundColor: AppColors.primaryTint,
-                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
-                  label: Text(
-                    _searchController.text.isNotEmpty
-                        ? 'Research "${_searchController.text.trim()}" with Meta AI'
-                        : 'Meta AI Commodity Price Research',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryDark,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+                    backgroundColor: AppColors.primaryTint,
+                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                    label: Text(
+                      _searchController.text.isNotEmpty
+                          ? 'Research "${_searchController.text.trim()}" with Meta AI'
+                          : 'Meta AI Commodity Price Research',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                    onPressed: () => _showAiResearchDialog(
+                      context,
+                      _searchController.text.isNotEmpty ? _searchController.text.trim() : 'Rice (50kg)',
                     ),
                   ),
-                  onPressed: () => _showAiResearchDialog(
-                    context,
-                    _searchController.text.isNotEmpty ? _searchController.text.trim() : 'Rice (50kg)',
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -764,7 +774,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Row(
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 2,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Text(
                                   p.formattedPrice,
@@ -774,7 +787,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                     color: AppColors.primary,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -858,7 +870,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                             ),
                             const SizedBox(height: 4),
                             // Explicit Data Source Badge (Section 5.2)
-                            Row(
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 2,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
@@ -870,6 +885,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   ),
                                   child: Text(
                                     p.sourceType.displayLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.w700,
@@ -879,7 +896,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 Text(
                                   p.updateTime,
                                   style: const TextStyle(

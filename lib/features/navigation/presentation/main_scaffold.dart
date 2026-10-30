@@ -59,8 +59,10 @@ class MainScaffold extends StatelessWidget {
           backgroundColor: Colors.white,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textTertiary,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+          selectedFontSize: 10.5,
+          unselectedFontSize: 10.5,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 10.5),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.5),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
           items: const [

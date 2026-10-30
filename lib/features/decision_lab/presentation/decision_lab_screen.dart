@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -1007,23 +1008,36 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   ),
                 ],
               ),
-              Slider(
-                value: state.budget,
-                min: 8000,
-                max: 30000,
-                divisions: 22,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (val) {
-                  ref.read(decisionLabProvider.notifier).updateBudget(val);
+              Builder(
+                builder: (context) {
+                  final minBudget = state.budget < 8000 ? (state.budget < 1000 ? 0.0 : (state.budget / 1000).floor() * 1000.0) : 8000.0;
+                  final maxBudget = state.budget > 30000 ? ((state.budget / 1000).ceil() * 1000.0) : 30000.0;
+                  final safeBudget = state.budget.clamp(minBudget, maxBudget);
+                  final budgetDivisions = maxBudget > minBudget ? max(1, ((maxBudget - minBudget) / 1000).round()) : 1;
+
+                  return Column(
+                    children: [
+                      Slider(
+                        value: safeBudget,
+                        min: minBudget,
+                        max: maxBudget,
+                        divisions: budgetDivisions,
+                        activeColor: AppColors.primary,
+                        inactiveColor: AppColors.cardBorder,
+                        onChanged: (val) {
+                          ref.read(decisionLabProvider.notifier).updateBudget(val);
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('₦${minBudget.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                          Text('₦${maxBudget.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        ],
+                      ),
+                    ],
+                  );
                 },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('₦8,000', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                  Text('₦30,000', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ],
               ),
             ],
           ),
@@ -1074,23 +1088,36 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   ),
                 ],
               ),
-              Slider(
-                value: state.transportCost,
-                min: 500,
-                max: 4000,
-                divisions: 14,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (val) {
-                  ref.read(decisionLabProvider.notifier).updateTransport(val);
+              Builder(
+                builder: (context) {
+                  final minTransport = state.transportCost < 500 ? (state.transportCost < 100 ? 0.0 : (state.transportCost / 100).floor() * 100.0) : 500.0;
+                  final maxTransport = state.transportCost > 4000 ? ((state.transportCost / 500).ceil() * 500.0) : 4000.0;
+                  final safeTransport = state.transportCost.clamp(minTransport, maxTransport);
+                  final transportDivisions = maxTransport > minTransport ? max(1, ((maxTransport - minTransport) / 250).round()) : 1;
+
+                  return Column(
+                    children: [
+                      Slider(
+                        value: safeTransport,
+                        min: minTransport,
+                        max: maxTransport,
+                        divisions: transportDivisions,
+                        activeColor: AppColors.primary,
+                        inactiveColor: AppColors.cardBorder,
+                        onChanged: (val) {
+                          ref.read(decisionLabProvider.notifier).updateTransport(val);
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('₦${minTransport.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                          Text('₦${maxTransport.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        ],
+                      ),
+                    ],
+                  );
                 },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('₦500', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                  Text('₦4,000', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ],
               ),
             ],
           ),
@@ -1129,23 +1156,36 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   ),
                 ],
               ),
-              Slider(
-                value: state.timeAvailableHours,
-                min: 1.0,
-                max: 6.0,
-                divisions: 10,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (val) {
-                  ref.read(decisionLabProvider.notifier).updateTimeAvailable(val);
+              Builder(
+                builder: (context) {
+                  final minHours = state.timeAvailableHours < 1.0 ? max(0.5, (state.timeAvailableHours * 2).floor() / 2.0) : 1.0;
+                  final maxHours = state.timeAvailableHours > 6.0 ? (state.timeAvailableHours * 2).ceil() / 2.0 : 6.0;
+                  final safeHours = state.timeAvailableHours.clamp(minHours, maxHours);
+                  final hoursDivisions = maxHours > minHours ? max(1, ((maxHours - minHours) * 2).round()) : 1;
+
+                  return Column(
+                    children: [
+                      Slider(
+                        value: safeHours,
+                        min: minHours,
+                        max: maxHours,
+                        divisions: hoursDivisions,
+                        activeColor: AppColors.primary,
+                        inactiveColor: AppColors.cardBorder,
+                        onChanged: (val) {
+                          ref.read(decisionLabProvider.notifier).updateTimeAvailable(val);
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${minHours.toStringAsFixed(1)} hr', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                          Text('${maxHours.toStringAsFixed(1)} hrs', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        ],
+                      ),
+                    ],
+                  );
                 },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('1.0 hr', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                  Text('6.0 hrs', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ],
               ),
             ],
           ),
@@ -1184,23 +1224,36 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   ),
                 ],
               ),
-              Slider(
-                value: state.maxStops.toDouble(),
-                min: 2.0,
-                max: 5.0,
-                divisions: 3,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (val) {
-                  ref.read(decisionLabProvider.notifier).updateMaxStops(val.round());
+              Builder(
+                builder: (context) {
+                  final minStops = state.maxStops < 2 ? 1.0 : 2.0;
+                  final maxStops = state.maxStops > 5 ? state.maxStops.toDouble() : 5.0;
+                  final safeStops = state.maxStops.toDouble().clamp(minStops, maxStops);
+                  final stopsDivisions = maxStops > minStops ? max(1, (maxStops - minStops).round()) : 1;
+
+                  return Column(
+                    children: [
+                      Slider(
+                        value: safeStops,
+                        min: minStops,
+                        max: maxStops,
+                        divisions: stopsDivisions,
+                        activeColor: AppColors.primary,
+                        inactiveColor: AppColors.cardBorder,
+                        onChanged: (val) {
+                          ref.read(decisionLabProvider.notifier).updateMaxStops(val.round());
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${minStops.toInt()} stops', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                          Text('${maxStops.toInt()} stops', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        ],
+                      ),
+                    ],
+                  );
                 },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('2 stops (consolidated)', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                  Text('5 stops (flexible)', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ],
               ),
             ],
           ),
@@ -1256,23 +1309,35 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   ),
                 ],
               ),
-              Slider(
-                value: state.timeCostPerHour,
-                min: 0.0,
-                max: 2000.0,
-                divisions: 8,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (val) {
-                  ref.read(decisionLabProvider.notifier).updateTimeCostPerHour(val);
+              Builder(
+                builder: (context) {
+                  final maxTimeCost = state.timeCostPerHour > 2000.0 ? ((state.timeCostPerHour / 250).ceil() * 250.0) : 2000.0;
+                  final safeTimeCost = state.timeCostPerHour.clamp(0.0, maxTimeCost);
+                  final timeCostDivisions = maxTimeCost > 0 ? max(1, (maxTimeCost / 250).round()) : 1;
+
+                  return Column(
+                    children: [
+                      Slider(
+                        value: safeTimeCost,
+                        min: 0.0,
+                        max: maxTimeCost,
+                        divisions: timeCostDivisions,
+                        activeColor: AppColors.primary,
+                        inactiveColor: AppColors.cardBorder,
+                        onChanged: (val) {
+                          ref.read(decisionLabProvider.notifier).updateTimeCostPerHour(val);
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('₦0 (Ignore)', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                          Text('₦${maxTimeCost.toStringAsFixed(0)} / hr', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                        ],
+                      ),
+                    ],
+                  );
                 },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('₦0 (Ignore)', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                  Text('₦2,000 / hr', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                ],
               ),
             ],
           ),
