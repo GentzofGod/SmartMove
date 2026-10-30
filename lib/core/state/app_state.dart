@@ -558,7 +558,35 @@ class AuthNotifier extends Notifier<UserSession> {
   }
 
   void updateRole(String newRole) {
-    state = state.copyWith(role: newRole);
+    String? defaultBiz = state.businessName;
+    String? defaultHub = state.marketHub;
+    String? defaultChannel = state.sellerChannel;
+    if (newRole == 'Trader' && (defaultBiz == null || defaultBiz.isEmpty)) {
+      defaultBiz = '${state.displayName}\'s Store';
+      defaultHub = defaultHub ?? 'Bodija Market';
+      defaultChannel = defaultChannel ?? 'Local Market';
+    }
+    state = state.copyWith(
+      role: newRole,
+      businessName: defaultBiz,
+      marketHub: defaultHub,
+      sellerChannel: defaultChannel,
+    );
+    AuthService.persistSession(state);
+  }
+
+  void updateSellerProfile({
+    String? businessName,
+    String? marketHub,
+    String? sellerChannel,
+    String? phone,
+  }) {
+    state = state.copyWith(
+      businessName: businessName ?? state.businessName,
+      marketHub: marketHub ?? state.marketHub,
+      sellerChannel: sellerChannel ?? state.sellerChannel,
+      phone: phone ?? state.phone,
+    );
     AuthService.persistSession(state);
   }
 

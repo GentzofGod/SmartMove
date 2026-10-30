@@ -31,14 +31,18 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   void _showAddObservationDialog(BuildContext context, {bool isSellerDirect = false}) {
+    final userSession = ref.read(authProvider);
     final productController = TextEditingController();
-    final sellerController = TextEditingController();
+    final sellerController = TextEditingController(
+      text: isSellerDirect && userSession.businessName != null ? userSession.businessName! : '',
+    );
     final priceController = TextEditingController();
     final unitController = TextEditingController(text: '1kg');
     final brandController = TextEditingController();
-    final userSession = ref.read(authProvider);
     String submitterRole = isSellerDirect ? 'Trader' : userSession.role;
-    String channel = 'Local Market';
+    String channel = isSellerDirect && userSession.sellerChannel != null
+        ? userSession.sellerChannel!
+        : 'Local Market';
     bool inStock = true;
 
     showModalBottomSheet(
@@ -677,7 +681,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   Widget _buildModerationTab(List<PriceObservation> observations, String role) {
-    final isAdmin = role == 'Trader' || role == 'Admin';
+    final isAdmin = role == 'Admin';
 
     return ListView(
       padding: const EdgeInsets.all(16),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
+import '../../../core/services/auth_service.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -50,7 +51,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: userSession.isAdmin
+                          ? const Color(0xFF673AB7)
+                          : userSession.isSeller
+                              ? AppColors.primary
+                              : const Color(0xFF0052CC),
                       child: Text(
                         userSession.displayName.isNotEmpty
                             ? userSession.displayName[0].toUpperCase()
@@ -85,19 +90,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: userSession.isGuest
-                                      ? AppColors.badgeWarningBg
-                                      : AppColors.badgeSuccessBg,
+                                  color: userSession.isAdmin
+                                      ? const Color(0xFFEDE7F6)
+                                      : userSession.isSeller
+                                          ? AppColors.badgeSuccessBg
+                                          : AppColors.badgeWarningBg,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  userSession.isGuest ? 'Guest' : userSession.role,
+                                  userSession.isGuest
+                                      ? 'Guest (${userSession.role})'
+                                      : userSession.role,
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: userSession.isGuest
-                                        ? AppColors.badgeWarningText
-                                        : AppColors.badgeSuccessText,
+                                    color: userSession.isAdmin
+                                        ? const Color(0xFF673AB7)
+                                        : userSession.isSeller
+                                            ? AppColors.primary
+                                            : AppColors.badgeWarningText,
                                   ),
                                 ),
                               ),
@@ -135,72 +146,209 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                   ),
-                ] else ...[
-                  const Divider(height: 20, color: AppColors.divider),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Text(
-                        'Active Role Mode:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Customer'),
-                            selected: userSession.role == 'Customer',
-                            selectedColor: AppColors.badgeSuccessBg,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              color: userSession.role == 'Customer'
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            onSelected: (val) {
-                              if (val) {
-                                ref
-                                    .read(authProvider.notifier)
-                                    .updateRole('Customer');
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text('Trader'),
-                            selected: userSession.role == 'Trader',
-                            selectedColor: AppColors.badgeSuccessBg,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              color: userSession.role == 'Trader'
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            onSelected: (val) {
-                              if (val) {
-                                ref
-                                    .read(authProvider.notifier)
-                                    .updateRole('Trader');
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
                 ],
+                const Divider(height: 20, color: AppColors.divider),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      'Active Role Mode:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Customer'),
+                          selected: userSession.role == 'Customer',
+                          selectedColor: AppColors.badgeSuccessBg,
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            color: userSession.role == 'Customer'
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              ref
+                                  .read(authProvider.notifier)
+                                  .updateRole('Customer');
+                            }
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Trader / Seller'),
+                          selected: userSession.role == 'Trader',
+                          selectedColor: AppColors.badgeSuccessBg,
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            color: userSession.role == 'Trader'
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              ref
+                                  .read(authProvider.notifier)
+                                  .updateRole('Trader');
+                            }
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Admin'),
+                          selected: userSession.role == 'Admin',
+                          selectedColor: const Color(0xFFEDE7F6),
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            color: userSession.role == 'Admin'
+                                ? const Color(0xFF673AB7)
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              ref
+                                  .read(authProvider.notifier)
+                                  .updateRole('Admin');
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Seller Business Card (Visible when in Trader role)
+          if (userSession.isSeller) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.storefront_rounded,
+                              color: AppColors.primary, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Registered Seller Profile',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _showEditBusinessProfile(context, userSession),
+                        icon: const Icon(Icons.edit_outlined, size: 14),
+                        label: const Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 14, color: AppColors.divider),
+                  Row(
+                    children: [
+                      const Text('Store Name: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Expanded(
+                        child: Text(
+                          userSession.businessName ?? '${userSession.displayName}\'s Store',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Text('Market Hub: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text(
+                        userSession.marketHub ?? 'Bodija Market',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Channel: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text(
+                        userSession.sellerChannel ?? 'Local Market',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                  if (userSession.phone != null && userSession.phone!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Text('Phone: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text(
+                          userSession.phone!,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else if (userSession.isAdmin) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E5F5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFCE93D8)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.security_rounded, color: Color(0xFF673AB7), size: 26),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Platform Administrator Mode',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF4A148C),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Full moderation privileges enabled: verify quotes, reject anomalies, and moderate listings.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF6A1B9A)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           const SizedBox(height: 20),
 
           // Menu Options List
@@ -354,6 +502,176 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  void _showEditBusinessProfile(BuildContext context, UserSession session) {
+    final bizController = TextEditingController(text: session.businessName ?? '');
+    final phoneController = TextEditingController(text: session.phone ?? '');
+    String selectedHub = session.marketHub ?? 'Bodija Market';
+    String selectedChannel = session.sellerChannel ?? 'Local Market';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Update Store Profile',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Business / Stall Name',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: bizController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Mama Bello Provisions & Grains',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Market Hub Base',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedHub,
+                      items: const [
+                        'Bodija Market',
+                        'Dugbe Market',
+                        'Oje Market',
+                        'Oja Oba Market',
+                        'Gbagi Market',
+                        'Online Store',
+                      ].map((hub) => DropdownMenuItem(value: hub, child: Text(hub))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => selectedHub = val);
+                      },
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Channel Type',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: ['Local Market', 'SMB Store', 'Online Retailer'].map((ch) {
+                        final isSel = selectedChannel == ch;
+                        return ChoiceChip(
+                          label: Text(ch),
+                          selected: isSel,
+                          selectedColor: AppColors.badgeSuccessBg,
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            color: isSel ? AppColors.primary : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedChannel = ch);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Phone / WhatsApp',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. +234 803 123 4567',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          ref.read(authProvider.notifier).updateSellerProfile(
+                                businessName: bizController.text.trim().isNotEmpty
+                                    ? bizController.text.trim()
+                                    : null,
+                                marketHub: selectedHub,
+                                sellerChannel: selectedChannel,
+                                phone: phoneController.text.trim().isNotEmpty
+                                    ? phoneController.text.trim()
+                                    : null,
+                              );
+                          Navigator.pop(bottomSheetContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Store profile updated successfully!'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Save Store Profile',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
