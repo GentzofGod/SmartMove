@@ -18,7 +18,7 @@ class DecisionEngine {
     List<Errand>? errands,
   }) {
     final hasCustomItems = items != null && items.isNotEmpty;
-    final defaultStops = DemoSeedData.getInitialStops();
+    final defaultStops = DemoSeedData.getBenchmarkStops();
 
     // Calculate dynamic base items subtotal
     double planABaseItems;

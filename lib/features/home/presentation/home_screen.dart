@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/price_observation.dart';
-import '../../../core/models/errand.dart';
 import '../../discover/presentation/product_detail_sheet.dart';
 import 'widgets/location_picker_sheet.dart';
 import 'widgets/meta_ai_scenario_card.dart';
@@ -284,261 +283,138 @@ class HomeScreen extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: const [
-                          Icon(Icons.shopping_bag_outlined,
-                              size: 16, color: AppColors.textSecondary),
-                          SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'Active Basket: 4 items  •  ₦11,600 est.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                      if (decisionState.activeItems.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            const Icon(Icons.shopping_bag_outlined,
+                                size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Active Basket: ${decisionState.activeItems.length} commodities  •  ₦${decisionState.selectedPlan.totalCost.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")} est.',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppColors.badgeSuccessBg,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(Icons.check_circle_outline_rounded,
-                                      size: 12, color: AppColors.primary),
-                                  SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      'Saves ~₦1,800 across verified local sellers',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.primaryDark,
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.badgeSuccessBg,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.check_circle_outline_rounded,
+                                        size: 12, color: AppColors.primary),
+                                    SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        'Multi-channel comparison calculated',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primaryDark,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          children: const [
+                            Icon(Icons.shopping_bag_outlined,
+                                size: 16, color: AppColors.textSecondary),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'No active shopping plan yet',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Type, speak, or scan items to compare live prices across Bodija & Ibadan markets.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Stat Metrics Row: Budget, Remaining Budget, Est. Time (Non-decorative, actual calculated constraints)
-              Builder(
-                builder: (context) {
-                  final remainingBudget = (decisionState.budget - decisionState.selectedPlan.totalCost).clamp(0.0, double.infinity);
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: _buildMetricCard(
-                          label: 'Budget',
-                          value: '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
-                          icon: Icons.account_balance_wallet_outlined,
-                          iconBg: const Color(0xFFFFF0B3),
-                          iconColor: const Color(0xFFB78103),
+              // Stat Metrics Row: Budget, Remaining Budget, Est. Time (Only when active plan & budget exists)
+              if (decisionState.activeItems.isNotEmpty && decisionState.budget > 0) ...[
+                Builder(
+                  builder: (context) {
+                    final remainingBudget = (decisionState.budget - decisionState.selectedPlan.totalCost).clamp(0.0, double.infinity);
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: _buildMetricCard(
+                            label: 'Budget',
+                            value: '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
+                            icon: Icons.account_balance_wallet_outlined,
+                            iconBg: const Color(0xFFFFF0B3),
+                            iconColor: const Color(0xFFB78103),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildMetricCard(
-                          label: 'Remaining',
-                          value: '₦${remainingBudget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
-                          icon: Icons.savings_outlined,
-                          iconBg: AppColors.primaryTint,
-                          iconColor: AppColors.primary,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildMetricCard(
+                            label: 'Remaining',
+                            value: '₦${remainingBudget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
+                            icon: Icons.savings_outlined,
+                            iconBg: AppColors.primaryTint,
+                            iconColor: AppColors.primary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildMetricCard(
-                          label: 'Est. Time',
-                          value: '${decisionState.selectedPlan.estimatedHours} hrs',
-                          icon: Icons.schedule_outlined,
-                          iconBg: const Color(0xFFDEEBFF),
-                          iconColor: const Color(0xFF0052CC),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildMetricCard(
+                            label: 'Est. Time',
+                            value: '${decisionState.selectedPlan.estimatedHours} hrs',
+                            icon: Icons.schedule_outlined,
+                            iconBg: const Color(0xFFDEEBFF),
+                            iconColor: const Color(0xFF0052CC),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+              ],
               const SizedBox(height: 20),
 
-              // Saved Shopping Lists (Section 5.1)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Saved Shopping Lists',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => context.go('/discover'),
-                    child: const Text(
-                      'View all',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        // Quick load weekly essentials list into Decision Lab
-                        ref.read(decisionLabProvider.notifier).setPlanContext(
-                          items: [
-                            ShoppingItem(
-                              id: 'si-w1',
-                              productName: 'Rice (1kg)',
-                              quantity: 2,
-                              unit: '1kg',
-                              estimatedUnitPrice: 1650,
-                            ),
-                            ShoppingItem(
-                              id: 'si-w2',
-                              productName: 'Eggs (crate)',
-                              quantity: 1,
-                              unit: 'crate of 30',
-                              estimatedUnitPrice: 5200,
-                            ),
-                          ],
-                          budget: 15000,
-                        );
-                        context.go('/decision-lab');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Loaded "Weekly Provisions" basket into Price Lab!'),
-                            backgroundColor: AppColors.primary,
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.bookmark_outline_rounded, size: 16, color: AppColors.primary),
-                                const SizedBox(width: 6),
-                                const Expanded(
-                                  child: Text(
-                                    'Weekly Basket',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            const Text('Rice & Eggs • ₦8,500', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        ref.read(decisionLabProvider.notifier).setPlanContext(
-                          items: [
-                            ShoppingItem(
-                              id: 'si-b1',
-                              productName: 'Eggs (crate)',
-                              quantity: 1,
-                              unit: 'crate of 30',
-                              estimatedUnitPrice: 5200,
-                            ),
-                            ShoppingItem(
-                              id: 'si-b2',
-                              productName: 'Cooking Oil (1L)',
-                              quantity: 1,
-                              unit: '1L',
-                              estimatedUnitPrice: 2850,
-                            ),
-                          ],
-                          budget: 10000,
-                        );
-                        context.go('/decision-lab');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Loaded "Family Breakfast" basket into Price Lab!'),
-                            backgroundColor: AppColors.primary,
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.bookmark_outline_rounded, size: 16, color: AppColors.primary),
-                                const SizedBox(width: 6),
-                                const Expanded(
-                                  child: Text(
-                                    'Breakfast List',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            const Text('Eggs & Oil • ₦8,050', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
 
               // Recent Price Changes Section (Section 5.1: Live market data or clean empty state)
               if (recentProducts.isNotEmpty) ...[
@@ -849,35 +725,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
 
-              const SizedBox(height: 18),
-              // Simulated Data Disclosure
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBorder.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.info_outline, size: 13, color: AppColors.textSecondary),
-                      SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          'SmartMove — Powered by Meta AI & Community Price Intelligence',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+
               const SizedBox(height: 16),
             ],
           ),

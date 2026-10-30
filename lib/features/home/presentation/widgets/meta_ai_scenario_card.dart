@@ -18,9 +18,13 @@ class MetaAiScenarioCard extends ConsumerStatefulWidget {
 
 class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
   bool _isProcessing = false;
+  final TextEditingController _inlinePromptController = TextEditingController();
 
-  static const String hackathonPrimaryPrompt =
-      'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. Compare prices across online stores and local markets to find the best deal.';
+  @override
+  void dispose() {
+    _inlinePromptController.dispose();
+    super.dispose();
+  }
 
   /// AI Safeguard: Parses prompt into proposal and opens Review Sheet for user approval
   Future<void> _processAiPlan(String prompt) async {
@@ -130,7 +134,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
   }
 
   void _showCustomPromptDialog() {
-    final controller = TextEditingController(text: hackathonPrimaryPrompt);
+    final controller = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -192,40 +196,12 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 controller: controller,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'e.g. I have ₦25,000 for 50kg rice, 5L vegetable oil, and tomatoes in Bodija...',
+                  hintText: 'e.g. 5kg rice, 2L cooking oil, 1 crate of eggs in Bodija...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  ActionChip(
-                    avatar: const Icon(Icons.flash_on, size: 14, color: AppColors.primary),
-                    label: const Text('₦25k: Yam, Beans & Garri', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      controller.text = 'I have ₦25,000. I need 3 tubers of Abuja yam, 5kg brown beans, and 1 paint bucket of yellow garri in Dugbe.';
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.shopping_basket, size: 14, color: AppColors.primary),
-                    label: const Text('₦18k: Rice, Eggs & Cooking Oil', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      controller.text = 'I have ₦18,000. I need 5kg Mama Gold rice, 1 crate of eggs, and 2L Kings vegetable oil in Bodija.';
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.storefront_outlined, size: 14, color: AppColors.primary),
-                    label: const Text('₦12k: Provisions & Milk', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      controller.text = 'I have ₦12,000 for 1 tin Peak milk powder, 2 loaves of sliced bread, and 1kg sugar.';
-                    },
-                  ),
-                ],
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -310,7 +286,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                     const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
-                        'Meta AI Trip Rehearsal',
+                        'Meta AI Assistant',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 15,
@@ -343,75 +319,93 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Scenario quote
+          // 1. The Prompt Box (comes first!)
           Container(
-            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.15),
-              ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Icon(Icons.format_quote_rounded,
-                    color: AppColors.primary, size: 18),
-                SizedBox(width: 6),
+                const SizedBox(width: 12),
+                const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    hackathonPrimaryPrompt,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.textPrimary,
-                      height: 1.35,
+                  child: TextField(
+                    controller: _inlinePromptController,
+                    onSubmitted: (value) {
+                      final text = value.trim();
+                      if (text.isNotEmpty) {
+                        _processAiPlan(text);
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Ask Meta AI (e.g. 5kg rice, 2L oil in Bodija)...',
+                      hintStyle: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
+                if (_isProcessing)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary, size: 20),
+                    onPressed: () {
+                      final text = _inlinePromptController.text.trim();
+                      if (text.isNotEmpty) {
+                        _processAiPlan(text);
+                      }
+                    },
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 12),
 
-          // Action Buttons
+          // 2. Action Buttons: Voice, Scan, Custom Prompt
           Row(
             children: [
-              // 1-Tap Scenario Button
+              // Voice Button
               Expanded(
                 child: SizedBox(
-                  height: 42,
+                  height: 38,
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing
-                        ? null
-                        : () => _processAiPlan(hackathonPrimaryPrompt),
+                    key: const ValueKey('btn_voice_transcribe'),
+                    onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                     ),
-                    icon: _isProcessing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 18),
-                    label: FittedBox(
+                    icon: const Icon(Icons.mic_rounded, color: Colors.white, size: 16),
+                    label: const FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        _isProcessing ? 'Analyzing...' : '1-Tap Plan',
-                        style: const TextStyle(
-                          fontSize: 12,
+                        'Voice Note',
+                        style: TextStyle(
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
@@ -420,84 +414,62 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
 
-              // Voice Transcribe Button (Microphone)
-              SizedBox(
-                height: 42,
-                width: 42,
-                child: IconButton(
-                  key: const ValueKey('btn_voice_transcribe'),
-                  onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.mic_rounded,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                  tooltip: 'Spoken Request (Muse Voice Transcribe)',
-                ),
-              ),
-              const SizedBox(width: 6),
-
-              // Handwritten Paper Note Scanner Button (Camera / Document Scanner)
-              SizedBox(
-                height: 42,
-                width: 42,
-                child: IconButton(
-                  key: const ValueKey('btn_scan_paper_note'),
-                  onPressed: _isProcessing ? null : _openPaperNoteScannerSheet,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.document_scanner_rounded,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                  tooltip: 'Scan Paper Note (Muse Spark Vision)',
-                ),
-              ),
-              const SizedBox(width: 6),
-
-              // Custom Text Prompt
+              // Scan Note Button
               Expanded(
                 child: SizedBox(
-                  height: 42,
-                  child: OutlinedButton(
+                  height: 38,
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('btn_scan_paper_note'),
+                    onPressed: _isProcessing ? null : _openPaperNoteScannerSheet,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                    icon: const Icon(Icons.document_scanner_rounded, color: AppColors.primary, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Scan Note',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Custom Text Prompt Button
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('btn_custom_prompt'),
                     onPressed: _isProcessing ? null : _showCustomPromptDialog,
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                      ),
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                     ),
-                    child: const FittedBox(
+                    icon: const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 16),
+                    label: const FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
                         'Custom Prompt',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primaryDark,
                         ),

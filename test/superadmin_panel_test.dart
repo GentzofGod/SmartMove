@@ -426,7 +426,7 @@ void main() {
       expect(find.text('Open SuperAdmin Moderation Panel'), findsOneWidget);
     });
 
-    testWidgets('13. In CommunityScreen, Customer does not see SuperAdmin Simulator', (tester) async {
+    testWidgets('13. In CommunityScreen, Customer sees seller application workflow and no simulation artifacts', (tester) async {
       await tester.binding.setSurfaceSize(const Size(500, 1000));
 
       final container = ProviderContainer();
@@ -455,24 +455,10 @@ void main() {
       await tester.tap(find.text('Seller Portal'));
       await tester.pumpAndSettle();
 
-      // Simulator is NOT visible for customer
-      expect(find.text('SuperAdmin Simulator: Preview verified seller dashboard.'), findsNothing);
+      // Customer sees onboarding CTA, no simulation toggle exists
+      expect(find.text('SmartMove Seller Hub'), findsOneWidget);
+      expect(find.text('Apply to Become a Verified Seller'), findsOneWidget);
       expect(find.text('Simulate Seller'), findsNothing);
-
-      // Switch to SuperAdmin
-      container.read(authProvider.notifier).setSession(
-            const UserSession(
-              id: 'sa1',
-              email: 'super@smartmove.ng',
-              displayName: 'SuperAdmin Chioma',
-              role: 'SuperAdmin',
-            ),
-          );
-      await tester.pumpAndSettle();
-
-      // Simulator IS visible for SuperAdmin
-      expect(find.text('SuperAdmin Simulator: Preview verified seller dashboard.'), findsOneWidget);
-      expect(find.text('Simulate Seller'), findsOneWidget);
     });
 
     testWidgets('14. In HomeScreen, SuperAdmin sees SuperAdmin chip, Customer does not', (tester) async {

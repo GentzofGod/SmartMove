@@ -614,7 +614,15 @@ class DemoSeedData {
     ];
   }
 
-  static List<Errand> getInitialErrands() {
+  /// Default active errands start empty.
+  /// Hardcoded commodity basket mock data has been removed from active application state.
+  static List<Errand> getInitialErrands() => const <Errand>[];
+
+  /// Default active itinerary stops start empty.
+  static List<ItineraryStop> getInitialStops() => const <ItineraryStop>[];
+
+  /// Benchmark reference errands for calculation tests
+  static List<Errand> getBenchmarkErrands() {
     return [
       Errand(
         id: 'e1',
@@ -665,7 +673,8 @@ class DemoSeedData {
     ];
   }
 
-  static List<ItineraryStop> getInitialStops() {
+  /// Benchmark reference itinerary stops for calculation tests
+  static List<ItineraryStop> getBenchmarkStops() {
     return [
       ItineraryStop(
         id: 's0',

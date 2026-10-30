@@ -743,43 +743,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               ],
             ),
           ),
-          if (userSession.isSuperAdmin) ...[
-            const SizedBox(height: 16),
-            // SuperAdmin simulator toggle
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEDE7F6),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFCE93D8)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.shield_outlined,
-                      color: Color(0xFF673AB7), size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'SuperAdmin Simulator: Preview verified seller dashboard.',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF4A148C),
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      ref.read(authProvider.notifier).updateRole('Trader');
-                    },
-                    child: const Text('Simulate Seller',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF673AB7))),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       );
     }

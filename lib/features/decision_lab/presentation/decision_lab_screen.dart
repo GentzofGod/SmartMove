@@ -253,9 +253,11 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Commodity Basket',
-                    style: TextStyle(
+                  Text(
+                    state.activeItems.isNotEmpty
+                        ? 'Active Basket'
+                        : 'Shopping Basket',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -264,7 +266,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   Text(
                     state.activeItems.isNotEmpty
                         ? '${state.activeItems.length} commodities'
-                        : '4 commodities',
+                        : '0 commodities',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.primary,
@@ -279,7 +281,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     ? state.activeItems
                         .map((i) => '${i.productName} (${i.quantity.toStringAsFixed(0)} ${i.unit})')
                         .join(', ')
-                    : 'Rice (2kg), Eggs (1 crate), Tomatoes (2kg), Cooking Oil (1L)',
+                    : 'No items in basket yet. Search commodities, speak a list, or scan a paper note.',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
@@ -1429,8 +1431,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         ),
         const SizedBox(height: 16),
         _buildScenarioCard(
-          title: 'Tight Budget Scenario',
-          description: 'Simulates a reduced budget of ₦11,000 to see which non-urgent items to cut.',
+          title: 'Tight Budget Conditions',
+          description: 'Tests a reduced budget of ₦11,000 to see which non-urgent items to cut.',
           onApply: () {
             ref.read(decisionLabProvider.notifier).updateBudget(11000);
             _tabController.animateTo(0);
@@ -1439,7 +1441,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         const SizedBox(height: 12),
         _buildScenarioCard(
           title: 'Rush Hour / Expensive Transport',
-          description: 'Simulates transit fare surge to ₦2,500 to evaluate if single-stop trips save money.',
+          description: 'Tests transit fare surge to ₦2,500 to evaluate if single-stop trips save money.',
           onApply: () {
             ref.read(decisionLabProvider.notifier).updateTransport(2500);
             _tabController.animateTo(0);
@@ -1448,7 +1450,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         const SizedBox(height: 12),
         _buildScenarioCard(
           title: 'Time Crunch (< 1.5 hrs)',
-          description: 'Simulates a tight buying schedule to evaluate if single-stop market hubs save critical time.',
+          description: 'Tests a tight buying schedule to evaluate if single-stop market hubs save critical time.',
           onApply: () {
             ref.read(decisionLabProvider.notifier).updateTimeAvailable(1.5);
             _tabController.animateTo(0);
@@ -1494,7 +1496,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
             height: 36,
             child: OutlinedButton(
               onPressed: onApply,
-              child: const Text('Simulate Scenario'),
+              child: const Text('Apply Scenario'),
             ),
           ),
         ],

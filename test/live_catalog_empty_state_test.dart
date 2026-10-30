@@ -166,5 +166,53 @@ void main() {
       expect(find.text('Yam Tubers'), findsWidgets);
       expect(find.textContaining('Oja Oba Stall 4'), findsWidgets);
     });
+
+    test('6. DemoSeedData getInitialErrands and getInitialStops return empty lists', () {
+      final errands = DemoSeedData.getInitialErrands();
+      final stops = DemoSeedData.getInitialStops();
+
+      expect(errands, isEmpty);
+      expect(stops, isEmpty);
+
+      // Benchmarks remain accessible for calculations
+      final benchmarkErrands = DemoSeedData.getBenchmarkErrands();
+      final benchmarkStops = DemoSeedData.getBenchmarkStops();
+      expect(benchmarkErrands, isNotEmpty);
+      expect(benchmarkStops, isNotEmpty);
+    });
+
+    testWidgets('7. HomeScreen does not show hardcoded 15000 budget, remaining, or mock commodity basket', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: HomeScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Ensure hardcoded "I have ₦15,000..." is NOT on the screen
+      expect(find.textContaining('I have ₦15,000. I need rice'), findsNothing);
+      expect(find.text('1-Tap Plan'), findsNothing);
+
+      // Ensure hardcoded "Budget: ₦15,000" and "Remaining" metrics are NOT shown when no basket is active
+      expect(find.text('₦15,000'), findsNothing);
+      expect(find.text('Remaining'), findsNothing);
+      expect(find.text('Weekly Basket'), findsNothing);
+      expect(find.text('Breakfast List'), findsNothing);
+
+      // Ensure clean prompt box comes first in Meta AI Assistant card
+      expect(find.text('Meta AI Assistant'), findsOneWidget);
+      expect(find.byType(TextField), findsWidgets);
+      expect(find.text('Voice Note'), findsOneWidget);
+      expect(find.text('Scan Note'), findsOneWidget);
+      expect(find.text('Custom Prompt'), findsOneWidget);
+    });
   });
 }
