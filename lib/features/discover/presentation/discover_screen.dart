@@ -9,6 +9,7 @@ import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
+import '../../home/presentation/widgets/paper_note_scanner_sheet.dart';
 import 'product_detail_sheet.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,26 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _openPaperNoteScannerSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PaperNoteScannerSheet(
+        onTranscriptConfirmed: (text) {
+          _searchController.text = text;
+          ref.read(productsProvider.notifier).search(text);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.primary,
+              content: Text('Handwritten note parsed: "$text"'),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showAiResearchDialog(BuildContext context, String commodityName) {
@@ -325,7 +346,16 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                             ref.read(productsProvider.notifier).search('');
                           },
                         )
-                      : null,
+                      : IconButton(
+                          key: const ValueKey('btn_discover_scan_paper_note'),
+                          icon: const Icon(
+                            Icons.document_scanner_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
+                          tooltip: 'Scan Handwritten Paper Note (Meta AI Vision)',
+                          onPressed: () => _openPaperNoteScannerSheet(context),
+                        ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,

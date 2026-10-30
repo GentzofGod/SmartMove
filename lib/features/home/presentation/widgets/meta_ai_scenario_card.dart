@@ -7,6 +7,7 @@ import '../../../../core/services/meta_ai_service.dart';
 import '../../../../core/models/errand.dart';
 import 'ai_proposal_review_sheet.dart';
 import 'muse_voice_input_sheet.dart';
+import 'paper_note_scanner_sheet.dart';
 
 class MetaAiScenarioCard extends ConsumerStatefulWidget {
   const MetaAiScenarioCard({super.key});
@@ -108,6 +109,19 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => MuseVoiceInputSheet(
+        onTranscriptConfirmed: (text) {
+          _processAiPlan(text);
+        },
+      ),
+    );
+  }
+
+  void _openPaperNoteScannerSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PaperNoteScannerSheet(
         onTranscriptConfirmed: (text) {
           _processAiPlan(text);
         },
@@ -319,7 +333,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                   ),
                 ),
                 child: const Text(
-                  'Muse Spark & Voice',
+                  'Muse Spark, Voice & Vision',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -413,6 +427,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 height: 42,
                 width: 42,
                 child: IconButton(
+                  key: const ValueKey('btn_voice_transcribe'),
                   onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -430,6 +445,33 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                     size: 20,
                   ),
                   tooltip: 'Spoken Request (Muse Voice Transcribe)',
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Handwritten Paper Note Scanner Button (Camera / Document Scanner)
+              SizedBox(
+                height: 42,
+                width: 42,
+                child: IconButton(
+                  key: const ValueKey('btn_scan_paper_note'),
+                  onPressed: _isProcessing ? null : _openPaperNoteScannerSheet,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.document_scanner_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  tooltip: 'Scan Paper Note (Muse Spark Vision)',
                 ),
               ),
               const SizedBox(width: 6),
