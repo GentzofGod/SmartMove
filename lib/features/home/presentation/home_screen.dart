@@ -540,7 +540,7 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
 
-              // Recent Price Changes Section (Section 5.1: Only when data exists)
+              // Recent Price Changes Section (Section 5.1: Live market data or clean empty state)
               if (recentProducts.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -653,8 +653,8 @@ class HomeScreen extends ConsumerWidget {
                                             fontSize: 9.5,
                                             fontWeight: FontWeight.w700,
                                             color: p.sourceType == ObservationSource.simulatedDemo
-                                                ? AppColors.textSecondary
-                                                : AppColors.badgeSuccessText,
+                                              ? AppColors.textSecondary
+                                              : AppColors.badgeSuccessText,
                                           ),
                                         ),
                                       ),
@@ -695,6 +695,79 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     );
                   },
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Recent Price Changes',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => context.go('/discover'),
+                      child: const Text(
+                        'Explore',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: const BoxDecoration(
+                          color: AppColors.background,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2_outlined,
+                          size: 28,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'No Live Commodity Quotes Yet',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Prices will appear here as verified traders and shoppers upload real market data.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 24),

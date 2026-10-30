@@ -638,17 +638,35 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No matching products found',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: AppColors.textPrimary),
+                          Icon(
+                            _searchController.text.isNotEmpty
+                                ? Icons.search_off_rounded
+                                : Icons.inventory_2_outlined,
+                            size: 52,
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            _searchController.text.isNotEmpty
+                                ? 'No matching commodities found'
+                                : 'No Commodity Listings Yet',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16.5,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'Try adjusting your search or source filter.',
+                          Text(
+                            _searchController.text.isNotEmpty
+                                ? 'Try adjusting your search terms or channel filters.'
+                                : 'Active commodity prices will appear here once published by verified market traders and stores.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.35,
+                            ),
                           ),
                         ],
                       ),

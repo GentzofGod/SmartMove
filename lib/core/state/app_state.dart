@@ -17,17 +17,17 @@ import '../services/commodity_comparison_service.dart';
 
 // --- Products State ---
 class ProductsNotifier extends Notifier<List<Product>> {
-  List<Product> _allProducts = DemoSeedData.getProducts();
+  List<Product> _allProducts = [];
 
   @override
   List<Product> build() {
     _fetchLive();
-    return DemoSeedData.getProducts();
+    return [];
   }
 
   Future<void> _fetchLive() async {
     final live = await SupabaseDataService.fetchProducts();
-    if (live != null && live.isNotEmpty) {
+    if (live != null) {
       _allProducts = live;
       state = live;
     }
@@ -460,12 +460,12 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
   @override
   List<PriceObservation> build() {
     _fetchLive();
-    return DemoSeedData.getCommunityObservations();
+    return [];
   }
 
   Future<void> _fetchLive() async {
     final live = await SupabaseDataService.fetchObservations();
-    if (live != null && live.isNotEmpty) {
+    if (live != null) {
       state = live;
     }
   }

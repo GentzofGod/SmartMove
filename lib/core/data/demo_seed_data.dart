@@ -4,7 +4,16 @@ import '../models/errand.dart';
 import '../models/itinerary_stop.dart';
 
 class DemoSeedData {
-  static List<Product> getProducts() {
+  /// Default active products now purely connect to live database.
+  /// Hardcoded foodstuffs mock data has been removed from active application state.
+  static List<Product> getProducts() => const <Product>[];
+
+  /// Default active community observations purely connect to live database.
+  static List<PriceObservation> getCommunityObservations() =>
+      const <PriceObservation>[];
+
+  /// Benchmark reference foodstuffs for standalone calculation tests if requested.
+  static List<Product> getBenchmarkFoodstuffs() {
     return [
       const Product(
         id: 'p1',
@@ -247,7 +256,8 @@ class DemoSeedData {
     ];
   }
 
-  static List<PriceObservation> getCommunityObservations() {
+  /// Benchmark reference foodstuff observations for standalone calculations
+  static List<PriceObservation> getBenchmarkFoodstuffObservations() {
     final now = DateTime.now();
     return [
       // 1. Rice Quotes across Channels

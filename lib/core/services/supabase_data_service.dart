@@ -28,7 +28,7 @@ class SupabaseDataService {
           .order('name', ascending: true);
 
       final List<dynamic> data = response as List<dynamic>;
-      if (data.isEmpty) return null;
+      if (data.isEmpty) return const <Product>[];
 
       return data.map((json) {
         return Product.fromJson(json as Map<String, dynamic>);
@@ -51,7 +51,7 @@ class SupabaseDataService {
           .order('display_order', ascending: true);
 
       final List<dynamic> data = response as List<dynamic>;
-      if (data.isEmpty) return null;
+      if (data.isEmpty) return const <CommodityCategory>[];
 
       return data.map((json) {
         return CommodityCategory.fromJson(json as Map<String, dynamic>);
@@ -121,7 +121,7 @@ class SupabaseDataService {
           .limit(30);
 
       final List<dynamic> data = response as List<dynamic>;
-      if (data.isEmpty) return null;
+      if (data.isEmpty) return const <PriceObservation>[];
 
       return data.map((json) {
         final map = json as Map<String, dynamic>;
@@ -286,7 +286,7 @@ class SupabaseDataService {
           .order('submitted_at', ascending: false);
 
       final List<dynamic> data = response as List<dynamic>;
-      if (data.isEmpty) return null;
+      if (data.isEmpty) return const <SellerApplication>[];
 
       return data.map((json) {
         return SellerApplication.fromJson(json as Map<String, dynamic>);

@@ -1467,12 +1467,37 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   Widget _buildObservationsList(List<PriceObservation> list) {
     if (list.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text(
-            'No price observations found for this filter.',
-            style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.storefront_outlined,
+                size: 52,
+                color: AppColors.primary.withValues(alpha: 0.4),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'No Community Price Quotes Yet',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16.5,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'No observations have been reported yet for this filter. Tap the + button to contribute verified market prices.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+            ],
           ),
         ),
       );
