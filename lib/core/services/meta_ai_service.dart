@@ -7,6 +7,171 @@ import '../models/ai_proposal.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
 import 'commodity_comparison_service.dart';
+import 'location_service.dart';
+
+/// User decision priority for multi-criteria seller option analysis
+enum UserDecisionPriority {
+  balancedValue,
+  lowestPrice,
+  convenienceDelivery,
+  highestQualityTrust;
+
+  String get label {
+    switch (this) {
+      case UserDecisionPriority.balancedValue:
+        return 'Balanced Value';
+      case UserDecisionPriority.lowestPrice:
+        return 'Lowest Outlay';
+      case UserDecisionPriority.convenienceDelivery:
+        return 'Doorstep & Speed';
+      case UserDecisionPriority.highestQualityTrust:
+        return 'Quality & Trust';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case UserDecisionPriority.balancedValue:
+        return 'Best composite balance of price, quality, travel distance, and seller trust.';
+      case UserDecisionPriority.lowestPrice:
+        return 'Minimizes total cash expenditure and standardized unit price.';
+      case UserDecisionPriority.convenienceDelivery:
+        return 'Prioritizes doorstep delivery, minimal transit time, and hassle-free returns.';
+      case UserDecisionPriority.highestQualityTrust:
+        return 'Prioritizes certified Grade A product quality and reputable buyer protection.';
+    }
+  }
+}
+
+/// A comprehensive multi-criteria evaluated seller option
+class EvaluatedSellerOption {
+  final PriceObservation observation;
+  final SellerChannel channel;
+  final double basePrice;
+  final String unit;
+  final double standardizedUnitPrice;
+  final String baseUnit;
+  final double requestedQuantity;
+  final double productSubtotal;
+  final double distanceKm;
+  final String transitWindow;
+  final String qualityGrade;
+  final double qualityScore; // 1.0 to 5.0
+  final List<String> qualityHighlights;
+  final double deliveryFee;
+  final String deliveryWindow;
+  final double totalLandedCost; // productSubtotal + deliveryFee
+  final String brandReputation;
+  final double reputationScore; // 1.0 to 5.0
+  final String customerSupportPolicy;
+  final double supportScore; // 1.0 to 5.0
+  final int compositeScore; // 0 - 100
+  final String? recommendationBadge;
+  final List<String> aiPros;
+  final List<String> aiCons;
+
+  const EvaluatedSellerOption({
+    required this.observation,
+    required this.channel,
+    required this.basePrice,
+    required this.unit,
+    required this.standardizedUnitPrice,
+    required this.baseUnit,
+    required this.requestedQuantity,
+    required this.productSubtotal,
+    required this.distanceKm,
+    required this.transitWindow,
+    required this.qualityGrade,
+    required this.qualityScore,
+    this.qualityHighlights = const [],
+    required this.deliveryFee,
+    required this.deliveryWindow,
+    required this.totalLandedCost,
+    required this.brandReputation,
+    required this.reputationScore,
+    required this.customerSupportPolicy,
+    required this.supportScore,
+    required this.compositeScore,
+    this.recommendationBadge,
+    this.aiPros = const [],
+    this.aiCons = const [],
+  });
+
+  String get formattedSubtotal => '₦${productSubtotal.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      )}';
+
+  String get formattedDeliveryFee => deliveryFee == 0
+      ? '₦0 (Walk-in / Free)'
+      : '₦${deliveryFee.toStringAsFixed(0).replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]},',
+          )}';
+
+  String get formattedTotalLandedCost => '₦${totalLandedCost.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      )}';
+
+  String get formattedStandardizedRate =>
+      '₦${standardizedUnitPrice.toStringAsFixed(0)} / $baseUnit';
+
+  EvaluatedSellerOption copyWith({
+    String? recommendationBadge,
+    int? compositeScore,
+  }) {
+    return EvaluatedSellerOption(
+      observation: observation,
+      channel: channel,
+      basePrice: basePrice,
+      unit: unit,
+      standardizedUnitPrice: standardizedUnitPrice,
+      baseUnit: baseUnit,
+      requestedQuantity: requestedQuantity,
+      productSubtotal: productSubtotal,
+      distanceKm: distanceKm,
+      transitWindow: transitWindow,
+      qualityGrade: qualityGrade,
+      qualityScore: qualityScore,
+      qualityHighlights: qualityHighlights,
+      deliveryFee: deliveryFee,
+      deliveryWindow: deliveryWindow,
+      totalLandedCost: totalLandedCost,
+      brandReputation: brandReputation,
+      reputationScore: reputationScore,
+      customerSupportPolicy: customerSupportPolicy,
+      supportScore: supportScore,
+      compositeScore: compositeScore ?? this.compositeScore,
+      recommendationBadge: recommendationBadge ?? this.recommendationBadge,
+      aiPros: aiPros,
+      aiCons: aiCons,
+    );
+  }
+}
+
+/// Comprehensive result container for multi-criteria option evaluation
+class MultiCriteriaAnalysisResult {
+  final Product product;
+  final double requestedQuantity;
+  final String targetUnit;
+  final UserDecisionPriority activePriority;
+  final List<EvaluatedSellerOption> evaluatedOptions;
+  final EvaluatedSellerOption? recommendedOption;
+  final String executiveSummary;
+  final List<String> comparisonHighlights;
+
+  const MultiCriteriaAnalysisResult({
+    required this.product,
+    required this.requestedQuantity,
+    required this.targetUnit,
+    required this.activePriority,
+    required this.evaluatedOptions,
+    this.recommendedOption,
+    required this.executiveSummary,
+    this.comparisonHighlights = const [],
+  });
+}
 
 /// Detected price anomaly in community or web listings
 class PriceAnomaly {
@@ -1238,6 +1403,421 @@ class MetaAiService {
     }
 
     return buffer.toString();
+  }
+
+  /// Multi-criteria decision analysis of available seller & fulfillment options
+  /// evaluated across distance, price, quality, delivery fee, brand reputation, and customer support.
+  MultiCriteriaAnalysisResult analyzeAvailableOptions({
+    required Product product,
+    required List<PriceObservation> observations,
+    double requestedQuantity = 1.0,
+    String? requestedUnit,
+    UserDecisionPriority priority = UserDecisionPriority.balancedValue,
+    GeoPoint? userLocation,
+  }) {
+    // If no observations provided, synthesize benchmarks from product base rate
+    final effectiveObservations = observations.isNotEmpty
+        ? observations
+        : [
+            PriceObservation(
+              id: 'local-${product.id}',
+              productId: product.id,
+              productName: product.name,
+              sellerName: product.bestSeller,
+              marketLocation: '${product.bestSeller} (Open Market)',
+              price: product.lowestPrice,
+              unit: product.standardUnit,
+              timestamp: DateTime.now(),
+              sourceType: product.sourceType,
+              submitterName: 'Market Trader',
+              submitterRole: 'Trader',
+              isVerified: true,
+              channel: 'Local Market',
+              brandOrGrade: product.brandOrGrade ?? 'Grade A / Market Benchmark',
+              standardizedUnitPrice:
+                  product.standardizedUnitPrice ?? product.lowestPrice,
+              baseUnit: product.baseUnit,
+            ),
+            PriceObservation(
+              id: 'smb-${product.id}',
+              productId: product.id,
+              productName: product.name,
+              sellerName: 'Neighborhood Supermarket',
+              marketLocation: 'Local Commercial Strip',
+              price: (product.lowestPrice * 1.12 / 50).round() * 50.0,
+              unit: product.standardUnit,
+              timestamp: DateTime.now(),
+              sourceType: ObservationSource.communityReported,
+              submitterName: 'Local Shopper',
+              isVerified: true,
+              channel: 'SMB Store',
+              brandOrGrade: 'Packaged Shelf Standard',
+              standardizedUnitPrice:
+                  (product.lowestPrice * 1.12 / 50).round() * 50.0,
+              baseUnit: product.baseUnit,
+            ),
+            PriceObservation(
+              id: 'online-${product.id}',
+              productId: product.id,
+              productName: product.name,
+              sellerName: 'Jumia Food Mart',
+              marketLocation: 'Online Platform',
+              price: (product.lowestPrice * 1.20 / 50).round() * 50.0,
+              unit: product.standardUnit,
+              timestamp: DateTime.now(),
+              sourceType: ObservationSource.onlineGrounded,
+              submitterName: 'Web Engine',
+              isVerified: true,
+              channel: 'Online Retailer',
+              brandOrGrade: 'Premium Sealed Delivery Grade',
+              standardizedUnitPrice:
+                  (product.lowestPrice * 1.20 / 50).round() * 50.0,
+              baseUnit: product.baseUnit,
+            ),
+          ];
+
+    final effectiveTargetUnit = requestedUnit ?? product.standardUnit;
+    final baseUnit = CommodityComparisonService.resolveBaseUnit(
+      effectiveTargetUnit,
+      commodityName: product.name,
+    );
+
+    final reqMultiplier = CommodityComparisonService.calculateUnitMultiplier(
+      effectiveTargetUnit,
+      commodityName: product.name,
+    );
+    final totalBaseUnits =
+        requestedQuantity * (reqMultiplier > 0 ? reqMultiplier : 1.0);
+
+    // Evaluate each option across the 6 criteria:
+    final rawEvaluated = <EvaluatedSellerOption>[];
+
+    for (final obs in effectiveObservations) {
+      final channel = obs.sellerChannel;
+
+      // 1. Distance & Transit
+      double distance = 1.5;
+      String transitWindow = '15 mins transit';
+      if (channel == SellerChannel.onlineRetailer) {
+        distance = 0.0;
+        transitWindow = 'Doorstep Delivery';
+      } else if (userLocation != null && userLocation.isSet) {
+        final marketCoord =
+            LocationService.knownMarketCoordinates[obs.sellerName] ??
+                LocationService.knownMarketCoordinates[obs.marketLocation];
+        if (marketCoord != null) {
+          distance = LocationService.calculateDistanceKm(
+            lat1: userLocation.latitude,
+            lon1: userLocation.longitude,
+            lat2: marketCoord.latitude,
+            lon2: marketCoord.longitude,
+          );
+        } else {
+          distance = channel == SellerChannel.smbStore ? 1.2 : 2.4;
+        }
+        final mins =
+            (distance * (channel == SellerChannel.smbStore ? 6 : 7))
+                .clamp(5, 45)
+                .round();
+        transitWindow = '$mins mins transit';
+      } else {
+        distance = channel == SellerChannel.smbStore ? 1.2 : 2.4;
+        transitWindow = '${(distance * 7).round()} mins transit';
+      }
+
+      // 2. Unit Price & Product Subtotal
+      final obsMultiplier = CommodityComparisonService.calculateUnitMultiplier(
+        obs.unit,
+        commodityName: product.name,
+      );
+      final stdPrice = obs.standardizedUnitPrice ??
+          (obsMultiplier > 0 ? obs.price / obsMultiplier : obs.price);
+      final subtotal = totalBaseUnits * stdPrice;
+
+      // 3. Quality, Grade & Inspection
+      String qualityGrade;
+      double qualityScore;
+      List<String> qualityHighlights;
+
+      if (channel == SellerChannel.onlineRetailer) {
+        qualityGrade = obs.brandOrGrade ?? 'Factory Sealed Branded Grade A';
+        qualityScore = 4.8;
+        qualityHighlights = [
+          'Tamper-evident packaging',
+          'Barcoded batch verification',
+          '100% manufacturer warranty',
+        ];
+      } else if (channel == SellerChannel.smbStore) {
+        qualityGrade = obs.brandOrGrade ?? 'Packaged Shelf Standard';
+        qualityScore = 4.5;
+        qualityHighlights = [
+          'Pre-weighed sealed containers',
+          'Clean air-conditioned storage',
+          'Visible expiry & batch stamp',
+        ];
+      } else {
+        qualityGrade = obs.brandOrGrade ?? 'Fresh Farm / Bulk Harvest';
+        qualityScore = obs.isVerified ? 4.3 : 4.0;
+        qualityHighlights = [
+          'Direct farm wholesale harvest',
+          'Physical inspection permitted',
+          'Flexible sack & basin portions',
+        ];
+      }
+
+      // 4. Delivery Fee & Delivery Window
+      double deliveryFee;
+      String deliveryWindow;
+
+      if (channel == SellerChannel.onlineRetailer) {
+        deliveryFee = 1500.0;
+        deliveryWindow = 'Next-day courier dispatch to door';
+      } else if (channel == SellerChannel.smbStore) {
+        deliveryFee = 600.0;
+        deliveryWindow = '1 - 2 hours neighborhood bike dispatch';
+      } else {
+        deliveryFee = 0.0;
+        deliveryWindow = 'Immediate walk-in collection (₦0)';
+      }
+
+      final totalLanded = subtotal + deliveryFee;
+
+      // 5. Brand Reputation & Seller Trust
+      String brandReputation;
+      double reputationScore;
+
+      if (channel == SellerChannel.onlineRetailer) {
+        brandReputation =
+            'National E-Commerce Platform (Guaranteed Escrow)';
+        reputationScore = 4.8;
+      } else if (channel == SellerChannel.smbStore) {
+        brandReputation =
+            'Registered Supermarket / SMB Merchant (4.6 ★)';
+        reputationScore = 4.6;
+      } else {
+        brandReputation = obs.isConfirmed
+            ? 'Market Union Verified Stall (${obs.sellerName})'
+            : 'Open Market Merchant (${obs.sellerName})';
+        reputationScore = obs.isConfirmed ? 4.4 : 4.1;
+      }
+
+      // 6. Customer Support & Return Policy
+      String supportPolicy;
+      double supportScore;
+
+      if (channel == SellerChannel.onlineRetailer) {
+        supportPolicy =
+            '7-Day doorstep returns & money-back dispute guarantee';
+        supportScore = 4.9;
+      } else if (channel == SellerChannel.smbStore) {
+        supportPolicy =
+            '24-Hour in-store exchange with printed register receipt';
+        supportScore = 4.5;
+      } else {
+        supportPolicy =
+            'On-site counter inspection & instant exchange before leaving';
+        supportScore = 4.0;
+      }
+
+      // Pros & Cons
+      List<String> pros;
+      List<String> cons;
+
+      if (channel == SellerChannel.localMarket) {
+        pros = [
+          'Lowest unit price per $baseUnit',
+          '₦0 delivery fee for physical pickup',
+          'In-person quality inspection & bargaining',
+        ];
+        cons = [
+          'Requires physical transit (${distance.toStringAsFixed(1)} km)',
+          'No return window once taken home',
+        ];
+      } else if (channel == SellerChannel.smbStore) {
+        pros = [
+          'Fast local neighborhood access (${distance.toStringAsFixed(1)} km)',
+          'Pre-weighed and sealed containers',
+          '24-hr receipt exchange guarantee',
+        ];
+        cons = [
+          'Moderate markup over wholesale market',
+          '₦600 fee if choosing bike dispatch',
+        ];
+      } else {
+        pros = [
+          'Zero physical travel (delivered to door)',
+          '7-day return policy with dispute protection',
+          'Factory sealed certified batch',
+        ];
+        cons = [
+          '₦1,500 shipping fee increases total outlay',
+          'Delivery transit wait time required',
+        ];
+      }
+
+      rawEvaluated.add(
+        EvaluatedSellerOption(
+          observation: obs,
+          channel: channel,
+          basePrice: obs.price,
+          unit: obs.unit,
+          standardizedUnitPrice: stdPrice,
+          baseUnit: baseUnit,
+          requestedQuantity: requestedQuantity,
+          productSubtotal: subtotal,
+          distanceKm: distance,
+          transitWindow: transitWindow,
+          qualityGrade: qualityGrade,
+          qualityScore: qualityScore,
+          qualityHighlights: qualityHighlights,
+          deliveryFee: deliveryFee,
+          deliveryWindow: deliveryWindow,
+          totalLandedCost: totalLanded,
+          brandReputation: brandReputation,
+          reputationScore: reputationScore,
+          customerSupportPolicy: supportPolicy,
+          supportScore: supportScore,
+          compositeScore: 0,
+          aiPros: pros,
+          aiCons: cons,
+        ),
+      );
+    }
+
+    // Pass 2: Normalize and calculate composite scores based on activePriority
+    final minCost =
+        rawEvaluated.map((e) => e.totalLandedCost).reduce(min);
+    final maxCost =
+        rawEvaluated.map((e) => e.totalLandedCost).reduce(max);
+
+    final scoredOptions = rawEvaluated.map((opt) {
+      final costFactor = maxCost > minCost
+          ? (1.0 - (opt.totalLandedCost - minCost) / (maxCost - minCost))
+          : 1.0;
+      final distFactor = opt.distanceKm == 0
+          ? 1.0
+          : (priority == UserDecisionPriority.convenienceDelivery
+              ? (1.0 - (opt.distanceKm / 3.0)).clamp(0.05, 0.55)
+              : (1.0 - (opt.distanceKm / 8.0)).clamp(0.15, 0.95));
+      final qualFactor = opt.qualityScore / 5.0;
+      final repFactor = opt.reputationScore / 5.0;
+      final suppFactor = opt.supportScore / 5.0;
+
+      double rawScore;
+      switch (priority) {
+        case UserDecisionPriority.balancedValue:
+          rawScore = costFactor * 0.35 +
+              qualFactor * 0.25 +
+              distFactor * 0.15 +
+              repFactor * 0.13 +
+              suppFactor * 0.12;
+          break;
+        case UserDecisionPriority.lowestPrice:
+          rawScore = costFactor * 0.70 +
+              qualFactor * 0.10 +
+              distFactor * 0.10 +
+              repFactor * 0.05 +
+              suppFactor * 0.05;
+          break;
+        case UserDecisionPriority.convenienceDelivery:
+          rawScore = distFactor * 0.55 +
+              suppFactor * 0.25 +
+              qualFactor * 0.12 +
+              costFactor * 0.08;
+          break;
+        case UserDecisionPriority.highestQualityTrust:
+          rawScore = qualFactor * 0.40 +
+              repFactor * 0.25 +
+              suppFactor * 0.20 +
+              costFactor * 0.15;
+          break;
+      }
+
+      final composite = (rawScore * 100).clamp(45, 99).round();
+      return opt.copyWith(compositeScore: composite);
+    }).toList();
+
+    // Sort descending by composite score
+    scoredOptions.sort((a, b) => b.compositeScore.compareTo(a.compositeScore));
+
+    // Assign badge to top recommendation
+    final topBadge = () {
+      switch (priority) {
+        case UserDecisionPriority.balancedValue:
+          return '🏆 Best Overall Value';
+        case UserDecisionPriority.lowestPrice:
+          return '💰 Lowest Total Outlay';
+        case UserDecisionPriority.convenienceDelivery:
+          return '⚡ Top Convenience & Doorstep';
+        case UserDecisionPriority.highestQualityTrust:
+          return '🌟 Certified Quality & Trust';
+      }
+    }();
+
+    final finalizedOptions = <EvaluatedSellerOption>[];
+    for (int i = 0; i < scoredOptions.length; i++) {
+      if (i == 0) {
+        finalizedOptions.add(
+            scoredOptions[i].copyWith(recommendationBadge: topBadge));
+      } else {
+        finalizedOptions.add(scoredOptions[i]);
+      }
+    }
+
+    final topPick = finalizedOptions.first;
+    final lowestLanded = finalizedOptions
+        .reduce((a, b) => a.totalLandedCost < b.totalLandedCost ? a : b);
+    final highestLanded = finalizedOptions
+        .reduce((a, b) => a.totalLandedCost > b.totalLandedCost ? a : b);
+    final maxSavings =
+        highestLanded.totalLandedCost - lowestLanded.totalLandedCost;
+
+    // Build Executive Muse Spark Narrative
+    final qtyStr = requestedQuantity.toStringAsFixed(
+      requestedQuantity.truncateToDouble() == requestedQuantity ? 0 : 1,
+    );
+
+    final summaryBuffer = StringBuffer();
+    summaryBuffer.write(
+      'Meta Muse Spark Option Analysis for $qtyStr $effectiveTargetUnit of ${product.name}: ',
+    );
+    summaryBuffer.write(
+      'Under your "${priority.label}" priority, ${topPick.observation.sellerName} (${topPick.channel.displayName}) ranks #1 with a composite fit score of ${topPick.compositeScore}/100. ',
+    );
+    summaryBuffer.write(
+      'Landed cost is ${topPick.formattedTotalLandedCost} (${topPick.formattedSubtotal} product + ${topPick.formattedDeliveryFee} delivery). ',
+    );
+
+    if (topPick.channel == SellerChannel.localMarket) {
+      summaryBuffer.write(
+        'Choosing the local market saves ₦${maxSavings.toStringAsFixed(0)} vs online platforms, offering direct wholesale inspection at ${topPick.transitWindow}.',
+      );
+    } else if (topPick.channel == SellerChannel.onlineRetailer) {
+      summaryBuffer.write(
+        'While shipping adds ₦${topPick.deliveryFee.toStringAsFixed(0)}, it eliminates physical transit and includes guaranteed 7-day doorstep return protection.',
+      );
+    } else {
+      summaryBuffer.write(
+        'Neighborhood SMB shopping balances quick ${topPick.transitWindow} with reliable sealed packaging and 24-hr receipt return assurance.',
+      );
+    }
+
+    final highlights = <String>[
+      'Landed price spread: ${lowestLanded.formattedTotalLandedCost} (Lowest) to ${highestLanded.formattedTotalLandedCost} (Highest), saving up to ₦${maxSavings.toStringAsFixed(0)}.',
+      'Delivery fee impact: Local walk-in has ₦0 fee; SMB express bike is ₦600; online courier is ₦1,500.',
+      'Quality & support: Open markets offer physical bulk inspection; supermarkets offer 24h receipt returns; online platforms offer 7-day buyer protection.',
+    ];
+
+    return MultiCriteriaAnalysisResult(
+      product: product,
+      requestedQuantity: requestedQuantity,
+      targetUnit: effectiveTargetUnit,
+      activePriority: priority,
+      evaluatedOptions: finalizedOptions,
+      recommendedOption: topPick,
+      executiveSummary: summaryBuffer.toString(),
+      comparisonHighlights: highlights,
+    );
   }
 
   /// Detects abnormal price spikes or suspiciously low quotes

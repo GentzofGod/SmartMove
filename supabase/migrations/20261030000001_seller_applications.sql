@@ -125,3 +125,4 @@ CREATE POLICY "Admins can update seller applications"
       SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'Admin'
     )
   );
+

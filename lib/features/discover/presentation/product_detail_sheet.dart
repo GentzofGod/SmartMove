@@ -23,6 +23,8 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
   String? _selectedChannelFilter;
   ComparisonSortPreference _sortPreference = ComparisonSortPreference.cheapestUnitPrice;
   bool _showAiAnalysis = false;
+  UserDecisionPriority _decisionPriority = UserDecisionPriority.balancedValue;
+  bool _showExpandedCriteria = false;
   final MetaAiService _metaAiService = const MetaAiService();
 
   String _formatAmount(double amount) {
@@ -290,6 +292,14 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
         : widget.product.lowestPrice;
 
     final estimatedBasketTotal = lowestQuotePrice * _quantity;
+
+    final multiCriteriaResult = _metaAiService.analyzeAvailableOptions(
+      product: widget.product,
+      observations: comparisonQuotes,
+      requestedQuantity: _quantity,
+      priority: _decisionPriority,
+      userLocation: currentLocation,
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -828,83 +838,8 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
 
             const SizedBox(height: 12),
 
-            // Meta AI Muse Spark Grounded Analysis Accordion
-            Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE8F5E9), Color(0xFFF1F8E9)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                children: [
-                  InkWell(
-                    onTap: () => setState(() => _showAiAnalysis = !_showAiAnalysis),
-                    borderRadius: BorderRadius.circular(14),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Meta AI Grounded Price Intelligence',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primaryDark,
-                                  ),
-                                ),
-                                Text(
-                                  'Evidence-based multi-seller advice & savings breakdown',
-                                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            _showAiAnalysis ? Icons.expand_less : Icons.expand_more,
-                            color: AppColors.primaryDark,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_showAiAnalysis) ...[
-                    const Divider(height: 1, color: Color(0xFFC8E6C9)),
-                    Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Text(
-                        _metaAiService.explainCommodityPriceComparison(
-                          product: widget.product,
-                          observations: comparisonQuotes,
-                          userBudget: 15000,
-                        ),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 1.45,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            // Meta AI Muse Spark Multi-Criteria Options Analysis
+            _buildMultiCriteriaAnalysisSection(multiCriteriaResult),
             const SizedBox(height: 14),
 
             // Price History Section (Section 5.2: Only where sufficient observations exist)
@@ -1174,6 +1109,520 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               fontWeight: FontWeight.w700,
               color: fg,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMultiCriteriaAnalysisSection(MultiCriteriaAnalysisResult result) {
+    final rec = result.recommendedOption;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE8F5E9), Color(0xFFF1F8E9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Collapsible Header
+          InkWell(
+            onTap: () => setState(() => _showAiAnalysis = !_showAiAnalysis),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Text(
+                              'Meta AI Multi-Criteria Options Matrix',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primaryDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Evaluated on Distance, Price, Quality, Delivery, Trust & Support',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _showAiAnalysis ? Icons.expand_less : Icons.expand_more,
+                    color: AppColors.primaryDark,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (_showAiAnalysis) ...[
+            const Divider(height: 1, color: Color(0xFFC8E6C9)),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Priority Selection Header & Chips
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Buyer Priority Preference:',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Text(
+                          '${result.evaluatedOptions.length} Options Evaluated',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: UserDecisionPriority.values.map((p) {
+                        final isSel = _decisionPriority == p;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(
+                              p.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                color: isSel ? AppColors.primary : AppColors.textPrimary,
+                              ),
+                            ),
+                            selected: isSel,
+                            selectedColor: AppColors.primaryTint,
+                            backgroundColor: Colors.white,
+                            side: BorderSide(
+                              color: isSel ? AppColors.primary : AppColors.cardBorder,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                setState(() => _decisionPriority = p);
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _decisionPriority.description,
+                    style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Top Recommendation Highlight Card
+                  if (rec != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF81C784), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF8E1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFFD54F)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.stars_rounded, size: 14, color: Color(0xFFF57F17)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      rec.recommendationBadge ?? 'Top Recommendation',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFFE65100),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryTint,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${rec.compositeScore}/100 Match',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      rec.observation.sellerName,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${rec.channel.displayName} • ${rec.formattedStandardizedRate}',
+                                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    rec.formattedTotalLandedCost,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Landed Outlay',
+                                    style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary.withValues(alpha: 0.8)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // 6 Multi-Criteria Badges Matrix
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _buildCriteriaPill(
+                                Icons.near_me_outlined,
+                                'Distance',
+                                rec.distanceKm == 0 ? 'Doorstep' : '${rec.distanceKm.toStringAsFixed(1)} km',
+                                const Color(0xFF1976D2),
+                              ),
+                              _buildCriteriaPill(
+                                Icons.local_shipping_outlined,
+                                'Delivery Fee',
+                                rec.formattedDeliveryFee,
+                                const Color(0xFF388E3C),
+                              ),
+                              _buildCriteriaPill(
+                                Icons.verified_outlined,
+                                'Quality',
+                                '${rec.qualityScore.toStringAsFixed(1)} ★ (${rec.qualityGrade.split(' ').first})',
+                                const Color(0xFF7B1FA2),
+                              ),
+                              _buildCriteriaPill(
+                                Icons.timer_outlined,
+                                'Transit',
+                                rec.transitWindow,
+                                const Color(0xFFF57C00),
+                              ),
+                              _buildCriteriaPill(
+                                Icons.support_agent_outlined,
+                                'Support',
+                                rec.customerSupportPolicy.split(' ').take(3).join(' '),
+                                const Color(0xFF00796B),
+                              ),
+                              _buildCriteriaPill(
+                                Icons.shield_outlined,
+                                'Reputation',
+                                '${rec.reputationScore.toStringAsFixed(1)} ★',
+                                const Color(0xFF455A64),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // AI Pros & Cons
+                          if (rec.aiPros.isNotEmpty) ...[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: rec.aiPros.take(2).map((pro) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF2E7D32)),
+                                      const SizedBox(width: 5),
+                                      Expanded(
+                                        child: Text(
+                                          pro,
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Grounded Executive Narrative
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFC8E6C9)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.psychology_outlined, size: 15, color: AppColors.primary),
+                            SizedBox(width: 6),
+                            Text(
+                              'Meta Muse Spark Rationale',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primaryDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          result.executiveSummary,
+                          style: const TextStyle(fontSize: 11.5, height: 1.45, color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Toggle to view all options side by side
+                  InkWell(
+                    onTap: () => setState(() => _showExpandedCriteria = !_showExpandedCriteria),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _showExpandedCriteria
+                                ? 'Hide Comparison Matrix'
+                                : 'Compare All ${result.evaluatedOptions.length} Options by Criteria',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          ),
+                          Icon(
+                            _showExpandedCriteria ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  if (_showExpandedCriteria) ...[
+                    const SizedBox(height: 10),
+                    for (int i = 0; i < result.evaluatedOptions.length; i++)
+                      _buildOptionCard(result.evaluatedOptions[i], i == 0),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCriteriaPill(IconData icon, String title, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$title: ',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: color),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptionCard(EvaluatedSellerOption opt, bool isTop) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isTop ? AppColors.primary : AppColors.cardBorder,
+          width: isTop ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    _buildChannelBadge(opt.channel),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        opt.observation.sellerName,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isTop ? AppColors.primaryTint : AppColors.background,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${opt.compositeScore}% Match',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: isTop ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Product Subtotal: ${opt.formattedSubtotal}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  Text('Delivery Fee: ${opt.formattedDeliveryFee}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    opt.formattedTotalLandedCost,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  ),
+                  const Text('Total Landed', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          Text(
+            'Distance: ${opt.distanceKm == 0 ? "Doorstep" : "${opt.distanceKm.toStringAsFixed(1)} km"} • Quality: ${opt.qualityGrade} • Support: ${opt.customerSupportPolicy}',
+            style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
           ),
         ],
       ),
