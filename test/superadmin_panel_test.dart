@@ -410,9 +410,10 @@ void main() {
       expect(find.text('SuperAdmin Role Mode:'), findsNothing);
       expect(find.text('SuperAdmin Moderation Panel'), findsNothing);
 
-      // Verify Saved Items is not hardcoded to '12' and My Wallet shows 'Not set'
+      // Verify My Wallet and Saved Items are removed from settings
       expect(find.text('12'), findsNothing);
-      expect(find.text('Not set'), findsOneWidget);
+      expect(find.byKey(const ValueKey('menu_my_wallet')), findsNothing);
+      expect(find.byKey(const ValueKey('menu_saved_items')), findsNothing);
 
       // Upgrade to SuperAdmin
       container.read(authProvider.notifier).setSession(

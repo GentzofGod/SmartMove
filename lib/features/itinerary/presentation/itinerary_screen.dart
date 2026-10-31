@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
+import '../../../core/localization/app_language.dart';
 import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 import 'map_navigation_sheet.dart';
 
@@ -356,9 +357,9 @@ class ItineraryScreen extends ConsumerWidget {
                                       );
                                     },
                                     icon: const Icon(Icons.navigation_rounded, size: 13),
-                                    label: const Text(
-                                      'Start Navigation',
-                                      style: TextStyle(
+                                    label: Text(
+                                      AppStrings.tr(ref, 'startNavigation'),
+                                      style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
                                       ),

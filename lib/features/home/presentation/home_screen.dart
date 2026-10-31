@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/price_observation.dart';
+import '../../../core/localization/app_language.dart';
 import '../../discover/presentation/product_detail_sheet.dart';
 import 'widgets/location_picker_sheet.dart';
 import 'widgets/meta_ai_scenario_card.dart';
@@ -370,41 +371,30 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Stat Metrics Row: Budget, Remaining Budget, Distance (Only when active plan & budget exists)
+              // Stat Metrics Row: Budget, Remaining Budget (Only when active options & budget exists)
               if (decisionState.activeItems.isNotEmpty && decisionState.budget > 0) ...[
                 Builder(
                   builder: (context) {
                     final remainingBudget = (decisionState.budget - decisionState.selectedPlan.totalCost).clamp(0.0, double.infinity);
-                    final totalDist = decisionState.selectedPlan.stops.fold(0.0, (sum, s) => sum + s.distanceKm);
                     return Row(
                       children: [
                         Expanded(
                           child: _buildMetricCard(
-                            label: 'Budget',
+                            label: AppStrings.tr(ref, 'budget'),
                             value: '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
                             icon: Icons.account_balance_wallet_outlined,
                             iconBg: const Color(0xFFFFF0B3),
                             iconColor: const Color(0xFFB78103),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: _buildMetricCard(
-                            label: 'Remaining',
+                            label: AppStrings.tr(ref, 'remaining'),
                             value: '₦${remainingBudget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
                             icon: Icons.savings_outlined,
                             iconBg: AppColors.primaryTint,
                             iconColor: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildMetricCard(
-                            label: 'Distance',
-                            value: totalDist > 0 ? '${totalDist.toStringAsFixed(1)} km' : 'Direct',
-                            icon: Icons.directions_outlined,
-                            iconBg: const Color(0xFFDEEBFF),
-                            iconColor: const Color(0xFF0052CC),
                           ),
                         ),
                       ],

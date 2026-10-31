@@ -9,6 +9,7 @@ import '../../../core/models/commodity_item.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
+import '../../../core/localization/app_language.dart';
 import 'widgets/trader_negotiation_sheet.dart';
 
 class DecisionLabScreen extends ConsumerStatefulWidget {
@@ -89,7 +90,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               unselectedLabelColor: AppColors.textSecondary,
               labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               tabs: [
-                const Tab(text: 'Compare Options'),
+                Tab(text: AppStrings.tr(ref, 'options')),
                 Tab(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -154,7 +155,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               fit: BoxFit.scaleDown,
               child: Text(
                 candidates.isNotEmpty && selectedPlan.id != 'plan-default'
-                    ? 'Proceed with ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}'
+                    ? '${AppStrings.tr(ref, 'proceedWith')} ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}'
                     : 'Add Items to Cart to Proceed',
                 style: const TextStyle(
                   fontSize: 15,

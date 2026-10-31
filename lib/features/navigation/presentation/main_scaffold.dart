@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/localization/app_language.dart';
 
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends ConsumerWidget {
   final Widget child;
 
   const MainScaffold({super.key, required this.child});
@@ -34,8 +36,12 @@ class MainScaffold extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = _calculateSelectedIndex(context);
+    final homeLabel = AppStrings.tr(ref, 'navHome');
+    final discoverLabel = AppStrings.tr(ref, 'navDiscover');
+    final priceLabLabel = AppStrings.tr(ref, 'navPriceLab');
+    final communityLabel = AppStrings.tr(ref, 'navCommunity');
 
     return Scaffold(
       body: child,
@@ -65,26 +71,26 @@ class MainScaffold extends StatelessWidget {
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.5),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: homeLabel,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.explore_outlined),
-              activeIcon: Icon(Icons.explore),
-              label: 'Discover',
+              icon: const Icon(Icons.explore_outlined),
+              activeIcon: const Icon(Icons.explore),
+              label: discoverLabel,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.analytics_outlined),
-              activeIcon: Icon(Icons.analytics),
-              label: 'Price Lab',
+              icon: const Icon(Icons.analytics_outlined),
+              activeIcon: const Icon(Icons.analytics),
+              label: priceLabLabel,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.storefront_outlined),
-              activeIcon: Icon(Icons.storefront),
-              label: 'Community',
+              icon: const Icon(Icons.storefront_outlined),
+              activeIcon: const Icon(Icons.storefront),
+              label: communityLabel,
             ),
           ],
         ),

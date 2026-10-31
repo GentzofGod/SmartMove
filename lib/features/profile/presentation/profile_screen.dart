@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
-import '../../../core/models/commodity_item.dart';
+import '../../../core/localization/app_language.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -21,7 +21,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _priceAlertsEnabled = true;
   bool _marketHoursEnabled = true;
   bool _errandDeadlinesEnabled = true;
-  String _selectedLanguage = 'English';
 
   @override
   void initState() {
@@ -34,13 +33,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _loadSavedSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedLang = prefs.getString('smartmove_app_language') ?? 'English';
+    ref.read(appLanguageProvider.notifier).setLanguage(savedLang);
     if (mounted) {
       setState(() {
         _notificationsEnabled = prefs.getBool('smartmove_notifications_enabled') ?? true;
         _priceAlertsEnabled = prefs.getBool('smartmove_price_alerts_enabled') ?? true;
         _marketHoursEnabled = prefs.getBool('smartmove_market_hours_enabled') ?? true;
         _errandDeadlinesEnabled = prefs.getBool('smartmove_errand_deadlines_enabled') ?? true;
-        _selectedLanguage = prefs.getString('smartmove_app_language') ?? 'English';
       });
     }
   }
@@ -51,18 +51,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _updateLanguageSetting(String language) async {
+    ref.read(appLanguageProvider.notifier).setLanguage(language);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('smartmove_app_language', language);
-    if (mounted) {
-      setState(() {
-        _selectedLanguage = language;
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final decisionState = ref.watch(decisionLabProvider);
     final userSession = ref.watch(authProvider);
     final currentLocation = ref.watch(locationProvider);
 
@@ -663,26 +658,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 1, indent: 56, color: AppColors.divider),
                 ],
-                _buildMenuItem(
-                  key: const ValueKey('menu_my_wallet'),
-                  icon: Icons.account_balance_wallet_outlined,
-                  title: 'My Wallet',
-                  trailingText: decisionState.budget > 0
-                      ? '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}'
-                      : 'Not set',
-                  onTap: () => _showWalletBudgetSheet(context, decisionState),
-                ),
-                const Divider(height: 1, indent: 56, color: AppColors.divider),
-                _buildMenuItem(
-                  key: const ValueKey('menu_saved_items'),
-                  icon: Icons.bookmark_border_rounded,
-                  title: 'Saved Items',
-                  trailingText: decisionState.activeItems.isNotEmpty
-                      ? '${decisionState.activeItems.length}'
-                      : '0',
-                  onTap: () => _showSavedItemsSheet(context, decisionState),
-                ),
-                const Divider(height: 1, indent: 56, color: AppColors.divider),
+
                 _buildMenuItem(
                   key: const ValueKey('menu_market_location'),
                   icon: Icons.location_on_outlined,
@@ -733,7 +709,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   key: const ValueKey('menu_language'),
                   icon: Icons.language_outlined,
                   title: 'Language',
-                  trailingText: _selectedLanguage,
+                  trailingText: ref.watch(appLanguageProvider),
                   onTap: () => _showLanguageSelectorSheet(context),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
@@ -741,7 +717,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   key: const ValueKey('menu_data_privacy'),
                   icon: Icons.security_outlined,
                   title: 'Data & Privacy',
-                  trailingText: 'Supabase Sync',
                   onTap: () => _showDataAndPrivacySheet(context),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
@@ -809,46 +784,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 12),
           ],
 
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              key: const ValueKey('btn_sync_offline_cache'),
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Syncing prices and user session with Supabase...'),
-                      ],
-                    ),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-                await ref.read(productsProvider.notifier).fetchLive();
-                await ref.read(authProvider.notifier).refreshProfileFromDatabase();
-                if (context.mounted) {
-                  messenger.hideCurrentSnackBar();
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Offline price cache and user profile synchronized with Supabase!'),
-                      backgroundColor: AppColors.primary,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Sync Offline Price Cache'),
-            ),
-          ),
           const SizedBox(height: 20),
         ],
       ),
@@ -1374,467 +1309,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  void _showWalletBudgetSheet(BuildContext context, DecisionLabState decisionState) {
-    final budgetController = TextEditingController(
-      text: decisionState.budget > 0 ? decisionState.budget.toStringAsFixed(0) : '',
-    );
-    final totalSpent = decisionState.activeItems.fold(0.0, (sum, i) => sum + i.totalEstimatedCost);
-    final remaining = decisionState.budget - totalSpent;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (bottomSheetContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'My Wallet & Shopping Budget',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.pop(bottomSheetContext),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Set your shopping spend ceiling and monitor active allocations across markets.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 16),
-                    // Budget overview card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.cardBorder),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Shopping Budget Ceiling:', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-                              Text(
-                                '₦${decisionState.budget.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Estimated Cart Items:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              Text(
-                                '₦${totalSpent.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Available Balance:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              Text(
-                                '₦${remaining.toStringAsFixed(0).replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: remaining >= 0 ? const Color(0xFF2E7D32) : const Color(0xFFD32F2F),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Preset Budget Adjustments',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [10000.0, 20000.0, 35000.0, 50000.0, 100000.0].map((preset) {
-                        return ActionChip(
-                          key: ValueKey('chip_budget_${preset.toInt()}'),
-                          label: Text(
-                            '₦${preset.toInt() ~/ 1000}k',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: AppColors.cardBorder),
-                          onPressed: () {
-                            setModalState(() {
-                              budgetController.text = preset.toInt().toString();
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Custom Budget Amount (₦)',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      key: const ValueKey('input_wallet_budget'),
-                      controller: budgetController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: 'Enter amount (e.g. 25000)',
-                        prefixText: '₦ ',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        key: const ValueKey('btn_save_wallet_budget'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () {
-                          final val = double.tryParse(budgetController.text.replaceAll(',', '').trim());
-                          if (val == null || val <= 0) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a valid budget amount.'),
-                                backgroundColor: AppColors.badgeErrorText,
-                              ),
-                            );
-                            return;
-                          }
-                          ref.read(decisionLabProvider.notifier).updateBudget(val);
-                          Navigator.pop(bottomSheetContext);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Shopping budget set to ₦${val.toStringAsFixed(0)}!'),
-                              backgroundColor: AppColors.primary,
-                            ),
-                          );
-                        },
-                        child: const Text('Save Shopping Budget', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 44,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey('btn_open_decision_lab_from_wallet'),
-                        icon: const Icon(Icons.analytics_outlined, size: 18),
-                        label: const Text('Open in Price Lab & Itinerary'),
-                        onPressed: () {
-                          Navigator.pop(bottomSheetContext);
-                          context.push('/decision-lab');
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showSavedItemsSheet(BuildContext context, DecisionLabState decisionState) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (bottomSheetContext) {
-        return Consumer(
-          builder: (context, ref, child) {
-            final activeItems = ref.watch(decisionLabProvider).activeItems;
-            return Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.82,
-              ),
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Saved Commodities (${activeItems.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(bottomSheetContext),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Active commodities compared for best store and market prices.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 12),
-                  if (activeItems.isEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-                      alignment: Alignment.center,
-                      child: Column(
-                        children: [
-                          Icon(Icons.bookmark_border_rounded, size: 48, color: Colors.grey.shade400),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No commodities saved yet',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Add items like Rice, Eggs, Garri, or Yam to compare market rates.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ] else ...[
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: activeItems.length,
-                        separatorBuilder: (c, i) => const Divider(height: 1, color: AppColors.divider),
-                        itemBuilder: (c, i) {
-                          final item = activeItems[i];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryTint,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 20),
-                            ),
-                            title: Text(
-                              item.productName,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text(
-                              '₦${item.estimatedUnitPrice.toStringAsFixed(0)} / ${item.unit} • Subtotal: ₦${item.totalEstimatedCost.toStringAsFixed(0)}',
-                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  key: ValueKey('btn_decrement_${item.id}'),
-                                  icon: const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.textSecondary),
-                                  onPressed: () {
-                                    ref.read(decisionLabProvider.notifier).updateItemQuantity(item.id, item.quantity - 1);
-                                  },
-                                ),
-                                Text(
-                                  '${item.quantity.toInt()} ${item.unit}',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                ),
-                                IconButton(
-                                  key: ValueKey('btn_increment_${item.id}'),
-                                  icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.primary),
-                                  onPressed: () {
-                                    ref.read(decisionLabProvider.notifier).updateItemQuantity(item.id, item.quantity + 1);
-                                  },
-                                ),
-                                IconButton(
-                                  key: ValueKey('btn_remove_item_${item.id}'),
-                                  icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.badgeErrorText),
-                                  onPressed: () {
-                                    ref.read(decisionLabProvider.notifier).removeShoppingItem(item.id);
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          key: const ValueKey('btn_add_saved_commodity'),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Add Item'),
-                          onPressed: () => _showAddCommodityDialog(context),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          key: const ValueKey('btn_open_decision_lab_from_saved'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: const Icon(Icons.tune_rounded, size: 18),
-                          label: const Text('Price Lab'),
-                          onPressed: () {
-                            Navigator.pop(bottomSheetContext);
-                            context.push('/decision-lab');
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showAddCommodityDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final qtyCtrl = TextEditingController(text: '1');
-    final unitCtrl = TextEditingController(text: 'kg');
-    final priceCtrl = TextEditingController(text: '1500');
-
-    showDialog(
-      context: context,
-      builder: (dlgContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Add Commodity', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  key: const ValueKey('input_commodity_name'),
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Commodity Name (e.g. Local Rice)'),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: const ValueKey('input_commodity_qty'),
-                        controller: qtyCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Quantity'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        key: const ValueKey('input_commodity_unit'),
-                        controller: unitCtrl,
-                        decoration: const InputDecoration(labelText: 'Unit (e.g. kg, bag)'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  key: const ValueKey('input_commodity_price'),
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Est. Unit Price (₦)', prefixText: '₦ '),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dlgContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              key: const ValueKey('btn_confirm_add_commodity'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: () {
-                final name = nameCtrl.text.trim();
-                final qty = double.tryParse(qtyCtrl.text.trim()) ?? 1.0;
-                final unit = unitCtrl.text.trim().isNotEmpty ? unitCtrl.text.trim() : 'unit';
-                final price = double.tryParse(priceCtrl.text.trim()) ?? 1000.0;
-                if (name.isNotEmpty) {
-                  final newItem = ShoppingItem(
-                    id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
-                    productName: name,
-                    quantity: qty,
-                    unit: unit,
-                    estimatedUnitPrice: price,
-                  );
-                  ref.read(decisionLabProvider.notifier).addShoppingItem(newItem);
-                  Navigator.pop(dlgContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Added $name to saved items!'),
-                      backgroundColor: AppColors.primary,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Add Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showNotificationPreferencesSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1957,78 +1431,115 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showLanguageSelectorSheet(BuildContext context) {
-    const languages = [
-      {'name': 'English', 'native': 'Nigerian English (Default)'},
-      {'name': 'Nigerian Pidgin', 'native': 'Naija Pidgin (Broken English)'},
-      {'name': 'Yorùbá', 'native': 'Èdè Yorùbá'},
-      {'name': 'Hausa', 'native': 'Harshen Hausa'},
-      {'name': 'Asụsụ Igbo', 'native': 'Asụsụ Igbo (Igbo Dialect)'},
-    ];
+    final currentLanguage = ref.read(appLanguageProvider);
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (bottomSheetContext) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Select Dialect / Language',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(bottomSheetContext),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Customize speech recognition, translation, and localized navigation.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              ...languages.map((lang) {
-                final isSelected = _selectedLanguage == lang['name'];
-                return ListTile(
-                  key: ValueKey('lang_option_${lang['name']}'),
-                  title: Text(
-                    lang['name']!,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    ),
-                  ),
-                  subtitle: Text(lang['native']!, style: const TextStyle(fontSize: 11)),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
-                      : null,
-                  onTap: () {
-                    _updateLanguageSetting(lang['name']!);
-                    Navigator.pop(bottomSheetContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Language set to ${lang['name']}!'),
-                        backgroundColor: AppColors.primary,
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.75,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Select Dialect / Language',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Navigator.pop(bottomSheetContext),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                );
-              }),
-            ],
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Choose from 15 common Nigerian languages and dialects across all geopolitical zones for localized navigation and price comparison.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: AppStrings.supportedLanguages.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1, indent: 12, color: AppColors.divider),
+                    itemBuilder: (context, index) {
+                      final lang = AppStrings.supportedLanguages[index];
+                      final isSelected = currentLanguage == lang.name;
+                      return ListTile(
+                        key: ValueKey('lang_option_${lang.name}'),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        selected: isSelected,
+                        selectedTileColor: AppColors.primaryTint.withValues(alpha: 0.5),
+                        title: Row(
+                          children: [
+                            Text(
+                              lang.name,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                lang.code.toUpperCase(),
+                                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(lang.nativeName, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500)),
+                            Text(lang.region, style: const TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+                          ],
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                            : null,
+                        onTap: () {
+                          _updateLanguageSetting(lang.name);
+                          Navigator.pop(bottomSheetContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Language set to ${lang.name}!'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -2079,36 +1590,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFA5D6A7)),
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.cloud_done_rounded, color: Color(0xFF2E7D32), size: 22),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Supabase Realtime Cloud Sync Active',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)),
-                            ),
-                            Text(
-                              'Verified trader listings and market quotes are authenticated with Supabase RLS.',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.lock_outline_rounded, color: AppColors.primary),
@@ -2298,10 +1779,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         icon: const Icon(Icons.mail_outline_rounded, size: 18),
                         label: const Text('Email Support', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         onPressed: () {
-                          SafeOutletLauncher.openExternalWebUrl(
+                          SafeOutletLauncher.openEmailSupport(
                             context,
-                            url: 'mailto:support@smartmove.ng?subject=SmartMove%20Support%20Inquiry',
-                            outletName: 'SmartMove Support Desk',
+                            email: 'support@smartmove.ng',
+                            subject: 'SmartMove Support Inquiry',
                           );
                         },
                       ),

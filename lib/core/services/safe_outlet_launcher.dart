@@ -367,6 +367,129 @@ class SafeOutletLauncher {
       ),
     );
   }
+  /// Safely open email client for support, or copy support email if no client is configured
+  static Future<void> openEmailSupport(
+    BuildContext context, {
+    String email = 'support@smartmove.ng',
+    String subject = 'SmartMove App Feedback & Support',
+  }) async {
+    final cleanEmail = email.trim();
+    final Uri mailtoUri = Uri(
+      scheme: 'mailto',
+      path: cleanEmail,
+      queryParameters: {
+        'subject': subject,
+      },
+    );
+
+    try {
+      final launched = await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        throw 'Could not launch mailto';
+      }
+    } catch (_) {
+      // Fallback: Show friendly support dialog with copy button instead of store redirect
+      if (context.mounted) {
+        await showDialog(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: const [
+                Icon(Icons.email_outlined, color: AppColors.primary, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Email Support',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Reach out directly to our Nigerian support desk:',
+                  style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTint,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mail_outline, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SelectableText(
+                          cleanEmail,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Copy Email',
+                        icon: const Icon(Icons.copy_rounded, size: 18, color: AppColors.primary),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: cleanEmail));
+                          Navigator.pop(dialogCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Copied $cleanEmail to clipboard'),
+                              backgroundColor: AppColors.primary,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'We respond within 24 hours Monday to Saturday.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Close'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: cleanEmail));
+                  Navigator.pop(dialogCtx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Copied $cleanEmail to clipboard'),
+                      backgroundColor: AppColors.primary,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_rounded, size: 16),
+                label: const Text('Copy Email'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   /// Safely prompt the user before opening an external ecommerce web site
   static Future<void> openExternalWebUrl(
     BuildContext context, {
@@ -374,6 +497,14 @@ class SafeOutletLauncher {
     required String outletName,
     String? searchQuery,
   }) async {
+    // If a mailto: link was accidentally passed here, redirect cleanly to email support
+    if (url.startsWith('mailto:')) {
+      final email = url.replaceFirst('mailto:', '').split('?').first;
+      return openEmailSupport(
+        context,
+        email: email.isNotEmpty ? email : 'support@smartmove.ng',
+      );
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(

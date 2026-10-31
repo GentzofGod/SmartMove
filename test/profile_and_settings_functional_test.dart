@@ -76,7 +76,7 @@ void main() {
       expect(find.text('+234 803 999 8888'), findsOneWidget);
     });
 
-    testWidgets('2. My Wallet sheet allows setting preset and custom budgets', (tester) async {
+    testWidgets('2. My Wallet menu item is cleanly removed from settings', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -84,34 +84,11 @@ void main() {
       await tester.pumpWidget(buildTestableProfileScreen());
       await tester.pumpAndSettle();
 
-      // Tap My Wallet
       final walletTile = find.byKey(const ValueKey('menu_my_wallet'));
-      expect(walletTile, findsOneWidget);
-      await tester.tap(walletTile);
-      await tester.pumpAndSettle();
-
-      expect(find.text('My Wallet & Shopping Budget'), findsOneWidget);
-      expect(find.text('Preset Budget Adjustments'), findsOneWidget);
-
-      // Select ₦35k preset
-      final preset35k = find.byKey(const ValueKey('chip_budget_35000'));
-      expect(preset35k, findsOneWidget);
-      await tester.tap(preset35k);
-      await tester.pumpAndSettle();
-
-      // Verify text field holds 35000
-      final budgetField = tester.widget<TextField>(find.byKey(const ValueKey('input_wallet_budget')));
-      expect(budgetField.controller?.text, '35000');
-
-      // Tap Save Shopping Budget
-      await tester.tap(find.byKey(const ValueKey('btn_save_wallet_budget')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Shopping budget set to ₦35000!'), findsOneWidget);
-      expect(find.text('₦35,000'), findsOneWidget);
+      expect(walletTile, findsNothing);
     });
 
-    testWidgets('3. Saved Items sheet displays items and allows adding a new commodity', (tester) async {
+    testWidgets('3. Saved Items menu item is cleanly removed from settings', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -119,35 +96,8 @@ void main() {
       await tester.pumpWidget(buildTestableProfileScreen());
       await tester.pumpAndSettle();
 
-      // Tap Saved Items
       final savedItemsTile = find.byKey(const ValueKey('menu_saved_items'));
-      expect(savedItemsTile, findsOneWidget);
-      await tester.tap(savedItemsTile);
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Saved Commodities'), findsOneWidget);
-
-      // Tap Add Item button
-      final addItemBtn = find.byKey(const ValueKey('btn_add_saved_commodity'));
-      expect(addItemBtn, findsOneWidget);
-      await tester.tap(addItemBtn);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Add Commodity'), findsOneWidget);
-
-      // Fill in new commodity details
-      await tester.enterText(find.byKey(const ValueKey('input_commodity_name')), 'Brown Beans Oloyin');
-      await tester.enterText(find.byKey(const ValueKey('input_commodity_qty')), '2');
-      await tester.enterText(find.byKey(const ValueKey('input_commodity_unit')), 'derica');
-      await tester.enterText(find.byKey(const ValueKey('input_commodity_price')), '2200');
-      await tester.pumpAndSettle();
-
-      // Tap Confirm Add
-      await tester.tap(find.byKey(const ValueKey('btn_confirm_add_commodity')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Added Brown Beans Oloyin to saved items!'), findsOneWidget);
-      expect(find.text('Brown Beans Oloyin'), findsOneWidget);
+      expect(savedItemsTile, findsNothing);
     });
 
     testWidgets('4. Notifications preferences modal allows toggling alerts and persists to SharedPreferences', (tester) async {
@@ -183,7 +133,7 @@ void main() {
       expect(prefs.getBool('smartmove_price_alerts_enabled'), false);
     });
 
-    testWidgets('5. Language selector bottom sheet allows changing dialect and updates UI', (tester) async {
+    testWidgets('5. Language selector bottom sheet includes all 15 common Nigerian languages and updates appLanguageProvider', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -204,7 +154,9 @@ void main() {
       expect(find.text('Asụsụ Igbo'), findsOneWidget);
 
       // Select Yorùbá
-      await tester.tap(find.byKey(const ValueKey('lang_option_Yorùbá')));
+      final yorubaOption = find.byKey(const ValueKey('lang_option_Yorùbá'));
+      expect(yorubaOption, findsOneWidget);
+      await tester.tap(yorubaOption);
       await tester.pumpAndSettle();
 
       expect(find.text('Language set to Yorùbá!'), findsOneWidget);
@@ -214,7 +166,7 @@ void main() {
       expect(prefs.getString('smartmove_app_language'), 'Yorùbá');
     });
 
-    testWidgets('6. Data & Privacy sheet displays security info and clears cache', (tester) async {
+    testWidgets('6. Data & Privacy sheet displays security info without Supabase Realtime cloud card', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -229,7 +181,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Data & Privacy Security'), findsOneWidget);
-      expect(find.text('Supabase Realtime Cloud Sync Active'), findsOneWidget);
+      // Supabase realtime card is removed
+      expect(find.text('Supabase Realtime Cloud Sync Active'), findsNothing);
       expect(find.text('Zero Financial Credential Storage'), findsOneWidget);
 
       // Tap Clear Offline Cache
@@ -241,7 +194,7 @@ void main() {
       expect(find.text('Offline price cache cleared and refreshed with live data!'), findsOneWidget);
     });
 
-    testWidgets('7. Help & Support sheet renders FAQs and support options', (tester) async {
+    testWidgets('7. Help & Support sheet renders FAQs and email support button without store redirect', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -260,6 +213,13 @@ void main() {
       expect(find.text('How do I become a verified seller?'), findsOneWidget);
       expect(find.byKey(const ValueKey('btn_whatsapp_support')), findsOneWidget);
       expect(find.byKey(const ValueKey('btn_email_support')), findsOneWidget);
+
+      // Tap Email Support - must NOT show External Store Redirect or Proceed to Store
+      await tester.tap(find.byKey(const ValueKey('btn_email_support')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('External Store Redirect'), findsNothing);
+      expect(find.text('Proceed to Store'), findsNothing);
     });
 
     testWidgets('8. About SmartMove dialog shows v1.2.0 and platform architecture', (tester) async {
@@ -286,7 +246,7 @@ void main() {
       expect(find.text('v1.2.0 (Build 2026.10)'), findsNothing);
     });
 
-    testWidgets('9. Sync Offline Price Cache button triggers live refresh', (tester) async {
+    testWidgets('9. Sync Offline Price Cache button is removed from settings', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -295,13 +255,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final syncBtn = find.byKey(const ValueKey('btn_sync_offline_cache'));
-      await tester.ensureVisible(syncBtn);
-      await tester.pumpAndSettle();
-      await tester.tap(syncBtn);
-      await tester.pump();
-      await tester.pumpAndSettle();
-
-      expect(find.text('Offline price cache and user profile synchronized with Supabase!'), findsOneWidget);
+      expect(syncBtn, findsNothing);
     });
   });
 }
