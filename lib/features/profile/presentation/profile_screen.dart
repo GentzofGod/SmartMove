@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
 import '../../../core/localization/app_language.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
@@ -112,7 +113,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       radius: 30,
                       backgroundColor: userSession.isAdmin
                           ? const Color(0xFF673AB7)
-                          : userSession.isSeller
+                          : (userSession.isSeller || userSession.isApprovedSeller)
                               ? AppColors.primary
                               : const Color(0xFF0052CC),
                       child: Text(
@@ -133,7 +134,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         children: [
                           Row(
                             children: [
-                              Flexible(
+                              Expanded(
                                 child: Text(
                                   userSession.displayName,
                                   overflow: TextOverflow.ellipsis,
@@ -151,7 +152,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 decoration: BoxDecoration(
                                   color: userSession.isAdmin
                                       ? const Color(0xFFEDE7F6)
-                                      : userSession.isSeller
+                                      : (userSession.isSeller || userSession.isApprovedSeller)
                                           ? AppColors.badgeSuccessBg
                                           : AppColors.badgeWarningBg,
                                   borderRadius: BorderRadius.circular(8),
@@ -161,19 +162,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ? 'Guest'
                                       : (userSession.isSuperAdmin
                                           ? 'SuperAdmin'
-                                          : userSession.role),
+                                          : (userSession.isApprovedSeller
+                                              ? (userSession.role == 'Trader' ? 'Trader' : 'Verified Seller')
+                                              : userSession.role)),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     color: userSession.isAdmin
                                         ? const Color(0xFF673AB7)
-                                        : userSession.isSeller
+                                        : (userSession.isSeller || userSession.isApprovedSeller)
                                             ? AppColors.primary
                                             : AppColors.badgeWarningText,
                                   ),
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 4),
                               IconButton(
                                 key: const ValueKey('btn_edit_user_profile'),
                                 icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
@@ -485,7 +488,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 16),
             ],
-          ] else if (userSession.isSeller) ...[
+          ] else if (userSession.isSeller || userSession.isApprovedSeller) ...[
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -499,20 +502,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.storefront_rounded,
-                              color: AppColors.primary, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Registered Seller Profile',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                      Expanded(
+                        child: Row(
+                          children: const [
+                            Icon(Icons.storefront_rounded,
+                                color: AppColors.primary, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Registered Seller Profile',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       TextButton.icon(
                         onPressed: () => _showEditBusinessProfile(context, userSession),
@@ -537,11 +545,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Row(
                     children: [
                       const Text('Market Hub: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      Text(
-                        userSession.marketHub ?? 'Bodija Market',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      Expanded(
+                        child: Text(
+                          userSession.marketHub ?? 'Bodija Market',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       const Text('Channel: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                       Text(
                         userSession.sellerChannel ?? 'Local Market',
@@ -549,6 +560,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ],
                   ),
+                  if (userSession.stallLocation != null && userSession.stallLocation!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Stall Location: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Expanded(
+                          child: Text(
+                            userSession.stallLocation!,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (userSession.phone != null && userSession.phone!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Row(
@@ -561,6 +587,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                   ],
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      key: const ValueKey('btn_open_seller_portal_profile'),
+                      onPressed: () {
+                        context.go('/community?tab=seller');
+                      },
+                      icon: const Icon(Icons.storefront_rounded, size: 16),
+                      label: const Text('Open Seller Portal', style: TextStyle(fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -794,6 +838,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final bizController = TextEditingController(text: session.businessName ?? '');
     final phoneController = TextEditingController(text: session.phone ?? '');
     final stallController = TextEditingController(text: session.stallLocation ?? '');
+    double? scannedLat = session.latitude;
+    double? scannedLon = session.longitude;
+    bool isScanningLocation = false;
     String selectedHub = session.marketHub ?? 'Bodija Market';
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
@@ -905,15 +952,153 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
-                      'Stall Number / Location Address',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Stall Number / Location Address',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                        if (scannedLat != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.badgeSuccessBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.check_circle_rounded, size: 12, color: AppColors.primary),
+                                SizedBox(width: 3),
+                                Text(
+                                  'GPS Verified',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 6),
+                    // High Accuracy GPS Stall Scanner
+                    InkWell(
+                      key: const ValueKey('btn_scan_stall_gps_profile'),
+                      onTap: isScanningLocation
+                          ? null
+                          : () async {
+                              setModalState(() => isScanningLocation = true);
+                              try {
+                                final activeLoc = ref.read(locationProvider);
+                                final result = await LocationService.scanDetailedStallLocation(
+                                  fallback: activeLoc.isSet ? activeLoc : null,
+                                );
+                                if (result != null) {
+                                  final prefix = stallController.text.trim();
+                                  final detailed = result.formatStallAddress(
+                                    prefix: prefix.isNotEmpty && !prefix.contains('Lat:') ? prefix : null,
+                                  );
+                                  stallController.text = detailed;
+                                  scannedLat = result.latitude;
+                                  scannedLon = result.longitude;
+                                  const hubs = [
+                                    'Bodija Market',
+                                    'Dugbe Market',
+                                    'Oje Market',
+                                    'Oja Oba Market',
+                                    'Gbagi Market',
+                                    'Online Store',
+                                  ];
+                                  if (hubs.contains(result.closestHub)) {
+                                    selectedHub = result.closestHub;
+                                  }
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Accurate GPS locked: ${result.town}, ${result.city} (${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)})'),
+                                        backgroundColor: AppColors.primary,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Could not scan GPS location: $e'),
+                                      backgroundColor: AppColors.badgeErrorText,
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                setModalState(() => isScanningLocation = false);
+                              }
+                            },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: scannedLat != null ? AppColors.badgeSuccessBg : AppColors.primaryTint,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: scannedLat != null
+                                ? AppColors.primary
+                                : AppColors.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (isScanningLocation)
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                              )
+                            else
+                              Icon(
+                                scannedLat != null ? Icons.gps_fixed_rounded : Icons.my_location_rounded,
+                                size: 20,
+                                color: AppColors.primary,
+                              ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isScanningLocation
+                                        ? 'Scanning high-accuracy GPS coordinates...'
+                                        : (scannedLat != null
+                                            ? 'GPS Locked: ${scannedLat!.toStringAsFixed(4)}° N, ${scannedLon!.toStringAsFixed(4)}° E'
+                                            : 'Scan Precise Stall GPS Location'),
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    scannedLat != null
+                                        ? 'High-accuracy coordinates locked for buyer map navigation'
+                                        : 'Auto-detect your stall address & GPS so buyers can navigate to you',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: scannedLat != null ? AppColors.primaryDark : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: stallController,
+                      maxLines: 2,
                       decoration: InputDecoration(
                         hintText: 'e.g. Stall B44, Main Grain Section, Bodija',
+                        helperText: 'Buyers will navigate to this precise physical address or stall GPS.',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -965,6 +1150,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 stallLocation: stallController.text.trim().isNotEmpty
                                     ? stallController.text.trim()
                                     : null,
+                                latitude: scannedLat,
+                                longitude: scannedLon,
                                 phone: phoneController.text.trim(),
                               );
 

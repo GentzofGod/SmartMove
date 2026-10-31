@@ -112,7 +112,6 @@ class GeoPoint {
       isDeviceLocation: json['isDeviceLocation'] as bool? ?? false,
     );
   }
-
   GeoPoint copyWith({
     double? latitude,
     double? longitude,
@@ -151,6 +150,63 @@ class GeoPoint {
       city.hashCode ^
       town.hashCode ^
       isDeviceLocation.hashCode;
+}
+
+/// Detailed scanned physical location result for seller store/stall registration,
+/// enabling high-accuracy buyer navigation directly to the merchant stall.
+class DetailedLocationResult {
+  final double latitude;
+  final double longitude;
+  final String fullAddress;
+  final String streetOrArea;
+  final String town;
+  final String city;
+  final String state;
+  final String closestHub;
+  final bool isGpsPrecision;
+
+  const DetailedLocationResult({
+    required this.latitude,
+    required this.longitude,
+    required this.fullAddress,
+    required this.streetOrArea,
+    required this.town,
+    required this.city,
+    required this.state,
+    required this.closestHub,
+    this.isGpsPrecision = true,
+  });
+
+  /// Formatted detailed stall address suitable for turn-by-turn navigation
+  String formatStallAddress({String? prefix}) {
+    final cleanPrefix = prefix?.trim() ?? '';
+    final hasPrefix = cleanPrefix.isNotEmpty;
+    final buffer = StringBuffer();
+    if (hasPrefix) {
+      buffer.write('$cleanPrefix, ');
+    }
+    if (streetOrArea.isNotEmpty &&
+        !buffer.toString().toLowerCase().contains(streetOrArea.toLowerCase())) {
+      buffer.write('$streetOrArea, ');
+    }
+    if (closestHub.isNotEmpty &&
+        !buffer.toString().toLowerCase().contains(closestHub.toLowerCase())) {
+      buffer.write('$closestHub, ');
+    }
+    if (town.isNotEmpty &&
+        !buffer.toString().toLowerCase().contains(town.toLowerCase())) {
+      buffer.write('$town, ');
+    }
+    if (city.isNotEmpty &&
+        !buffer.toString().toLowerCase().contains(city.toLowerCase())) {
+      buffer.write(city);
+    }
+    var res = buffer.toString().trim();
+    if (res.endsWith(',')) {
+      res = res.substring(0, res.length - 1).trim();
+    }
+    return '$res (Lat: ${latitude.toStringAsFixed(4)}, Lon: ${longitude.toStringAsFixed(4)})';
+  }
 }
 
 class NigerianTown {
@@ -1087,14 +1143,153 @@ class LocationService {
           label = 'Live: $town';
         }
 
+        final road = address['road']?.toString() ??
+            address['pedestrian']?.toString() ??
+            address['street']?.toString() ??
+            address['footway']?.toString() ??
+            suburb ??
+            '';
+
         return {
           'town': town,
           'city': city,
           'label': label,
+          'road': road,
+          'suburb': suburb ?? '',
+          'county': county ?? '',
+          'state': state ?? '',
+          'displayName': displayName,
         };
       }
     } catch (_) {}
     return null;
+  }
+
+  /// High-accuracy GPS location scanner specifically for merchant stall registration,
+  /// capturing exact coordinates, street details, and matching local market hub
+  /// so consumers can accurately navigate straight to the merchant stall.
+  static Future<DetailedLocationResult?> scanDetailedStallLocation({
+    GeoPoint? fallback,
+  }) async {
+    double? lat;
+    double? lon;
+    bool isGps = false;
+
+    // Fast-path hardware GPS
+    if (!kIsWeb) {
+      final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      if (!isTest) {
+        try {
+          final enabled = await Geolocator.isLocationServiceEnabled();
+          if (enabled) {
+            var permission = await Geolocator.checkPermission();
+            if (permission == LocationPermission.denied) {
+              permission = await Geolocator.requestPermission();
+            }
+            if (permission == LocationPermission.whileInUse ||
+                permission == LocationPermission.always) {
+              try {
+                final pos = await Geolocator.getCurrentPosition(
+                  locationSettings: const LocationSettings(
+                    accuracy: LocationAccuracy.high,
+                    timeLimit: Duration(seconds: 4),
+                  ),
+                );
+                lat = pos.latitude;
+                lon = pos.longitude;
+                isGps = true;
+              } catch (_) {
+                final last = await Geolocator.getLastKnownPosition();
+                if (last != null) {
+                  lat = last.latitude;
+                  lon = last.longitude;
+                  isGps = true;
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Fallback 1: fallback GeoPoint if set
+    if ((lat == null || lon == null) && fallback != null && fallback.isSet) {
+      lat = fallback.latitude;
+      lon = fallback.longitude;
+      isGps = fallback.isDeviceLocation;
+    }
+
+    // Fallback 2: IP-based location
+    if (lat == null || lon == null) {
+      try {
+        final ip = await _getIpBasedLocation();
+        if (ip != null && ip.isSet) {
+          lat = ip.latitude;
+          lon = ip.longitude;
+          isGps = false;
+        }
+      } catch (_) {}
+    }
+
+    // Fallback 3: Bodija default if all else fails or test suite
+    if (lat == null || lon == null) {
+      lat = 7.4343;
+      lon = 3.9056;
+      isGps = false;
+    }
+
+    // Reverse geocode to get street, town, city, displayName
+    Map<String, String>? geoDetails;
+    try {
+      geoDetails = await reverseGeocode(lat, lon);
+    } catch (_) {}
+
+    final town = geoDetails?['town'] ?? findClosestTown(lat, lon).town;
+    final city = geoDetails?['city'] ?? findClosestTown(lat, lon).city;
+    final streetOrArea = (geoDetails?['road'] != null && geoDetails!['road']!.isNotEmpty)
+        ? geoDetails['road']!
+        : ((geoDetails?['suburb'] != null && geoDetails!['suburb']!.isNotEmpty)
+            ? geoDetails['suburb']!
+            : town);
+    final state = geoDetails?['state'] ?? city;
+    final displayName = geoDetails?['displayName'] ?? '$streetOrArea, $town, $city';
+
+    // Map to closest recognized market hub
+    final closestHubPoint = findClosestHub(lat, lon);
+    String closestHubName = 'Bodija Market';
+    if (closestHubPoint.label.contains('Bodija')) {
+      closestHubName = 'Bodija Market';
+    } else if (closestHubPoint.label.contains('Dugbe')) {
+      closestHubName = 'Dugbe Market';
+    } else if (closestHubPoint.label.contains('Oje')) {
+      closestHubName = 'Oje Market';
+    } else if (closestHubPoint.label.contains('Oja Oba')) {
+      closestHubName = 'Oja Oba Market';
+    } else if (closestHubPoint.label.contains('Gbagi')) {
+      closestHubName = 'Gbagi Market';
+    } else if (closestHubPoint.label.contains('Wuse')) {
+      closestHubName = 'Wuse 2 Market Zone';
+    } else if (closestHubPoint.label.contains('Ikeja')) {
+      closestHubName = 'Ikeja Commercial Hub';
+    } else if (closestHubPoint.label.contains('Yaba') || closestHubPoint.label.contains('Mainland')) {
+      closestHubName = 'Lagos Mainland (Yaba/Surulere)';
+    } else if (closestHubPoint.label.contains('Abeokuta')) {
+      closestHubName = 'Abeokuta Commercial Hub (Ibara)';
+    } else {
+      closestHubName = closestHubPoint.label;
+    }
+
+    return DetailedLocationResult(
+      latitude: lat,
+      longitude: lon,
+      fullAddress: displayName,
+      streetOrArea: streetOrArea,
+      town: town,
+      city: city,
+      state: state,
+      closestHub: closestHubName,
+      isGpsPrecision: isGps,
+    );
   }
 
   /// Helper to extract clean town and city from geocoded address components

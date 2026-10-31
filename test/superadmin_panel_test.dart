@@ -510,5 +510,82 @@ void main() {
       expect(find.byKey(const ValueKey('btn_superadmin_home_chip')), findsOneWidget);
       expect(find.textContaining('SuperAdmin'), findsWidgets);
     });
+
+    testWidgets('15. Approved seller accesses Seller Portal in CommunityScreen without block', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Approved seller whose role might still be Customer
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'appr_user_1',
+              email: 'moria@foodstuffs.ng',
+              displayName: 'Iya Moria',
+              role: 'Customer',
+              businessName: 'Iya Moria Foodstuffs',
+              marketHub: 'Bodija Market',
+              sellerApplicationStatus: SellerApplicationStatus.approved,
+              stallLocation: 'Stall 14, Grain Section, Bodija',
+              latitude: 7.4343,
+              longitude: 3.9056,
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: CommunityScreen(initialTab: 1), // Direct access to Seller Portal
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify that Seller Portal is displayed and user is NOT blocked by onboarding CTA
+      expect(find.text('Iya Moria Foodstuffs'), findsOneWidget);
+      expect(find.text('Add New Commodity Price'), findsOneWidget);
+      expect(find.text('SmartMove Seller Hub'), findsNothing);
+      expect(find.text('Application Pending Review'), findsNothing);
+    });
+
+    testWidgets('16. ProfileScreen shows Open Seller Portal button and Verified Seller badge for approved seller', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 1000));
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(authProvider.notifier).setSession(
+            const UserSession(
+              id: 'appr_user_2',
+              email: 'tunde@bakare.ng',
+              displayName: 'Tunde Bakare',
+              role: 'Customer',
+              businessName: 'Bakare Agro Emporium',
+              marketHub: 'Bodija Market',
+              sellerApplicationStatus: SellerApplicationStatus.approved,
+              stallLocation: 'Stall 22, Spices Line, Bodija Market',
+            ),
+          );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: ProfileScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verified Seller badge is shown
+      expect(find.text('Verified Seller'), findsOneWidget);
+      // Registered Seller Profile card is shown
+      expect(find.text('Registered Seller Profile'), findsOneWidget);
+      expect(find.text('Bakare Agro Emporium'), findsOneWidget);
+      // Open Seller Portal button is present
+      expect(find.byKey(const ValueKey('btn_open_seller_portal_profile')), findsOneWidget);
+    });
   });
 }

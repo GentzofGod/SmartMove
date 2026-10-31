@@ -53,6 +53,8 @@ class UserSession {
   final String? sellerChannel;
   final String? phone;
   final String? stallLocation;
+  final double? latitude;
+  final double? longitude;
   final SellerApplicationStatus sellerApplicationStatus;
 
   const UserSession({
@@ -66,17 +68,24 @@ class UserSession {
     this.sellerChannel,
     this.phone,
     this.stallLocation,
+    this.latitude,
+    this.longitude,
     this.sellerApplicationStatus = SellerApplicationStatus.none,
   });
 
-  bool get isSeller => role == 'Trader' || role == 'Seller';
+  bool get isSeller =>
+      role == 'Trader' ||
+      role == 'Seller' ||
+      role == 'trader' ||
+      role == 'seller' ||
+      sellerApplicationStatus == SellerApplicationStatus.approved;
   bool get isSuperAdmin =>
       role == 'SuperAdmin' || role == 'super_admin' || role == 'superadmin';
   bool get isAdmin =>
       role == 'Admin' || role == 'Administrator' || isSuperAdmin;
   bool get isCustomer => !isSeller && !isAdmin;
   bool get canModerate => isAdmin || isSuperAdmin;
-  bool get canSubmitVerifiedListing => isSeller || isAdmin;
+  bool get canSubmitVerifiedListing => isSeller || isApprovedSeller || isAdmin;
   bool get isPendingSeller =>
       sellerApplicationStatus == SellerApplicationStatus.pending;
   bool get isApprovedSeller =>
@@ -108,6 +117,8 @@ class UserSession {
         'sellerChannel': sellerChannel,
         'phone': phone,
         'stallLocation': stallLocation,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
         'sellerApplicationStatus': sellerApplicationStatus.name,
       };
 
@@ -122,9 +133,15 @@ class UserSession {
         sellerChannel: json['sellerChannel'] as String?,
         phone: json['phone'] as String?,
         stallLocation: json['stallLocation'] as String?,
+        latitude: (json['latitude'] ?? json['lat']) != null
+            ? double.tryParse((json['latitude'] ?? json['lat']).toString())
+            : null,
+        longitude: (json['longitude'] ?? json['lon'] ?? json['lng']) != null
+            ? double.tryParse((json['longitude'] ?? json['lon'] ?? json['lng']).toString())
+            : null,
         sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
           (s) => s.name == json['sellerApplicationStatus'],
-          orElse: () => json['role'] == 'Trader'
+          orElse: () => (json['role'] == 'Trader' || json['role'] == 'Seller')
               ? SellerApplicationStatus.approved
               : SellerApplicationStatus.none,
         ),
@@ -141,6 +158,8 @@ class UserSession {
     String? sellerChannel,
     String? phone,
     String? stallLocation,
+    double? latitude,
+    double? longitude,
     SellerApplicationStatus? sellerApplicationStatus,
   }) {
     return UserSession(
@@ -154,6 +173,8 @@ class UserSession {
       sellerChannel: sellerChannel ?? this.sellerChannel,
       phone: phone ?? this.phone,
       stallLocation: stallLocation ?? this.stallLocation,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       sellerApplicationStatus:
           sellerApplicationStatus ?? this.sellerApplicationStatus,
     );
@@ -222,6 +243,8 @@ class AuthService {
     String? sellerChannel;
     String? phone;
     String? stallLocation;
+    double? latitude;
+    double? longitude;
     String? appStatus;
 
     // 1. Fetch live row from public.profiles table
@@ -240,6 +263,8 @@ class AuthService {
         sellerChannel = profile['seller_channel']?.toString();
         phone = profile['phone']?.toString();
         stallLocation = profile['stall_location']?.toString();
+        if (profile['latitude'] != null) latitude = double.tryParse(profile['latitude'].toString());
+        if (profile['longitude'] != null) longitude = double.tryParse(profile['longitude'].toString());
         appStatus = profile['seller_application_status']?.toString();
       }
     } catch (_) {}
@@ -270,6 +295,14 @@ class AuthService {
       sellerChannel: sellerChannel ?? (userMeta['seller_channel'] as String?),
       phone: phone ?? (userMeta['phone'] as String?),
       stallLocation: stallLocation ?? (userMeta['stall_location'] as String?),
+      latitude: latitude ??
+          ((userMeta['latitude'] ?? userMeta['lat']) != null
+              ? double.tryParse((userMeta['latitude'] ?? userMeta['lat']).toString())
+              : null),
+      longitude: longitude ??
+          ((userMeta['longitude'] ?? userMeta['lon'] ?? userMeta['lng']) != null
+              ? double.tryParse((userMeta['longitude'] ?? userMeta['lon'] ?? userMeta['lng']).toString())
+              : null),
       sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
         (s) => s.name == (appStatus ?? userMeta['seller_application_status']),
         orElse: () => canonicalRole == 'Trader'
@@ -335,6 +368,12 @@ class AuthService {
             sellerChannel: meta['seller_channel'] as String?,
             phone: meta['phone'] as String?,
             stallLocation: meta['stall_location'] as String?,
+            latitude: (meta['latitude'] ?? meta['lat']) != null
+                ? double.tryParse((meta['latitude'] ?? meta['lat']).toString())
+                : null,
+            longitude: (meta['longitude'] ?? meta['lon'] ?? meta['lng']) != null
+                ? double.tryParse((meta['longitude'] ?? meta['lon'] ?? meta['lng']).toString())
+                : null,
             sellerApplicationStatus: SellerApplicationStatus.values.firstWhere(
               (s) => s.name == meta['seller_application_status'],
               orElse: () => role == 'Trader'
@@ -370,6 +409,9 @@ class AuthService {
       businessName: isTrader ? '${email.split('@').first} Enterprise' : null,
       marketHub: isTrader ? 'Bodija Market' : null,
       sellerChannel: isTrader ? 'Local Market' : null,
+      stallLocation: isTrader ? 'Stall 14, Grain Section, Bodija Market, Ibadan' : null,
+      latitude: isTrader ? 7.4343 : null,
+      longitude: isTrader ? 3.9056 : null,
       sellerApplicationStatus: isTrader
           ? SellerApplicationStatus.approved
           : SellerApplicationStatus.none,

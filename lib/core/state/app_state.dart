@@ -940,6 +940,8 @@ class AuthNotifier extends Notifier<UserSession> {
     required String sellerChannel,
     required String phone,
     String? stallLocation,
+    double? latitude,
+    double? longitude,
   }) {
     state = state.copyWith(
       businessName: businessName,
@@ -947,14 +949,31 @@ class AuthNotifier extends Notifier<UserSession> {
       sellerChannel: sellerChannel,
       phone: phone,
       stallLocation: stallLocation,
+      latitude: latitude,
+      longitude: longitude,
       sellerApplicationStatus: SellerApplicationStatus.pending,
     );
     AuthService.persistSession(state);
   }
 
-  void approveSellerStatus() {
+  void approveSellerStatus({
+    String? businessName,
+    String? marketHub,
+    String? sellerChannel,
+    String? phone,
+    String? stallLocation,
+    double? latitude,
+    double? longitude,
+  }) {
     state = state.copyWith(
       role: 'Trader',
+      businessName: businessName ?? state.businessName,
+      marketHub: marketHub ?? state.marketHub,
+      sellerChannel: sellerChannel ?? state.sellerChannel,
+      phone: phone ?? state.phone,
+      stallLocation: stallLocation ?? state.stallLocation,
+      latitude: latitude ?? state.latitude,
+      longitude: longitude ?? state.longitude,
       sellerApplicationStatus: SellerApplicationStatus.approved,
     );
     AuthService.persistSession(state);
@@ -1019,6 +1038,8 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
     required String sellerChannel,
     required String phone,
     String? stallLocation,
+    double? latitude,
+    double? longitude,
   }) {
     final newApp = SellerApplication(
       id: 'app-${DateTime.now().millisecondsSinceEpoch}',
@@ -1029,6 +1050,8 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       marketHub: marketHub,
       sellerChannel: sellerChannel,
       stallLocation: stallLocation,
+      latitude: latitude,
+      longitude: longitude,
       phone: phone,
       status: SellerApplicationStatus.pending,
       submittedAt: DateTime.now(),
@@ -1046,6 +1069,8 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
           sellerChannel: sellerChannel,
           phone: phone,
           stallLocation: stallLocation,
+          latitude: latitude,
+          longitude: longitude,
         );
   }
 
@@ -1071,7 +1096,16 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
     final currentUser = ref.read(authProvider);
     final appMatches = state.where((a) => a.id == applicationId);
     if (appMatches.isNotEmpty && appMatches.first.userId == currentUser.id) {
-      ref.read(authProvider.notifier).approveSellerStatus();
+      final app = appMatches.first;
+      ref.read(authProvider.notifier).approveSellerStatus(
+        businessName: app.businessName,
+        marketHub: app.marketHub,
+        sellerChannel: app.sellerChannel,
+        phone: app.phone,
+        stallLocation: app.stallLocation,
+        latitude: app.latitude,
+        longitude: app.longitude,
+      );
     }
   }
 

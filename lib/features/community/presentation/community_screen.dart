@@ -7,9 +7,11 @@ import '../../../core/models/price_observation.dart';
 import '../../../core/models/seller_application.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
+import '../../../core/services/location_service.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
-  const CommunityScreen({super.key});
+  final int initialTab;
+  const CommunityScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
@@ -47,7 +49,19 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 1),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant CommunityScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      _tabController.animateTo(widget.initialTab.clamp(0, 1));
+    }
   }
 
   @override
@@ -619,7 +633,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     List<PriceObservation> observations,
     UserSession userSession,
   ) {
-    if (!userSession.isSeller) {
+    if (!userSession.isApprovedSeller && !userSession.isAdmin) {
       if (userSession.isPendingSeller) {
         return ListView(
           padding: const EdgeInsets.all(16),
@@ -780,20 +794,26 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.verified_user_rounded, color: Colors.white, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        userSession.businessName ?? 'Verified Trader Store',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified_user_rounded, color: Colors.white, size: 22),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            userSession.businessName ?? 'Verified Trader Store',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -812,6 +832,23 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 'Publish and update commodity prices in real time. Direct quotes are badged as "Trader Confirmed" and featured in consumer comparisons.',
                 style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.3),
               ),
+              if (userSession.stallLocation != null && userSession.stallLocation!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, color: Colors.white70, size: 14),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        userSession.stallLocation!,
+                        style: const TextStyle(fontSize: 11.5, color: Colors.white70),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 14),
               ElevatedButton.icon(
                 onPressed: () => _showAddObservationDialog(context, isSellerDirect: true),
@@ -1258,6 +1295,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     final bizController = TextEditingController(text: session.businessName ?? '');
     final phoneController = TextEditingController(text: session.phone ?? '');
     final stallController = TextEditingController(text: session.stallLocation ?? '');
+    double? scannedLat = session.latitude;
+    double? scannedLon = session.longitude;
+    bool isScanningLocation = false;
     String selectedHub = session.marketHub ?? 'Bodija Market';
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
@@ -1356,12 +1396,153 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       }).toList(),
                     ),
                     const SizedBox(height: 14),
-                    const Text('Stall / Shop Location Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Stall / Shop Location Address',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                        if (scannedLat != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.badgeSuccessBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.check_circle_rounded, size: 12, color: AppColors.primary),
+                                SizedBox(width: 3),
+                                Text(
+                                  'GPS Verified',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 6),
+                    // High Accuracy GPS Stall Scanner
+                    InkWell(
+                      key: const ValueKey('btn_scan_stall_gps_community'),
+                      onTap: isScanningLocation
+                          ? null
+                          : () async {
+                              setModalState(() => isScanningLocation = true);
+                              try {
+                                final activeLoc = ref.read(locationProvider);
+                                final result = await LocationService.scanDetailedStallLocation(
+                                  fallback: activeLoc.isSet ? activeLoc : null,
+                                );
+                                if (result != null) {
+                                  final prefix = stallController.text.trim();
+                                  final detailed = result.formatStallAddress(
+                                    prefix: prefix.isNotEmpty && !prefix.contains('Lat:') ? prefix : null,
+                                  );
+                                  stallController.text = detailed;
+                                  scannedLat = result.latitude;
+                                  scannedLon = result.longitude;
+                                  const hubs = [
+                                    'Bodija Market',
+                                    'Dugbe Market',
+                                    'Oje Market',
+                                    'Oja Oba Market',
+                                    'Gbagi Market',
+                                    'Online Store',
+                                  ];
+                                  if (hubs.contains(result.closestHub)) {
+                                    selectedHub = result.closestHub;
+                                  }
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Accurate GPS locked: ${result.town}, ${result.city} (${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)})'),
+                                        backgroundColor: AppColors.primary,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Could not scan GPS location: $e'),
+                                      backgroundColor: AppColors.badgeErrorText,
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                setModalState(() => isScanningLocation = false);
+                              }
+                            },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: scannedLat != null ? AppColors.badgeSuccessBg : AppColors.primaryTint,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: scannedLat != null
+                                ? AppColors.primary
+                                : AppColors.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (isScanningLocation)
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                              )
+                            else
+                              Icon(
+                                scannedLat != null ? Icons.gps_fixed_rounded : Icons.my_location_rounded,
+                                size: 20,
+                                color: AppColors.primary,
+                              ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isScanningLocation
+                                        ? 'Scanning high-accuracy GPS coordinates...'
+                                        : (scannedLat != null
+                                            ? 'GPS Locked: ${scannedLat!.toStringAsFixed(4)}° N, ${scannedLon!.toStringAsFixed(4)}° E'
+                                            : 'Scan Precise Stall GPS Location'),
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    scannedLat != null
+                                        ? 'High-accuracy coordinates locked for buyer map navigation'
+                                        : 'Auto-detect your stall address & GPS so buyers can navigate to you',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: scannedLat != null ? AppColors.primaryDark : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: stallController,
+                      maxLines: 2,
                       decoration: InputDecoration(
                         hintText: 'e.g. Stall B44, Main Grain Section, Bodija',
+                        helperText: 'Buyers will navigate to this precise physical address or stall GPS.',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -1404,6 +1585,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                                 stallLocation: stallController.text.trim().isNotEmpty
                                     ? stallController.text.trim()
                                     : null,
+                                latitude: scannedLat,
+                                longitude: scannedLon,
                                 phone: phoneController.text.trim(),
                               );
 

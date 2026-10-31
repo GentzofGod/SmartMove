@@ -2,7 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smartmove/core/models/seller_application.dart';
+import 'package:smartmove/core/models/commodity_item.dart';
 import 'package:smartmove/core/services/auth_service.dart';
+import 'package:smartmove/core/services/decision_engine.dart';
+import 'package:smartmove/core/services/location_service.dart';
 import 'package:smartmove/core/state/app_state.dart';
 
 void main() {
@@ -202,6 +205,144 @@ void main() {
       expect(currentUser.isRejectedSeller, isTrue);
       expect(currentUser.isSeller, isFalse);
       expect(currentUser.canApplyForSeller, isTrue); // Allowed to reapply after rejection
+    });
+
+    test('7. Approved seller with role Customer is recognized as seller with portal access', () {
+      const approvedSession = UserSession(
+        id: 'usr-appr-99',
+        email: 'approved@market.ng',
+        displayName: 'Iya Moria',
+        role: 'Customer', // Role still Customer in session
+        businessName: 'Iya Moria Foodstuffs',
+        marketHub: 'Bodija Market',
+        sellerApplicationStatus: SellerApplicationStatus.approved,
+        stallLocation: 'Stall 18, Grain Section, Bodija Market (Lat: 7.4343, Lon: 3.9056)',
+        latitude: 7.4343,
+        longitude: 3.9056,
+      );
+
+      // Verify session getters recognize approved status
+      expect(approvedSession.isApprovedSeller, isTrue);
+      expect(approvedSession.isSeller, isTrue);
+      expect(approvedSession.canSubmitVerifiedListing, isTrue);
+      expect(approvedSession.isCustomer, isFalse);
+    });
+
+    test('8. Detailed location scanning produces formatted stall address with GPS coordinates', () async {
+      final scanned = await LocationService.scanDetailedStallLocation(
+        fallback: const GeoPoint(
+          latitude: 7.4343,
+          longitude: 3.9056,
+          label: 'Bodija Market Hub',
+          city: 'Ibadan',
+          town: 'Bodija',
+          isDeviceLocation: true,
+        ),
+      );
+
+      expect(scanned, isNotNull);
+      expect(scanned!.latitude, closeTo(7.4343, 0.001));
+      expect(scanned.longitude, closeTo(3.9056, 0.001));
+      expect(scanned.closestHub, equals('Bodija Market'));
+
+      final formatted = scanned.formatStallAddress(prefix: 'Stall B44');
+      expect(formatted, contains('Stall B44'));
+      expect(formatted, contains('Lat: 7.4343'));
+      expect(formatted, contains('Lon: 3.9056'));
+    });
+
+    test('9. Submitting application with scanned GPS coordinates preserves location data', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      const applicant = UserSession(
+        id: 'usr-gps-01',
+        email: 'gps@market.ng',
+        displayName: 'GPS Trader',
+        role: 'Customer',
+      );
+      container.read(authProvider.notifier).setSession(applicant);
+
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+            user: applicant,
+            businessName: 'GPS Agro Hub',
+            marketHub: 'Bodija Market',
+            sellerChannel: 'Local Market',
+            stallLocation: 'Stall 12, Main Grain Line, Bodija Market (Lat: 7.4343, Lon: 3.9056)',
+            latitude: 7.4343,
+            longitude: 3.9056,
+            phone: '+234 803 111 2222',
+          );
+
+      final apps = container.read(sellerApplicationsProvider);
+      final submitted = apps.firstWhere((a) => a.userId == 'usr-gps-01');
+      expect(submitted.latitude, equals(7.4343));
+      expect(submitted.longitude, equals(3.9056));
+      expect(submitted.stallLocation, contains('Lat: 7.4343'));
+
+      // Approve application and verify user session inherits GPS coordinates
+      container.read(sellerApplicationsProvider.notifier).approveApplication(submitted.id);
+      final updatedUser = container.read(authProvider);
+      expect(updatedUser.isApprovedSeller, isTrue);
+      expect(updatedUser.latitude, equals(7.4343));
+      expect(updatedUser.longitude, equals(3.9056));
+      expect(updatedUser.stallLocation, contains('Stall 12'));
+    });
+
+    test('10. DecisionEngine uses seller physical GPS coordinates to calculate buyer navigation distance', () {
+      final trader = SellerApplication(
+        id: 'trader-bodija-1',
+        userId: 'usr-trader-01',
+        applicantName: 'Chief Ade',
+        applicantEmail: 'ade@bodija.ng',
+        businessName: 'Ade Grain Terminals',
+        marketHub: 'Bodija Market',
+        sellerChannel: 'Local Market',
+        stallLocation: 'Stall 4, Grain Line, Bodija Market (Lat: 7.4343, Lon: 3.9056)',
+        latitude: 7.4343,
+        longitude: 3.9056,
+        phone: '+234 802 333 4444',
+        status: SellerApplicationStatus.approved,
+        submittedAt: DateTime.now(),
+      );
+
+      // Buyer at Dugbe (Lat: 7.3876, Lon: 3.8767)
+      const buyerLocation = GeoPoint(
+        latitude: 7.3876,
+        longitude: 3.8767,
+        label: 'Dugbe Commercial Hub',
+        city: 'Ibadan',
+        town: 'Dugbe',
+        isDeviceLocation: true,
+      );
+
+      final shoppingItems = [
+        ShoppingItem(
+          id: 'item-rice',
+          productName: 'Parboiled Rice 50kg',
+          quantity: 1,
+          unit: '50kg bag',
+          estimatedUnitPrice: 75000,
+        ),
+      ];
+
+      final plans = DecisionEngine.calculateCandidatePlans(
+        userBudget: 100000,
+        baseTransportFare: 1000,
+        maxTimeHours: 3.0,
+        items: shoppingItems,
+        userLocation: buyerLocation,
+        registeredTraders: [trader],
+      );
+
+      expect(plans.isNotEmpty, isTrue);
+      final planA = plans.firstWhere((p) => p.id == 'plan-a');
+      expect(planA.stops.isNotEmpty, isTrue);
+
+      final sellerStop = planA.stops.firstWhere((s) => s.isPlatformRegisteredTrader);
+      expect(sellerStop.location, contains('Stall 4, Grain Line, Bodija Market'));
+      // Verified distance from Dugbe (7.3876, 3.8767) to Bodija (7.4343, 3.9056) is ~6.1 km
+      expect(sellerStop.distanceKm, closeTo(6.1, 1.5));
     });
   });
 }

@@ -52,7 +52,14 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/community',
-          builder: (context, state) => const CommunityScreen(),
+          builder: (context, state) {
+            final tabParam = state.uri.queryParameters['tab'];
+            final initialTab =
+                (tabParam == 'seller' || tabParam == '1' || tabParam == 'portal')
+                    ? 1
+                    : 0;
+            return CommunityScreen(initialTab: initialTab);
+          },
         ),
       ],
     ),

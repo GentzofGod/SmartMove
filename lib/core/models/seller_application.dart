@@ -27,6 +27,8 @@ class SellerApplication {
   final String marketHub;
   final String sellerChannel;
   final String? stallLocation;
+  final double? latitude;
+  final double? longitude;
   final String phone;
   final SellerApplicationStatus status;
   final DateTime submittedAt;
@@ -42,6 +44,8 @@ class SellerApplication {
     required this.marketHub,
     required this.sellerChannel,
     this.stallLocation,
+    this.latitude,
+    this.longitude,
     required this.phone,
     this.status = SellerApplicationStatus.pending,
     required this.submittedAt,
@@ -58,6 +62,8 @@ class SellerApplication {
         'marketHub': marketHub,
         'sellerChannel': sellerChannel,
         'stallLocation': stallLocation,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
         'phone': phone,
         'status': status.name,
         'submittedAt': submittedAt.toIso8601String(),
@@ -73,6 +79,8 @@ class SellerApplication {
         'market_hub': marketHub,
         'seller_channel': sellerChannel,
         'stall_location': stallLocation,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
         'phone': phone,
         'status': status.name,
         'submitted_at': submittedAt.toIso8601String(),
@@ -97,6 +105,12 @@ class SellerApplication {
             (json['sellerChannel'] ?? json['seller_channel']) as String? ?? 'Local Market',
         stallLocation:
             (json['stallLocation'] ?? json['stall_location']) as String?,
+        latitude: (json['latitude'] ?? json['lat']) != null
+            ? double.tryParse((json['latitude'] ?? json['lat']).toString())
+            : null,
+        longitude: (json['longitude'] ?? json['lon'] ?? json['lng']) != null
+            ? double.tryParse((json['longitude'] ?? json['lon'] ?? json['lng']).toString())
+            : null,
         phone: json['phone'] as String? ?? '',
         status: SellerApplicationStatus.values.firstWhere(
           (s) => s.name == json['status'],
@@ -124,6 +138,8 @@ class SellerApplication {
     String? marketHub,
     String? sellerChannel,
     String? stallLocation,
+    double? latitude,
+    double? longitude,
     String? phone,
     SellerApplicationStatus? status,
     DateTime? submittedAt,
@@ -139,6 +155,8 @@ class SellerApplication {
       marketHub: marketHub ?? this.marketHub,
       sellerChannel: sellerChannel ?? this.sellerChannel,
       stallLocation: stallLocation ?? this.stallLocation,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       phone: phone ?? this.phone,
       status: status ?? this.status,
       submittedAt: submittedAt ?? this.submittedAt,

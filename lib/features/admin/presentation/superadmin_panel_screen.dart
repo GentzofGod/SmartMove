@@ -622,6 +622,30 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                       ],
                     ),
                   ],
+                  if (app.latitude != null && app.longitude != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.gps_fixed_rounded,
+                            size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'GPS Coordinates: ',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700]),
+                        ),
+                        Text(
+                          '${app.latitude!.toStringAsFixed(4)}° N, ${app.longitude!.toStringAsFixed(4)}° E',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Row(
                     children: [

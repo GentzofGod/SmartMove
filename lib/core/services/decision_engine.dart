@@ -610,6 +610,17 @@ class DecisionEngine {
           );
         } else if (matchedTrader != null) {
           // Platform registered hardware trader
+          final traderLat = matchedTrader.latitude ?? defaultMarketBLat;
+          final traderLon = matchedTrader.longitude ?? defaultMarketBLon;
+          final traderDistance = (userLocation != null && userLocation.isSet && matchedTrader.latitude != null && matchedTrader.longitude != null)
+              ? LocationService.calculateDistanceKm(
+                  lat1: userLocation.latitude,
+                  lon1: userLocation.longitude,
+                  lat2: matchedTrader.latitude!,
+                  lon2: matchedTrader.longitude!,
+                )
+              : distanceHubA;
+
           sources.add(
             ItemAcquisitionSource(
               id: '$planId-src-$i',
@@ -622,9 +633,9 @@ class DecisionEngine {
               outletName: matchedTrader.businessName,
               channel: AcquisitionChannel.registeredTrader,
               marketHubOrLocation: matchedTrader.stallLocation ?? matchedTrader.marketHub,
-              latitude: defaultMarketBLat,
-              longitude: defaultMarketBLon,
-              dynamicDistanceKm: distanceHubA,
+              latitude: traderLat,
+              longitude: traderLon,
+              dynamicDistanceKm: traderDistance,
               isPlatformRegisteredTrader: true,
               traderId: matchedTrader.userId,
               contactPhone: matchedTrader.phone.isNotEmpty ? matchedTrader.phone : null,
@@ -725,6 +736,17 @@ class DecisionEngine {
           );
         } else if (matchedTrader != null) {
           // Platform registered electronics trader
+          final traderLat = matchedTrader.latitude ?? defaultMarketBLat;
+          final traderLon = matchedTrader.longitude ?? defaultMarketBLon;
+          final traderDistance = (userLocation != null && userLocation.isSet && matchedTrader.latitude != null && matchedTrader.longitude != null)
+              ? LocationService.calculateDistanceKm(
+                  lat1: userLocation.latitude,
+                  lon1: userLocation.longitude,
+                  lat2: traderLat,
+                  lon2: traderLon,
+                )
+              : distanceHubA;
+
           sources.add(
             ItemAcquisitionSource(
               id: '$planId-src-$i',
@@ -737,9 +759,9 @@ class DecisionEngine {
               outletName: matchedTrader.businessName,
               channel: AcquisitionChannel.registeredTrader,
               marketHubOrLocation: matchedTrader.stallLocation ?? matchedTrader.marketHub,
-              latitude: defaultMarketBLat,
-              longitude: defaultMarketBLon,
-              dynamicDistanceKm: distanceHubA,
+              latitude: traderLat,
+              longitude: traderLon,
+              dynamicDistanceKm: traderDistance,
               isPlatformRegisteredTrader: true,
               traderId: matchedTrader.userId,
               contactPhone: matchedTrader.phone.isNotEmpty ? matchedTrader.phone : null,
@@ -814,7 +836,16 @@ class DecisionEngine {
         final outletName = matchedTrader.businessName;
         final stallLocation = matchedTrader.stallLocation ?? (matchedTrader.marketHub.isNotEmpty ? matchedTrader.marketHub : '$userCity Central Market');
         final phone = matchedTrader.phone.isNotEmpty ? matchedTrader.phone : null;
-        final distance = isMultiMarket && i % 2 == 0 ? distanceHubB : distanceHubA;
+        final traderLat = matchedTrader.latitude ?? defaultMarketBLat;
+        final traderLon = matchedTrader.longitude ?? defaultMarketBLon;
+        final traderDistance = (userLocation != null && userLocation.isSet && matchedTrader.latitude != null && matchedTrader.longitude != null)
+            ? LocationService.calculateDistanceKm(
+                lat1: userLocation.latitude,
+                lon1: userLocation.longitude,
+                lat2: traderLat,
+                lon2: traderLon,
+              )
+            : (isMultiMarket && i % 2 == 0 ? distanceHubB : distanceHubA);
 
         sources.add(
           ItemAcquisitionSource(
@@ -828,9 +859,9 @@ class DecisionEngine {
             outletName: outletName,
             channel: AcquisitionChannel.registeredTrader,
             marketHubOrLocation: stallLocation,
-            latitude: defaultMarketBLat,
-            longitude: defaultMarketBLon,
-            dynamicDistanceKm: distance,
+            latitude: traderLat,
+            longitude: traderLon,
+            dynamicDistanceKm: traderDistance,
             isPlatformRegisteredTrader: true,
             traderId: matchedTrader.userId,
             contactPhone: phone,
