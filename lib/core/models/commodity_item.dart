@@ -25,6 +25,9 @@ class ShoppingItem {
   final String? preferredSellerType; // 'Local Market', 'Online Retailer', 'SMB Store', 'Any'
   final List<String> acceptableAlternatives;
   bool isChecked;
+  final String? webReferenceUrl;
+  final List<String> referenceLinks;
+  final String? matchedVendorName;
 
   ShoppingItem({
     required this.id,
@@ -40,6 +43,9 @@ class ShoppingItem {
     this.preferredSellerType = 'Any',
     this.acceptableAlternatives = const [],
     this.isChecked = false,
+    this.webReferenceUrl,
+    this.referenceLinks = const [],
+    this.matchedVendorName,
   });
 
   double get totalEstimatedCost => quantity * estimatedUnitPrice;
@@ -58,6 +64,9 @@ class ShoppingItem {
     String? preferredSellerType,
     List<String>? acceptableAlternatives,
     bool? isChecked,
+    String? webReferenceUrl,
+    List<String>? referenceLinks,
+    String? matchedVendorName,
   }) {
     return ShoppingItem(
       id: id ?? this.id,
@@ -73,6 +82,9 @@ class ShoppingItem {
       preferredSellerType: preferredSellerType ?? this.preferredSellerType,
       acceptableAlternatives: acceptableAlternatives ?? this.acceptableAlternatives,
       isChecked: isChecked ?? this.isChecked,
+      webReferenceUrl: webReferenceUrl ?? this.webReferenceUrl,
+      referenceLinks: referenceLinks ?? this.referenceLinks,
+      matchedVendorName: matchedVendorName ?? this.matchedVendorName,
     );
   }
 }

@@ -1197,9 +1197,13 @@ class MetaAiService {
 
   // --- 3. Muse Spark Structured Extraction & Proposal ---
 
-  /// Parse natural language request into a validated AI Plan Proposal
+  /// Parse natural language request into a validated AI Plan Proposal with multi-layer web grounding
   /// Reports errors transparently in a user-friendly manner instead of falling back to coded mock data.
-  Future<AiPlanProposal> parseToProposal(String prompt) async {
+  Future<AiPlanProposal> parseToProposal(
+    String prompt, {
+    String? city,
+    bool enableWebGrounding = true,
+  }) async {
     final sanitizedPrompt = sanitizePrompt(prompt);
     if (sanitizedPrompt.trim().isEmpty) {
       return AiPlanProposal.error(
@@ -1208,6 +1212,8 @@ class MetaAiService {
         rawInput: prompt,
       );
     }
+
+    AiPlanProposal initialProposal;
 
     // If authenticated Meta Model API or Supabase Edge Proxy is configured, attempt remote inference
     if (hasValidAuth) {
@@ -1280,7 +1286,7 @@ class MetaAiService {
         if (body is Map) {
           final content = body['choices']?[0]?['message']?['content'];
           if (content != null) {
-            final parsedJson = content is Map ? content : jsonDecode(content.toString());
+            final parsedJson = _parseFlexibleAiResponse(content);
             final validated = validateProposal(
               parsedJson,
               sanitizedPrompt,
@@ -1288,14 +1294,29 @@ class MetaAiService {
               executionStatus: 'Meta AI Live Cloud: Success',
               fallbackReason: null,
             );
-            if (validated != null) return validated;
+            if (validated != null) {
+              initialProposal = validated;
+            } else {
+              return AiPlanProposal.error(
+                message:
+                    'Meta AI cloud service returned an unparseable response. Please enter your commodities manually in Price Lab.',
+                rawInput: sanitizedPrompt,
+              );
+            }
+          } else {
+            return AiPlanProposal.error(
+              message:
+                  'Meta AI cloud service returned an empty response. Please enter your commodities manually in Price Lab.',
+              rawInput: sanitizedPrompt,
+            );
           }
+        } else {
+          return AiPlanProposal.error(
+            message:
+                'Meta AI cloud service returned an error (HTTP ${statusCode ?? 'unavailable'}). Please enter your commodities manually in Price Lab.',
+            rawInput: sanitizedPrompt,
+          );
         }
-        return AiPlanProposal.error(
-          message:
-              'Meta AI cloud service returned an error (HTTP ${statusCode ?? 'unavailable'}). Please enter your commodities manually in Price Lab.',
-          rawInput: sanitizedPrompt,
-        );
       } catch (err) {
         return AiPlanProposal.error(
           message:
@@ -1303,10 +1324,265 @@ class MetaAiService {
           rawInput: sanitizedPrompt,
         );
       }
+    } else {
+      // Local Muse Spark NLP reasoning engine
+      initialProposal = _extractLocalProposal(sanitizedPrompt);
     }
 
-    // Local Muse Spark NLP reasoning engine
-    return _extractLocalProposal(sanitizedPrompt);
+    if (initialProposal.hasError || initialProposal.shoppingItems.isEmpty || !enableWebGrounding) {
+      return initialProposal;
+    }
+
+    // Layer 2 & 3: Multi-store & e-commerce search + AI structuring & harmonization
+    return await harmonizeAndStructureWithWebGrounding(
+      rawPrompt: sanitizedPrompt,
+      baseProposal: initialProposal,
+      city: city,
+    );
+  }
+
+  /// Flexible JSON and unstructured text parser catering to irregular structures or markdown formatting
+  dynamic _parseFlexibleAiResponse(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Map) return raw;
+    if (raw is List) return {'shopping_items': raw};
+    if (raw is! String) return null;
+
+    String text = raw.trim();
+
+    // 1. Strip markdown codeblocks e.g. ```json ... ```
+    final codeBlockRegex = RegExp(r'```(?:json)?\s*([\s\S]*?)\s*```', caseSensitive: false);
+    final match = codeBlockRegex.firstMatch(text);
+    if (match != null && match.group(1) != null) {
+      text = match.group(1)!.trim();
+    }
+
+    // 2. Extract first valid JSON object { ... } or array [ ... ]
+    final firstBrace = text.indexOf('{');
+    final firstBracket = text.indexOf('[');
+
+    if (firstBrace != -1 && (firstBracket == -1 || firstBrace < firstBracket)) {
+      final lastBrace = text.lastIndexOf('}');
+      if (lastBrace > firstBrace) {
+        final jsonSnippet = text.substring(firstBrace, lastBrace + 1);
+        try {
+          return jsonDecode(jsonSnippet);
+        } catch (_) {}
+      }
+    } else if (firstBracket != -1) {
+      final lastBracket = text.lastIndexOf(']');
+      if (lastBracket > firstBracket) {
+        final jsonSnippet = text.substring(firstBracket, lastBracket + 1);
+        try {
+          final decoded = jsonDecode(jsonSnippet);
+          if (decoded is List) return {'shopping_items': decoded};
+        } catch (_) {}
+      }
+    }
+
+    try {
+      return jsonDecode(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Multi-Layer Web Grounding & Flexible AI Structuring Pipeline:
+  /// Layer 1: Items derived from user prompt (in baseProposal).
+  /// Layer 2: Live search in e-commerce and local vendor catalogs for each item to derive reference links & live quotes.
+  /// Layer 3: Passes search results back to AI (or local harmonization engine) to structure the proposal flexibly,
+  ///          handling unexpected formats, markdown blocks, and irregular JSON cleanly.
+  Future<AiPlanProposal> harmonizeAndStructureWithWebGrounding({
+    required String rawPrompt,
+    required AiPlanProposal baseProposal,
+    String? city,
+  }) async {
+    final searchResultsByItem = <String, List<LiveWebVendorResult>>{};
+    final allDiscoveredVendors = <LiveWebVendorResult>[];
+
+    // Layer 2: Search stores & e-commerce catalogs for each parsed item
+    for (final item in baseProposal.shoppingItems) {
+      try {
+        final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
+          item.productName,
+          city: city,
+        );
+        if (vendors.isNotEmpty) {
+          searchResultsByItem[item.productName] = vendors;
+          allDiscoveredVendors.addAll(vendors);
+        }
+      } catch (_) {}
+    }
+
+    if (allDiscoveredVendors.isEmpty) {
+      return baseProposal;
+    }
+
+    // Layer 3: AI Structuring & Harmonization
+    if (hasValidAuth) {
+      try {
+        final promptPayload = {
+          'user_request': rawPrompt,
+          'derived_items': baseProposal.shoppingItems.map((i) => {
+            'name': i.productName,
+            'quantity': i.quantity,
+            'unit': i.unit,
+            'initial_estimate': i.estimatedUnitPrice,
+          }).toList(),
+          'search_results': searchResultsByItem.map((name, vendors) => MapEntry(
+            name,
+            vendors.map((v) => {
+              'vendor': v.vendorName,
+              'title': v.title,
+              'detected_price': v.detectedPrice,
+              'url': v.targetUrl,
+              'channel': v.channel,
+              'snippet': v.snippet,
+            }).toList(),
+          )),
+        };
+
+        dynamic body;
+        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+          final response = await http.post(
+            Uri.parse('$effectiveEndpoint/v1/chat/completions'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $effectiveApiKey',
+            },
+            body: jsonEncode({
+              'model': 'muse-spark-1.3',
+              'messages': [
+                {
+                  'role': 'system',
+                  'content':
+                      'You are Meta Muse Spark for SmartMove. You are provided with parsed shopping items and live web search results from e-commerce and local stores.\n'
+                      'Structure and harmonize this data into clean JSON with:\n'
+                      '- "budget": total estimated spending budget based on verified search prices.\n'
+                      '- "shopping_items": array of items each with: "name", "quantity", "unit", "estimated_unit_price" (grounded in the search results), "web_reference_url" (best store link), "reference_links" (array of all vendor URLs), "matched_vendor" (name of store/platform), and "brand_or_grade".\n'
+                      '- "web_search_summary": brief summary of price spread and recommended platform.\n'
+                      'Output ONLY valid JSON.',
+                },
+                {'role': 'user', 'content': jsonEncode(promptPayload)},
+              ],
+              'temperature': 0.1,
+            }),
+          ).timeout(const Duration(seconds: 20));
+
+          if (response.statusCode == 200) {
+            body = jsonDecode(response.body);
+          }
+        }
+
+        if (body is Map) {
+          final content = body['choices']?[0]?['message']?['content'];
+          if (content != null) {
+            final parsedJson = _parseFlexibleAiResponse(content);
+            if (parsedJson != null) {
+              final validated = validateProposal(
+                parsedJson,
+                rawPrompt,
+                isFallback: false,
+                executionStatus: 'Meta AI Live Cloud: Multi-Store Grounded',
+              );
+              if (validated != null && !validated.hasError && validated.shoppingItems.isNotEmpty) {
+                return validated.copyWith(
+                  liveWebVendors: allDiscoveredVendors,
+                  webSearchSummary: validated.webSearchSummary ??
+                      'Grounded across ${allDiscoveredVendors.length} live store listings & reference catalogs.',
+                );
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // Fall back gracefully to deterministic local harmonization
+      }
+    }
+
+    return _harmonizeLocally(
+      rawPrompt: rawPrompt,
+      baseProposal: baseProposal,
+      searchResultsByItem: searchResultsByItem,
+      allDiscoveredVendors: allDiscoveredVendors,
+      city: city,
+    );
+  }
+
+  AiPlanProposal _harmonizeLocally({
+    required String rawPrompt,
+    required AiPlanProposal baseProposal,
+    required Map<String, List<LiveWebVendorResult>> searchResultsByItem,
+    required List<LiveWebVendorResult> allDiscoveredVendors,
+    String? city,
+  }) {
+    final enrichedItems = <ShoppingItem>[];
+
+    for (final item in baseProposal.shoppingItems) {
+      final vendors = searchResultsByItem[item.productName] ??
+          searchResultsByItem.entries
+              .firstWhere(
+                (e) =>
+                    e.key.toLowerCase().contains(item.productName.toLowerCase()) ||
+                    item.productName.toLowerCase().contains(e.key.toLowerCase()),
+                orElse: () => MapEntry('', const <LiveWebVendorResult>[]),
+              )
+              .value;
+
+      final detectedPrices = vendors
+          .where((v) => v.detectedPrice != null && v.detectedPrice! > 0)
+          .map((v) => v.detectedPrice!)
+          .toList();
+
+      final groundedPrice = detectedPrices.isNotEmpty
+          ? detectedPrices.reduce((a, b) => a < b ? a : b)
+          : item.estimatedUnitPrice;
+
+      final bestVendor = vendors.isNotEmpty ? vendors.first : null;
+      final refLinks = vendors
+          .map((v) => v.targetUrl)
+          .where((u) => u.isNotEmpty)
+          .toList();
+
+      enrichedItems.add(
+        item.copyWith(
+          estimatedUnitPrice: groundedPrice,
+          webReferenceUrl: bestVendor?.targetUrl ??
+              WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
+          referenceLinks: refLinks.isNotEmpty
+              ? refLinks
+              : [
+                  WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
+                  WebSearchGroundingService.buildKongaSearchUrl(item.productName),
+                  WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: city),
+                ],
+          matchedVendorName: bestVendor?.vendorName ?? 'Online / Store Reference',
+        ),
+      );
+    }
+
+    final computedTotal = enrichedItems.fold<double>(
+      0.0,
+      (sum, i) => sum + i.totalEstimatedCost,
+    );
+    final effectiveBudget = baseProposal.budget > 0
+        ? baseProposal.budget
+        : (computedTotal * 1.15).roundToDouble();
+
+    final summary =
+        'Grounded across ${allDiscoveredVendors.length} live store listings & reference catalogs.';
+
+    return baseProposal.copyWith(
+      budget: effectiveBudget,
+      shoppingItems: enrichedItems,
+      liveWebVendors: allDiscoveredVendors,
+      webSearchSummary: summary,
+      executionStatus: baseProposal.executionStatus.contains('Live Cloud')
+          ? 'Meta AI Grounded: Multi-Store Search Verified'
+          : (baseProposal.isFallback
+              ? 'Meta AI: Resilient Fallback Active (Web Search Grounded)'
+              : 'Meta AI: Live Web Search Grounded'),
+    );
   }
 
   /// Backward-compatible method wrapper
@@ -1348,6 +1624,29 @@ class MetaAiService {
             final unit = (itemMap['unit'] ?? itemMap['unitType'] ?? itemMap['standardUnit'])?.toString().trim() ?? 'item';
             final price = (itemMap['estimated_unit_price'] ?? itemMap['estimatedUnitPrice'] ?? itemMap['price'] as num?)?.toDouble() ?? 1000.0;
             final brand = (itemMap['brand_or_grade'] ?? itemMap['brandOrGrade'] ?? itemMap['brand'])?.toString().trim();
+            final webRefUrl = (itemMap['web_reference_url'] ??
+                    itemMap['webReferenceUrl'] ??
+                    itemMap['reference_url'] ??
+                    itemMap['url'] ??
+                    itemMap['link'])
+                ?.toString()
+                .trim();
+            final matchedVendor = (itemMap['matched_vendor'] ??
+                    itemMap['matched_vendor_name'] ??
+                    itemMap['matchedVendorName'] ??
+                    itemMap['store'] ??
+                    itemMap['vendor'])
+                ?.toString()
+                .trim();
+            final refLinksRaw = (itemMap['reference_links'] ??
+                itemMap['referenceLinks'] ??
+                itemMap['references']) as List<dynamic>?;
+            final List<String> refLinks = refLinksRaw != null
+                ? refLinksRaw
+                    .map((e) => e.toString().trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList()
+                : (webRefUrl != null && webRefUrl.isNotEmpty ? [webRefUrl] : []);
 
             if (name != null && name.isNotEmpty && quantity > 0) {
               String cleanedName = name;
@@ -1368,6 +1667,9 @@ class MetaAiService {
                   quantity: quantity,
                   unit: cleanedUnit,
                   estimatedUnitPrice: price,
+                  webReferenceUrl: webRefUrl,
+                  referenceLinks: refLinks,
+                  matchedVendorName: matchedVendor,
                 ),
               );
             }
@@ -1416,6 +1718,17 @@ class MetaAiService {
 
       final ambiguities = detectAmbiguitiesAndFollowUps(rawInput, budget, validatedItems, errand);
 
+      final webSummary = (json['web_search_summary'] ?? json['webSearchSummary'])?.toString();
+      final liveVendorsRaw = (json['live_web_vendors'] ?? json['liveWebVendors']) as List<dynamic>?;
+      final List<LiveWebVendorResult> liveVendors = [];
+      if (liveVendorsRaw != null) {
+        for (final v in liveVendorsRaw) {
+          if (v is LiveWebVendorResult) {
+            liveVendors.add(v);
+          }
+        }
+      }
+
       return AiPlanProposal(
         budget: budget,
         shoppingItems: validatedItems,
@@ -1427,6 +1740,8 @@ class MetaAiService {
         isFallback: isFallback,
         executionStatus: executionStatus,
         fallbackReason: fallbackReason,
+        liveWebVendors: liveVendors,
+        webSearchSummary: webSummary,
       );
     } catch (_) {
       return null;
@@ -2672,7 +2987,7 @@ class MetaAiService {
         category = 'finance';
       } else if (lower.contains('pharmacy') || lower.contains('chemist')) {
         title = 'Visit pharmacy';
-        location = 'Pharmacy Plus';
+        location = 'Community Pharmacy';
         category = 'pharmacy';
       } else if (lower.contains('electric bill') ||
           lower.contains('electricity bill') ||

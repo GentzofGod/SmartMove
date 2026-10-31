@@ -1,4 +1,5 @@
 import 'errand.dart';
+import '../services/web_search_grounding_service.dart';
 
 /// Represents a detected user intent or planning preference
 enum PlanningPreference {
@@ -39,6 +40,8 @@ class AiPlanProposal {
   final String? fallbackReason;
   final bool hasError;
   final String? errorMessage;
+  final List<LiveWebVendorResult> liveWebVendors;
+  final String? webSearchSummary;
 
   const AiPlanProposal({
     required this.budget,
@@ -55,6 +58,8 @@ class AiPlanProposal {
     this.fallbackReason,
     this.hasError = false,
     this.errorMessage,
+    this.liveWebVendors = const [],
+    this.webSearchSummary,
   });
 
   /// Factory for user-friendly error reporting instead of falling back to coded responses
@@ -72,6 +77,7 @@ class AiPlanProposal {
       errorMessage: message,
       isFallback: false,
       executionStatus: 'Meta AI Error',
+      liveWebVendors: const [],
     );
   }
 
@@ -92,6 +98,8 @@ class AiPlanProposal {
     String? fallbackReason,
     bool? hasError,
     String? errorMessage,
+    List<LiveWebVendorResult>? liveWebVendors,
+    String? webSearchSummary,
   }) {
     return AiPlanProposal(
       budget: budget ?? this.budget,
@@ -110,6 +118,8 @@ class AiPlanProposal {
       fallbackReason: fallbackReason ?? this.fallbackReason,
       hasError: hasError ?? this.hasError,
       errorMessage: errorMessage ?? this.errorMessage,
+      liveWebVendors: liveWebVendors ?? this.liveWebVendors,
+      webSearchSummary: webSearchSummary ?? this.webSearchSummary,
     );
   }
 }

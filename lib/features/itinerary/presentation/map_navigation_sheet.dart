@@ -123,7 +123,7 @@ class MapNavigationSheet extends StatelessWidget {
                   Positioned(
                     top: 140,
                     right: 40,
-                    child: _buildMapPin('Pharmacy Plus', Icons.local_pharmacy_outlined, AppColors.blue),
+                    child: _buildMapPin('Community Pharmacy', Icons.local_pharmacy_outlined, AppColors.blue),
                   ),
                   Positioned(
                     bottom: 60,

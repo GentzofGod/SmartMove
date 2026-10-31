@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/ai_proposal.dart';
 import '../../../../core/models/errand.dart';
+import '../../../../core/services/safe_outlet_launcher.dart';
 
 /// Modal bottom sheet for reviewing, adjusting, and confirming an AI Plan Proposal
 ///
@@ -145,6 +146,74 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
   double get _itemsTotal =>
       _items.fold(0.0, (sum, i) => sum + (i.quantity * i.estimatedUnitPrice));
 
+  void _showItemReferencesSheet(ShoppingItem item) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Store Reference Links: ${item.productName}',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Live web links gathered from multi-store search grounding to verify prices:',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              for (final link in item.referenceLinks) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.primaryTint,
+                    child: Icon(Icons.storefront_outlined, size: 16, color: AppColors.primary),
+                  ),
+                  title: Text(
+                    link.contains('jumia')
+                        ? 'Jumia Online Store'
+                        : (link.contains('konga')
+                            ? 'Konga Online Mall'
+                            : (link.contains('jiji')
+                                ? 'Jiji Marketplace'
+                                : (link.contains('google.com/maps')
+                                    ? 'Google Maps Local Stores'
+                                    : 'External Store Listing'))),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                  subtitle: Text(
+                    link,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                  trailing: const Icon(Icons.open_in_new, size: 16, color: AppColors.primary),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    SafeOutletLauncher.openExternalWebUrl(
+                      context,
+                      url: link,
+                      outletName: item.productName,
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -261,16 +330,20 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
             decoration: BoxDecoration(
               color: widget.proposal.hasError
                   ? const Color(0xFFFFEBEE)
-                  : widget.proposal.isLiveCloud
+                  : widget.proposal.liveWebVendors.isNotEmpty
                       ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFE8F5E9),
+                      : widget.proposal.isLiveCloud
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFE8F5E9),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: widget.proposal.hasError
                     ? const Color(0xFFFFCDD2)
-                    : widget.proposal.isLiveCloud
+                    : widget.proposal.liveWebVendors.isNotEmpty
                         ? const Color(0xFFA5D6A7)
-                        : const Color(0xFFA5D6A7),
+                        : widget.proposal.isLiveCloud
+                            ? const Color(0xFFA5D6A7)
+                            : const Color(0xFFA5D6A7),
               ),
             ),
             child: Row(
@@ -278,7 +351,9 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                 Icon(
                   widget.proposal.hasError
                       ? Icons.error_outline_rounded
-                      : Icons.cloud_done_rounded,
+                      : (widget.proposal.liveWebVendors.isNotEmpty
+                          ? Icons.travel_explore_rounded
+                          : Icons.cloud_done_rounded),
                   size: 16,
                   color: widget.proposal.hasError
                       ? AppColors.errorText
@@ -292,9 +367,11 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                       Text(
                         widget.proposal.hasError
                             ? 'Meta AI Notice'
-                            : widget.proposal.isLiveCloud
-                                ? 'Meta AI Live Cloud: Success'
-                                : 'Meta AI Proposal Extracted',
+                            : (widget.proposal.liveWebVendors.isNotEmpty
+                                ? 'Multi-Store Grounded (Jumia • Konga • Jiji • Stores)'
+                                : (widget.proposal.isLiveCloud
+                                    ? 'Meta AI Live Cloud: Success'
+                                    : 'Meta AI Proposal Extracted')),
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
@@ -307,9 +384,10 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                         widget.proposal.hasError
                             ? (widget.proposal.errorMessage ??
                                 'Commodities could not be automatically extracted.')
-                            : widget.proposal.isLiveCloud
-                                ? 'Processed directly via Meta Muse Spark remote model.'
-                                : 'Processed with Meta Muse Spark reasoning engine.',
+                            : (widget.proposal.webSearchSummary ??
+                                (widget.proposal.isLiveCloud
+                                    ? 'Processed directly via Meta Muse Spark remote model.'
+                                    : 'Processed with Meta Muse Spark reasoning engine.')),
                         style: TextStyle(
                           fontSize: 10.5,
                           color: widget.proposal.hasError
@@ -531,6 +609,88 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              if (_items[i].webReferenceUrl != null ||
+                                  _items[i].matchedVendorName != null ||
+                                  _items[i].referenceLinks.isNotEmpty) ...[
+                                const SizedBox(height: 5),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    InkWell(
+                                      onTap: () {
+                                        final url = _items[i].webReferenceUrl ??
+                                            (_items[i].referenceLinks.isNotEmpty
+                                                ? _items[i].referenceLinks.first
+                                                : null);
+                                        if (url != null) {
+                                          SafeOutletLauncher.openExternalWebUrl(
+                                            context,
+                                            url: url,
+                                            outletName: _items[i].matchedVendorName ??
+                                                'Store Catalog',
+                                          );
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryTint.withValues(alpha: 0.5),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: AppColors.primary.withValues(alpha: 0.3),
+                                              width: 0.8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.open_in_new,
+                                                size: 11, color: AppColors.primary),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _items[i].matchedVendorName ?? 'Store Ref',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.primaryDark,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    if (_items[i].referenceLinks.length > 1) ...[
+                                      InkWell(
+                                        onTap: () =>
+                                            _showItemReferencesSheet(_items[i]),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                                color: Colors.grey.shade300,
+                                                width: 0.8),
+                                          ),
+                                          child: Text(
+                                            '+${_items[i].referenceLinks.length - 1} stores',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey.shade800,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),

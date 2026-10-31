@@ -131,4 +131,98 @@ void main() {
       expect(benchmarks.length, equals(5));
     });
   });
+
+  group('Multi-Layer Web Grounding Pipeline & Flexible AI Structuring', () {
+    test('parseToProposal runs Layer 1 item derivation -> Layer 2 store search -> Layer 3 harmonization', () async {
+      const aiService = MetaAiService();
+      final proposal = await aiService.parseToProposal(
+        'I have ₦25,000 for rice and cooking oil in Lagos',
+        city: 'Lagos',
+        enableWebGrounding: true,
+      );
+
+      expect(proposal.hasError, isFalse);
+      expect(proposal.shoppingItems, isNotEmpty);
+      expect(proposal.shoppingItems.length, greaterThanOrEqualTo(2));
+
+      // Layer 2 & 3 must attach store links and discovered vendors
+      expect(proposal.liveWebVendors, isNotEmpty);
+      expect(proposal.webSearchSummary, isNotNull);
+
+      for (final item in proposal.shoppingItems) {
+        expect(item.webReferenceUrl, isNotNull);
+        expect(item.webReferenceUrl!.startsWith('http'), isTrue);
+        expect(item.referenceLinks, isNotEmpty);
+        expect(item.matchedVendorName, isNotNull);
+      }
+    });
+
+    test('validateProposal flexibly parses irregularity, markdown blocks, and attaches reference URLs', () {
+      const aiService = MetaAiService();
+      final irregularJson = {
+        'budget': 35000.0,
+        'shopping_items': [
+          {
+            'name': 'Rechargeable Fan',
+            'quantity': 1,
+            'unit': 'unit',
+            'price': 22000.0,
+            'web_reference_url': 'https://www.jumia.com.ng/catalog/?q=Rechargeable+Fan',
+            'matched_vendor': 'Jumia Official Store',
+            'reference_links': [
+              'https://www.jumia.com.ng/catalog/?q=Rechargeable+Fan',
+              'https://www.konga.com/search?search=Rechargeable+Fan',
+            ],
+          },
+        ],
+        'web_search_summary': 'Harmonized across 2 online platforms',
+      };
+
+      final proposal = aiService.validateProposal(irregularJson, 'Rechargeable fan request');
+      expect(proposal, isNotNull);
+      expect(proposal!.shoppingItems.length, equals(1));
+      final item = proposal.shoppingItems.first;
+      expect(item.productName, equals('Rechargeable Fan'));
+      expect(item.webReferenceUrl, equals('https://www.jumia.com.ng/catalog/?q=Rechargeable+Fan'));
+      expect(item.matchedVendorName, equals('Jumia Official Store'));
+      expect(item.referenceLinks.length, equals(2));
+      expect(proposal.webSearchSummary, equals('Harmonized across 2 online platforms'));
+    });
+
+    test('Decision Engine candidate plans contain NO preseeded stores', () {
+      final item = ShoppingItem(
+        id: 'si-generic-1',
+        productName: 'Desk Organizer',
+        quantity: 1,
+        unit: 'piece',
+        estimatedUnitPrice: 4500,
+      );
+
+      final plans = DecisionEngine.calculateCandidatePlans(
+        userBudget: 10000,
+        baseTransportFare: 400,
+        maxTimeHours: 2.0,
+        items: [item],
+        userLocation: const GeoPoint(
+          latitude: 7.3775,
+          longitude: 3.9470,
+          city: 'Ibadan',
+          label: 'Ibadan Central',
+        ),
+      );
+
+      expect(plans, isNotEmpty);
+      for (final plan in plans) {
+        for (final source in plan.acquisitionSources) {
+          expect(source.outletName.toLowerCase(), isNot(contains('commercial central arcade')));
+          expect(source.outletName.toLowerCase(), isNot(contains('techhub dugbe stationers')));
+          expect(source.outletName.toLowerCase(), isNot(contains('pharmacy plus')));
+          expect(source.outletName.toLowerCase(), isNot(contains('ace hardware')));
+          expect(source.marketHubOrLocation.toLowerCase(), isNot(contains('commercial central arcade')));
+          expect(source.marketHubOrLocation.toLowerCase(), isNot(contains('dugbe commercial arcade')));
+          expect(source.marketHubOrLocation.toLowerCase(), isNot(contains('bodija fresh produce agro stalls')));
+        }
+      }
+    });
+  });
 }

@@ -795,20 +795,6 @@ class LocationService {
       city: 'Lagos',
       town: 'Yaba',
     ),
-    'Pharmacy Plus': GeoPoint(
-      latitude: 6.5180,
-      longitude: 3.3720,
-      label: 'Pharmacy Plus',
-      city: 'Lagos',
-      town: 'Yaba',
-    ),
-    'TechHub Dugbe': GeoPoint(
-      latitude: 7.3876,
-      longitude: 3.8767,
-      label: 'TechHub Dugbe',
-      city: 'Ibadan',
-      town: 'Dugbe',
-    ),
   };
 
   /// Persist the selected or live location to SharedPreferences
