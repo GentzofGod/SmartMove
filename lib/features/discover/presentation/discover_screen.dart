@@ -671,6 +671,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                               height: 1.35,
                             ),
                           ),
+                          if (_searchController.text.trim().isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: () => _showAiResearchDialog(context, _searchController.text.trim()),
+                              icon: const Icon(Icons.auto_awesome, size: 16),
+                              label: Text('Research "${_searchController.text.trim()}" on Live Platforms'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

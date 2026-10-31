@@ -797,6 +797,7 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                           context,
                           url: url,
                           outletName: item.matchedVendorName ?? item.productName,
+                          searchQuery: WebSearchGroundingService.cleanSearchQuery(item.productName),
                         );
                       }
                     },

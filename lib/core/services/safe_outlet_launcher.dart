@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 import 'meta_ai_service.dart';
@@ -340,6 +341,7 @@ class SafeOutletLauncher {
                                     context,
                                     url: vendor.targetUrl,
                                     outletName: vendor.vendorName,
+                                    searchQuery: comparison.commodityName,
                                   ),
                                 ),
                               ],
@@ -370,6 +372,7 @@ class SafeOutletLauncher {
     BuildContext context, {
     required String url,
     required String outletName,
+    String? searchQuery,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -393,6 +396,49 @@ class SafeOutletLauncher {
               'You are leaving SmartMove to visit $outletName:',
               style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
             ),
+            if (searchQuery != null && searchQuery.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTint,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, size: 15, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Target Item: "$searchQuery"',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryDark,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: searchQuery));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Copied "$searchQuery" to clipboard'),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(2),
+                        child: Icon(Icons.copy_rounded, size: 15, color: AppColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(10),

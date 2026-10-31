@@ -50,6 +50,53 @@ void main() {
         expect(v.priceDisplay, isNotEmpty);
       }
     });
+
+    test('cleanSearchQuery sanitizes noisy phrases into targeted search keywords', () {
+      expect(
+        WebSearchGroundingService.cleanSearchQuery('I want to buy 2 bags of 50kg Mama Gold rice under 80000'),
+        equals('50kg Mama Gold rice'),
+      );
+      expect(
+        WebSearchGroundingService.cleanSearchQuery('1 crate of fresh eggs'),
+        equals('Crate of Eggs'),
+      );
+      expect(
+        WebSearchGroundingService.cleanSearchQuery('1 crate of fresh eggs', platform: 'jumia'),
+        equals('Eggs'),
+      );
+      expect(
+        WebSearchGroundingService.cleanSearchQuery('where can i buy electric cooker 2-burner'),
+        equals('Electric Cooker 2-Burner'),
+      );
+      expect(
+        WebSearchGroundingService.cleanSearchQuery('10 tubers of yam'),
+        equals('Tubers of Yam'),
+      );
+    });
+
+    test('detectCategory accurately categorizes commodities', () {
+      expect(WebSearchGroundingService.detectCategory('Eggs'), equals('freshFoodstuff'));
+      expect(WebSearchGroundingService.detectCategory('Yam'), equals('freshFoodstuff'));
+      expect(WebSearchGroundingService.detectCategory('Rice 50kg'), equals('packagedGroceries'));
+      expect(WebSearchGroundingService.detectCategory('Electric Cooker'), equals('electronicsAndAppliances'));
+      expect(WebSearchGroundingService.detectCategory('Lathe Chuck Tool'), equals('hardwareAndSpares'));
+    });
+
+    test('fetchLiveWebVendors for fresh foodstuff grounds in authentic agro & grocery platforms', () async {
+      final vendors = await WebSearchGroundingService.fetchLiveWebVendors('Eggs', city: 'Ibadan');
+      expect(vendors, isNotEmpty);
+
+      // Must NOT assign Jumia/Konga for fresh table eggs
+      expect(vendors.any((v) => v.vendorName.contains('Jumia Official Store')), isFalse);
+      expect(vendors.any((v) => v.vendorName.contains('Konga Online Shopping')), isFalse);
+
+      // Must have authentic farm produce / grocery platforms
+      final hasAgroOrGrocery = vendors.any((v) =>
+          v.vendorName.contains('Jiji Farm') ||
+          v.vendorName.contains('Supermart') ||
+          v.vendorName.contains('Central Food Market'));
+      expect(hasAgroOrGrocery, isTrue);
+    });
   });
 
   group('Meta AI Live Multi-Vendor Comparison', () {
