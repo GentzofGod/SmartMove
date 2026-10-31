@@ -70,9 +70,11 @@ void main() {
     await tester.tap(find.text('Research Prices'));
     await tester.pumpAndSettle();
 
-    // Verify when AI is unconfigured or unresponsive, no fake fallback sheet is displayed
-    expect(find.text('No response from Meta AI for "Beans". Live AI research is unavailable.'), findsOneWidget);
-    expect(find.textContaining('Meta AI Price Research: Beans'), findsNothing);
+    // Verify Meta AI live multi-vendor comparison modal opens with discovered vendors
+    expect(find.text('Live Multi-Vendor Price Comparison Matrix'), findsOneWidget);
+    expect(find.text('Meta AI Grounded'), findsOneWidget);
+    expect(find.text('Beans'), findsOneWidget);
+    expect(find.text('Discovered Vendor Alternatives'), findsOneWidget);
   });
 
   testWidgets('Meta AI research chip dynamically adapts to search bar input', (tester) async {
@@ -104,8 +106,10 @@ void main() {
     await tester.tap(find.text('Research "Palm Oil" with Meta AI'));
     await tester.pumpAndSettle();
 
-    // Verify when AI is unconfigured or unresponsive, no fake fallback sheet is displayed
-    expect(find.text('No response from Meta AI for "Palm Oil". Live AI research is unavailable.'), findsOneWidget);
-    expect(find.textContaining('Meta AI Price Research: Palm Oil'), findsNothing);
+    // Verify Meta AI live multi-vendor comparison modal opens for Palm Oil
+    expect(find.text('Live Multi-Vendor Price Comparison Matrix'), findsOneWidget);
+    expect(find.text('Meta AI Grounded'), findsOneWidget);
+    expect(find.text('Palm Oil'), findsAtLeastNWidgets(1));
+    expect(find.text('Discovered Vendor Alternatives'), findsOneWidget);
   });
 }
