@@ -1691,7 +1691,7 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             ),
                             SizedBox(width: 6),
                             Text(
-                              'Meta Muse Spark Rationale',
+                              'AI Assistant Recommendation',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,

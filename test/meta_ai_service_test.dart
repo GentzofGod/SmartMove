@@ -14,7 +14,7 @@ void main() {
             'I have ₦15,000. I need rice, eggs, tomatoes, and cooking oil. Collect package before 2 PM.',
       );
 
-      expect(voiceResult.modelName, 'Meta Muse Voice Transcribe 1.0');
+      expect(voiceResult.modelName, 'SmartMove Voice AI');
       expect(voiceResult.confidence >= 0.9, true);
       expect(voiceResult.text.contains('rice'), true);
       expect(voiceResult.text.contains('15,000'), true);
@@ -36,7 +36,7 @@ void main() {
         'I have ₦15,000. I need 2kg rice, 1 crate of eggs, 2kg tomatoes, 1L cooking oil. Collect package before 2 PM.',
       );
 
-      expect(proposal.modelName, 'Meta Muse Spark 1.3');
+      expect(proposal.modelName, 'SmartMove AI Assistant');
       expect(proposal.budget, 15000.0);
       expect(proposal.shoppingItems.length, 4);
 
@@ -78,7 +78,7 @@ void main() {
         budget: 15000,
       );
 
-      expect(explanation.contains('Meta Muse Spark Insight'), true);
+      expect(explanation.contains('SmartMove AI Insight'), true);
       expect(explanation.contains('Option A'), true);
       expect(explanation.contains('Option B'), true);
       // Explains exact computed item savings between Option B and Option A
@@ -265,7 +265,7 @@ void main() {
         userBudget: 15000,
       );
 
-      expect(explanation.contains('Meta Muse Spark Price Intelligence'), true);
+      expect(explanation.contains('SmartMove AI Price Intelligence'), true);
       expect(explanation.contains('Bodija Wholesale'), true);
       expect(explanation.contains('Jumia Supermarket'), true);
       // Explains calculated ₦450 savings

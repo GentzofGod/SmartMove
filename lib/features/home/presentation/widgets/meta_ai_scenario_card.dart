@@ -49,7 +49,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 Expanded(
                   child: Text(
                     proposal.errorMessage ??
-                        'Meta AI could not process your request. Please enter items directly in Price Lab.',
+                        'AI Assistant could not process your request. Please enter items directly in Price Lab.',
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
                   ),
                 ),
@@ -70,7 +70,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
         messenger.showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF2E7D32),
-            content: Text('✓ Meta AI Live Cloud: Proposal generated successfully!'),
+            content: Text('✓ SmartMove AI: Proposal generated successfully!'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -96,7 +96,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
         setState(() => _isProcessing = false);
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Could not complete Meta AI proposal extraction.'),
+            content: Text('Could not complete AI proposal extraction.'),
             backgroundColor: AppColors.errorText,
           ),
         );
@@ -191,7 +191,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Meta Muse Spark Options',
+                        'SmartMove AI Options',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -329,7 +329,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                   ),
                 ),
                 child: const Text(
-                  'Muse Spark, Voice & Vision',
+                  'Voice & Vision',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -370,7 +370,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       }
                     },
                     decoration: const InputDecoration(
-                      hintText: 'Ask Meta AI (e.g. 5kg rice, 2L oil in Bodija)...',
+                      hintText: 'Ask AI Assistant (e.g. 5kg rice, 2L oil in Bodija)...',
                       hintStyle: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                       border: InputBorder.none,
                       isDense: true,

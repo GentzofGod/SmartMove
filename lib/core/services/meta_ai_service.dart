@@ -380,7 +380,7 @@ class VoiceTranscriptionResult {
   const VoiceTranscriptionResult({
     required this.text,
     this.confidence = 0.98,
-    this.modelName = 'Meta Muse Voice Transcribe 1.0',
+    this.modelName = 'SmartMove Voice AI',
     this.isFallback = false,
     this.note,
     this.detectedDialect = VoiceDialect.autoDetect,
@@ -397,7 +397,7 @@ class VoiceTranscriptionResult {
     return VoiceTranscriptionResult(
       text: '',
       confidence: 0.0,
-      modelName: 'Meta Muse Voice Transcribe 1.0',
+      modelName: 'SmartMove Voice AI',
       isFallback: false,
       hasError: true,
       errorMessage: message,
@@ -505,7 +505,7 @@ class PaperNoteScanResult {
     required this.rawTranscribedText,
     required this.extractedLines,
     this.confidence = 0.96,
-    this.modelName = 'Meta Muse Spark 1.3 (Vision)',
+    this.modelName = 'SmartMove AI Vision',
     this.isFallback = false,
     this.note,
     required this.proposal,
@@ -526,7 +526,7 @@ class PaperNoteScanResult {
       rawTranscribedText: '',
       extractedLines: const [],
       confidence: 0.0,
-      modelName: 'Meta Muse Spark 1.3 (Vision)',
+      modelName: 'SmartMove AI Vision',
       isFallback: false,
       hasError: true,
       errorMessage: message,
@@ -737,10 +737,10 @@ class MetaAiService {
             return VoiceTranscriptionResult(
               text: transcribedText,
               confidence: (data['confidence'] as num?)?.toDouble() ?? 0.96,
-              modelName: 'Meta Muse Voice Transcribe 1.0',
+              modelName: 'SmartMove Voice AI',
               isFallback: false,
               note:
-                  'Meta AI Live Cloud: Speech transcribed in ${resolvedDialect.label} via Meta Muse Voice Transcribe (Success)',
+                  'SmartMove AI: Speech transcribed in ${resolvedDialect.label} via Voice AI (Success)',
               detectedDialect: resolvedDialect,
               englishTranslation: translation,
               isDialectTranslated: translation != null && translation.isNotEmpty,
@@ -779,7 +779,7 @@ class MetaAiService {
     return VoiceTranscriptionResult(
       text: sample,
       confidence: 0.98,
-      modelName: 'Meta Muse Voice Transcribe 1.0',
+      modelName: 'SmartMove Voice AI',
       isFallback: true,
       note: 'Meta AI Fallback Active (${resolvedDialect.label}): $reason',
       detectedDialect: resolvedDialect,
@@ -1082,7 +1082,7 @@ class MetaAiService {
                 parsedJson,
                 transcription,
                 isFallback: false,
-                executionStatus: 'Meta AI Live Cloud: Muse Spark Vision (Success)',
+                executionStatus: 'SmartMove AI: Document Vision (Success)',
                 fallbackReason: null,
               );
 
@@ -1091,10 +1091,10 @@ class MetaAiService {
                   rawTranscribedText: transcription,
                   extractedLines: lines,
                   confidence: 0.97,
-                  modelName: 'Meta Muse Spark 1.3 (Vision)',
+                  modelName: 'SmartMove AI Vision',
                   isFallback: false,
                   note:
-                      'Meta AI Live Cloud: Handwritten paper note transcribed with Meta Muse Spark Vision (Success)',
+                      'SmartMove AI: Handwritten paper note transcribed with AI Vision (Success)',
                   proposal: proposal,
                   imageBytes: imageBytes,
                   imagePath: imagePath,
@@ -1133,7 +1133,7 @@ class MetaAiService {
         rawTranscribedText: textToProcess,
         extractedLines: lines,
         confidence: 0.96,
-        modelName: 'Meta Muse Spark 1.3 (Vision)',
+        modelName: 'SmartMove AI Vision',
         isFallback: false,
         note: 'Transcribed from custom note text',
         proposal: proposal,
@@ -1149,7 +1149,7 @@ class MetaAiService {
         rawTranscribedText: matchedSample.transcribedPrompt,
         extractedLines: matchedSample.recognizedLines,
         confidence: 0.98,
-        modelName: 'Meta Muse Spark 1.3 (Vision)',
+        modelName: 'SmartMove AI Vision',
         isFallback: false,
         note: 'Transcribed from verified preset: ${matchedSample.title}',
         proposal: proposal,
@@ -1738,7 +1738,7 @@ class MetaAiService {
         shoppingItems: validatedItems,
         deadlineErrand: errand,
         rawInput: rawInput,
-        modelName: 'Meta Muse Spark 1.3',
+        modelName: 'SmartMove AI Assistant',
         clarificationQuestions: ambiguities,
         hasAmbiguity: ambiguities.isNotEmpty,
         isFallback: isFallback,
@@ -3054,7 +3054,7 @@ class MetaAiService {
       shoppingItems: items,
       deadlineErrand: nonShoppingErrand,
       rawInput: prompt,
-      modelName: 'Meta Muse Spark 1.3',
+      modelName: 'SmartMove AI Assistant',
       detectedPreference: preference,
       clarificationQuestions: ambiguities,
       hasAmbiguity: ambiguities.isNotEmpty,
@@ -3083,10 +3083,10 @@ class MetaAiService {
     final diffSavings = planB.totalCost - planA.totalCost;
 
     if (budget < 12000) {
-      return 'Meta Muse Spark Insight: With your ₦${budget.toStringAsFixed(0)} budget, Option D is the safest choice (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while prioritizing essential commodities (no price-drop claim made).';
+      return 'SmartMove AI Insight: With your ₦${budget.toStringAsFixed(0)} budget, Option D is the safest choice (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while prioritizing essential commodities (no price-drop claim made).';
     }
 
-    return 'Meta Muse Spark Insight: Option A has the lowest total outlay (${planA.formattedTotalCost}) by splitting purchases across open wholesale markets, saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B. Conversely, Option B provides consolidated single-hub sourcing with verified platform traders for ₦${planB.formattedTotalCost}.';
+    return 'SmartMove AI Insight: Option A has the lowest total outlay (${planA.formattedTotalCost}) by splitting purchases across open wholesale markets, saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B. Conversely, Option B provides consolidated single-hub sourcing with verified platform traders for ₦${planB.formattedTotalCost}.';
   }
 
   // --- 5. Muse Spark Proactive Optimization Assistant ---
@@ -3322,7 +3322,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating sourcing into a single verified trader hub, absorbing a small $diffText grocery difference.',
+            'AI Assistant interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating sourcing into a single verified trader hub, absorbing a small $diffText grocery difference.',
         targetPlanId: lowestTransportPlan.id,
         suggestedTransport: lowestTransportPlan.transportCost,
         suggestedMaxStops: lowestTransportPlan.stopCount,
@@ -3343,7 +3343,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Express convenience. ${fastestPlan.name} provides direct walk-in neighborhood retail sourcing for rapid acquisition.',
+            'AI Assistant interpreted your preference: Express convenience. ${fastestPlan.name} provides direct walk-in neighborhood retail sourcing for rapid acquisition.',
         targetPlanId: fastestPlan.id,
         suggestedMaxHours: fastestPlan.estimatedHours,
       );
@@ -3366,7 +3366,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while acquiring high-priority essential staples within a strict budget.',
+            'AI Assistant interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while acquiring high-priority essential staples within a strict budget.',
         targetPlanId: cashflowPlan.id,
         suggestedDelayNonUrgent: true,
       );
@@ -3636,7 +3636,7 @@ class MetaAiService {
     required double userBudget,
   }) {
     if (observations.isEmpty) {
-      return 'Meta Muse Spark Insight: ${product.name} is currently best priced at ${product.bestSeller} (${product.formattedPrice} per ${product.standardUnit}). No alternate seller observations recorded yet in this hub.';
+      return 'SmartMove AI Insight: ${product.name} is currently best priced at ${product.bestSeller} (${product.formattedPrice} per ${product.standardUnit}). No alternate seller observations recorded yet in this hub.';
     }
 
     final localQuotes = observations.where((o) => o.channel == 'Local Market').toList();
@@ -3661,7 +3661,7 @@ class MetaAiService {
     final unitSavings = highestStdRate - lowestStdRate;
 
     final buffer = StringBuffer();
-    buffer.write('Meta Muse Spark Price Intelligence: ');
+    buffer.write('SmartMove AI Price Intelligence: ');
     buffer.write('Comparing ${observations.length} quotes for "${product.name}". ');
     buffer.write(
       'Best deal is at ${lowest.sellerName} (${lowest.formattedPrice}/${lowest.unit}), saving ₦${diff.toStringAsFixed(0)} compared to ${highest.sellerName} (${highest.formattedPrice}/${highest.unit}). ',
@@ -4020,7 +4020,7 @@ class MetaAiService {
 
     final summaryBuffer = StringBuffer();
     summaryBuffer.write(
-      'Meta Muse Spark Option Analysis for $qtyStr $effectiveTargetUnit of ${product.name}: ',
+      'SmartMove AI Option Analysis for $qtyStr $effectiveTargetUnit of ${product.name}: ',
     );
     summaryBuffer.write(
       'Under your "${priority.label}" priority, ${topPick.observation.sellerName} (${topPick.channel.displayName}) ranks #1 with a composite fit score of ${topPick.compositeScore}/100. ',

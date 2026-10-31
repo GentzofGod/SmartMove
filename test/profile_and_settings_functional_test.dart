@@ -237,7 +237,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('v1.2.0 (Build 2026.10)'), findsOneWidget);
-      expect(find.text('Meta AI Architecture: Meta Muse Spark 1.3'), findsOneWidget);
+      expect(find.text('AI Architecture: SmartMove AI Assistant'), findsOneWidget);
 
       // Close dialog
       await tester.tap(find.text('Close'));

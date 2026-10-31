@@ -176,7 +176,7 @@ void main() {
         priority: UserDecisionPriority.balancedValue,
       );
 
-      expect(result.executiveSummary, contains('Meta Muse Spark Option Analysis'));
+      expect(result.executiveSummary, contains('SmartMove AI Option Analysis'));
       expect(result.executiveSummary, contains('Landed cost'));
       expect(result.comparisonHighlights.length, greaterThanOrEqualTo(2));
     });
@@ -222,7 +222,7 @@ void main() {
 
       // Verify recommendation badge and Landed Outlay label
       expect(find.text('Landed Outlay'), findsOneWidget);
-      expect(find.text('Meta Muse Spark Rationale'), findsOneWidget);
+      expect(find.text('AI Assistant Recommendation'), findsOneWidget);
 
       // Tap 'Lowest Outlay' chip
       await tester.tap(find.text('Lowest Outlay'));

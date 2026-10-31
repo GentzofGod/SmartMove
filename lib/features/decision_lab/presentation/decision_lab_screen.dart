@@ -940,7 +940,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                         SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Meta Muse Spark Trade-Off Insight',
+                            'AI Assistant Trade-Off Insight',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
@@ -1033,7 +1033,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       color: AppColors.primary, size: 18),
                   SizedBox(width: 8),
                   Text(
-                    'Ask Muse Spark to Refine Options',
+                    'Ask AI Assistant to Refine Options',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -1131,7 +1131,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                                 SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'Muse Spark Interpretation Proposal',
+                                    'AI Assistant Recommendation',
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 12,
@@ -1537,7 +1537,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Meta AI is discovering live vendor alternatives for ${source.commodityName}...',
+                                        'AI Assistant is discovering live vendor alternatives for ${source.commodityName}...',
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -2163,7 +2163,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
             Icon(Icons.tips_and_updates_outlined, color: Color(0xFFE65100), size: 18),
             SizedBox(width: 8),
             Text(
-              'Meta AI Proactive Optimizations',
+              'SmartMove AI Optimizations',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,

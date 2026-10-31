@@ -61,7 +61,7 @@ void main() {
     budget: 50000,
     shoppingItems: [sampleItem],
     rawInput: 'I need an electric cooker for ₦50,000',
-    modelName: 'Meta Muse Spark 1.3',
+    modelName: 'SmartMove AI Assistant',
     isFallback: false,
     executionStatus: 'Meta AI Grounded',
     liveWebVendors: sampleItem.availableSourceQuotes,

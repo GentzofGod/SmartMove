@@ -1696,7 +1696,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           Padding(
                             padding: EdgeInsets.only(bottom: 10),
                             child: Text(
-                              'SmartMove combines real-time physical market stalls (Bodija, Mile 12, Wuse) with verified e-commerce platforms (Jumia, Konga, Supermart.ng). Meta Muse normalizes units to compare true landed cost including transport.',
+                              'SmartMove combines real-time physical market stalls (Bodija, Mile 12, Wuse) with verified e-commerce platforms (Jumia, Konga, Supermart.ng). SmartMove AI Assistant normalizes units to compare true landed cost including transport.',
                               style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
                             ),
                           ),
@@ -1724,7 +1724,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           Padding(
                             padding: EdgeInsets.only(bottom: 10),
                             child: Text(
-                              'Snap a photo of your handwritten shopping list or receipt. Meta Muse Vision extracts the items, units, and suggested budget, generating a structured comparison plan.',
+                              'Snap a photo of your handwritten shopping list or receipt. SmartMove AI extracts the items, units, and suggested budget, generating structured comparison options.',
                               style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
                             ),
                           ),
@@ -1837,7 +1837,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    'Meta AI Architecture: Meta Muse Spark 1.3',
+                    'AI Architecture: SmartMove AI Assistant',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF512DA8)),
                   ),
                 ),

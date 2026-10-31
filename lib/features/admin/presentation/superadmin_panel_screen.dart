@@ -809,7 +809,7 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Meta Muse Spark AI Market Audits',
+                      'SmartMove AI Market Audits',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,

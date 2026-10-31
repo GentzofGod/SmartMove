@@ -189,8 +189,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Header
-      expect(find.text('Muse Voice Transcribe'), findsOneWidget);
-      expect(find.text('Multi-Dialect West African Speech-to-Text Model'), findsOneWidget);
+      expect(find.text('AI Voice Assistant'), findsOneWidget);
+      expect(find.text('Multi-Dialect West African Speech Recognition'), findsOneWidget);
 
       // Verify Dialect Chips exist
       expect(find.byKey(const ValueKey('chip_dialect_auto')), findsOneWidget);

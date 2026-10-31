@@ -353,7 +353,7 @@ class SafeOutletLauncher {
                     const SizedBox(height: 10),
                     Center(
                       child: Text(
-                        'Live web grounding powered by Meta Muse Spark & web search indexing',
+                        'Live web grounding powered by SmartMove AI Assistant & web search indexing',
                         style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.8)),
                       ),
                     ),

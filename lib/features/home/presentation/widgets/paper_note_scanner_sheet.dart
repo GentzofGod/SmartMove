@@ -164,7 +164,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                           ),
                         ),
                         Text(
-                          'Meta Muse Spark Multimodal Vision Model',
+                          'SmartMove AI Vision Assistant',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,

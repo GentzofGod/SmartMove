@@ -37,7 +37,7 @@ void main() {
         simulatedNoteId: 'sample_bodija',
       );
 
-      expect(result.modelName, 'Meta Muse Spark 1.3 (Vision)');
+      expect(result.modelName, 'SmartMove AI Vision');
       expect(result.confidence >= 0.95, true);
       expect(result.proposal.budget, 25000.0);
       expect(result.proposal.shoppingItems.isNotEmpty, true);
@@ -165,7 +165,7 @@ void main() {
 
       // Verify Header
       expect(find.text('Scan Paper Shopping List'), findsOneWidget);
-      expect(find.text('Meta Muse Spark Multimodal Vision Model'), findsOneWidget);
+      expect(find.text('SmartMove AI Vision Assistant'), findsOneWidget);
 
       // Verify Action Buttons
       expect(find.byKey(const ValueKey('btn_take_camera_photo')), findsOneWidget);
@@ -213,8 +213,9 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Verify header updated to Muse Spark, Voice & Vision
-      expect(find.text('Muse Spark, Voice & Vision'), findsOneWidget);
+      // Verify header
+      expect(find.text('Meta AI Assistant'), findsOneWidget);
+      expect(find.text('Voice & Vision'), findsOneWidget);
 
       // Verify Scan Paper Note button exists
       final scanBtn = find.byKey(const ValueKey('btn_scan_paper_note'));

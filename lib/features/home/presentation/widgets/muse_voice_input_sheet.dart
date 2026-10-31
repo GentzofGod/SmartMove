@@ -82,11 +82,11 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       _isRecording = false;
       _isTranscribing = true;
       _transcriptController.text =
-          'Transcribing with Meta Muse Voice Transcribe 1.0 (${_selectedDialect.languageCode})...';
+          'Transcribing with AI Voice Assistant (${_selectedDialect.languageCode})...';
     });
 
     const aiService = MetaAiService();
-    // Simulate low-latency chunked recognition from Muse Voice Transcribe
+    // Simulate low-latency chunked recognition from AI Voice Assistant
     await Future.delayed(const Duration(milliseconds: 650));
 
     final result = await aiService.transcribeAudio(
@@ -103,7 +103,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         _isFallback = isUnavailable;
         _transcriptionStatus = isUnavailable
             ? 'Voice input unavailable. Please type your request directly below.'
-            : 'Meta AI Live Cloud: Muse Voice Transcribe (${result.detectedDialect.label})';
+            : 'SmartMove AI: Voice Input (${result.detectedDialect.label})';
       });
     }
   }
@@ -131,7 +131,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         _transcriptController.text = result.text;
         _isFallback = result.isFallback;
         _transcriptionStatus =
-            'Meta Muse Voice Transcribe: Transcribed ${result.detectedDialect.label}';
+            'AI Voice Assistant: Transcribed ${result.detectedDialect.label}';
       });
     }
   }
@@ -188,7 +188,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Muse Voice Transcribe',
+                        'AI Voice Assistant',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -198,7 +198,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'Multi-Dialect West African Speech-to-Text Model',
+                        'Multi-Dialect West African Speech Recognition',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
