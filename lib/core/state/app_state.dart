@@ -33,6 +33,10 @@ class ProductsNotifier extends Notifier<List<Product>> {
     }
   }
 
+  Future<void> fetchLive() async {
+    await _fetchLive();
+  }
+
   void filterCategory(String category) {
     if (category == 'All') {
       state = _allProducts;
@@ -912,6 +916,19 @@ class AuthNotifier extends Notifier<UserSession> {
       businessName: businessName ?? state.businessName,
       marketHub: marketHub ?? state.marketHub,
       sellerChannel: sellerChannel ?? state.sellerChannel,
+      phone: phone ?? state.phone,
+    );
+    AuthService.persistSession(state);
+  }
+
+  void updateUserProfile({
+    String? displayName,
+    String? email,
+    String? phone,
+  }) {
+    state = state.copyWith(
+      displayName: displayName ?? state.displayName,
+      email: email ?? state.email,
       phone: phone ?? state.phone,
     );
     AuthService.persistSession(state);

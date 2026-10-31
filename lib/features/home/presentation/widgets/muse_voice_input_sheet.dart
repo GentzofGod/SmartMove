@@ -90,18 +90,19 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     await Future.delayed(const Duration(milliseconds: 650));
 
     final result = await aiService.transcribeAudio(
-      simulatedVoiceSample: _selectedDialect.samplePrompt,
       dialect: _selectedDialect,
     );
 
     if (mounted) {
+      final isUnavailable = result.isFallback || result.hasError || result.text.isEmpty;
       setState(() {
         _isTranscribing = false;
         _transcriptionResult = result;
-        _transcriptController.text = result.text;
-        _isFallback = result.isFallback;
-        _transcriptionStatus = result.isFallback
-            ? 'Meta AI Fallback Engine Active: Offline Dialect Engine (${result.detectedDialect.label})'
+        // User request: Clear fallback to nothing instead of canned "I have 15000..."
+        _transcriptController.text = isUnavailable ? '' : result.text;
+        _isFallback = isUnavailable;
+        _transcriptionStatus = isUnavailable
+            ? 'Voice input unavailable. Please type your request directly below.'
             : 'Meta AI Live Cloud: Muse Voice Transcribe (${result.detectedDialect.label})';
       });
     }
@@ -387,9 +388,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                   ),
                   const SizedBox(height: 8),
 
-                  // Prompt hint for selected dialect
+                  // Guidance note for selected dialect
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
@@ -405,10 +406,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            '"${_selectedDialect.samplePrompt}"',
+                            'Speak clearly in ${_selectedDialect.label} or English, or type below.',
                             style: const TextStyle(
                               fontSize: 10.5,
-                              fontStyle: FontStyle.italic,
                               color: AppColors.textSecondary,
                             ),
                             maxLines: 2,
@@ -427,7 +427,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Text(
-                              'Test Sample',
+                              'Sample',
                               style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w700,

@@ -233,7 +233,7 @@ void main() {
       expect(confirmedTranscript!.contains('₦15,000'), true);
     });
 
-    testWidgets('9. Push-to-talk recording flow transcribes in selected Pidgin dialect', (tester) async {
+    testWidgets('9. Push-to-talk recording flow clears fallback to empty and allows direct text input', (tester) async {
       tester.view.physicalSize = const Size(800, 1100);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -271,8 +271,18 @@ void main() {
       await tester.pump(const Duration(milliseconds: 800));
       await tester.pumpAndSettle();
 
-      // Verify Pidgin transcription and translation
-      expect(find.text('English Translation (Nigerian Pidgin):'), findsOneWidget);
+      // Verify that fallback is cleared to empty string and user-friendly error is shown
+      expect(
+        find.text('Voice input unavailable. Please type your request directly below.'),
+        findsOneWidget,
+      );
+
+      // Enter shopping request manually without having to delete canned mock text
+      await tester.enterText(
+        find.byType(TextField),
+        '2 paint rubber of garri and 1 bag of rice',
+      );
+      await tester.pumpAndSettle();
 
       // Scroll and Tap Generate proposal
       final proposalBtn = find.byKey(const ValueKey('btn_generate_plan_proposal'));
