@@ -1496,23 +1496,41 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                             ),
                           ),
                         ] else ...[
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.directions_outlined, size: 14),
-                            label: const Text('Directions / Stall Info', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                            style: OutlinedButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          if (source.webUrl != null)
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.map_outlined, size: 14),
+                              label: const Text('Locate on Maps', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E7D32),
+                                foregroundColor: Colors.white,
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => SafeOutletLauncher.openExternalWebUrl(
+                                context,
+                                url: source.webUrl!,
+                                outletName: source.outletName,
+                              ),
+                            )
+                          else
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.directions_outlined, size: 14),
+                              label: const Text('Directions / Stall Info', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Locating ${source.outletName} at ${source.marketHubOrLocation}...'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
                             ),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Locating ${source.outletName} at ${source.marketHubOrLocation}...'),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
                           if (source.contactPhone != null && SafeOutletLauncher.isValidPhoneNumber(source.contactPhone))
                             OutlinedButton.icon(
                               icon: const Icon(Icons.phone_outlined, size: 14),
@@ -1525,6 +1543,54 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                               onPressed: () => SafeOutletLauncher.callTraderPhone(source.contactPhone!),
                             ),
                         ],
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.auto_awesome, size: 13, color: AppColors.primary),
+                          label: const Text('Compare Alternatives', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Meta AI is discovering live vendor alternatives for ${source.commodityName}...',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
+                            const aiService = MetaAiService();
+                            final loc = ref.read(locationProvider);
+                            final userCity = loc.city.isNotEmpty ? loc.city : (loc.town.isNotEmpty ? loc.town : 'Ibadan');
+                            final comparison = await aiService.conductLiveAiVendorComparison(
+                              source.commodityName,
+                              city: userCity,
+                            );
+                            if (context.mounted) {
+                              messenger.hideCurrentSnackBar();
+                              SafeOutletLauncher.showMultiVendorComparisonSheet(
+                                context,
+                                comparison: comparison,
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ],

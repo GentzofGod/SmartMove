@@ -8,6 +8,7 @@ import '../../../core/models/product.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
+import '../../../core/services/safe_outlet_launcher.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 import '../../home/presentation/widgets/paper_note_scanner_sheet.dart';
 import 'product_detail_sheet.dart';
@@ -138,10 +139,34 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     if (query.isEmpty) return;
 
     final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Meta AI is researching live web vendors for "$query"...',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+
     const aiService = MetaAiService();
-    final plan = await aiService.queryAiPriceResearch(query);
+    final town = ref.read(locationProvider).displayTown;
+    final plan = await aiService.queryAiPriceResearch(query, city: town);
 
     if (!context.mounted) return;
+    messenger.hideCurrentSnackBar();
 
     if (plan == null) {
       messenger.showSnackBar(
@@ -153,142 +178,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       return;
     }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryTint,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Meta AI Price Research: ${plan.commodityName}',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                      const Text(
-                        'Multi-channel intelligence grounded on verified market surveys',
-                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Estimated Benchmark Range:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    plan.estimatedPriceRange,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text('Target Platforms & Channels', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-            const SizedBox(height: 8),
-            ...plan.targetPlatforms.map((platform) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        platform.toLowerCase().contains('jumia') || platform.toLowerCase().contains('konga') || platform.toLowerCase().contains('supermart')
-                            ? Icons.language
-                            : Icons.storefront,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(platform, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                      ),
-                      const Text(
-                        'Verified Channel',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                )),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F8E9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'Recommendation: ${plan.recommendation}',
-                style: const TextStyle(fontSize: 12, color: AppColors.primaryDark, fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _searchController.text = commodityName;
-                  ref.read(productsProvider.notifier).search(commodityName);
-                },
-                child: const Text('Filter Catalog by this Commodity', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final comparison = LiveAiMultiVendorComparison(
+      commodityName: plan.commodityName,
+      summary: plan.aiComparisonInsight ??
+          'Discovered ${plan.liveVendors.length} live vendor alternatives across web and local outlets.',
+      lowestPrice: plan.estimatedBenchmarkMin,
+      highestPrice: plan.estimatedBenchmarkMax,
+      priceSpreadDisplay: plan.estimatedPriceRange,
+      aiRecommendation: plan.customRecommendation ?? plan.recommendation,
+      vendors: plan.liveVendors,
     );
+
+    await SafeOutletLauncher.showMultiVendorComparisonSheet(context, comparison: comparison);
   }
 
   @override

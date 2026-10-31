@@ -5,6 +5,7 @@ import '../models/item_acquisition_source.dart';
 import '../models/seller_application.dart';
 import '../models/price_observation.dart';
 import '../services/location_service.dart';
+import '../services/web_search_grounding_service.dart';
 import '../data/demo_seed_data.dart';
 
 class DecisionEngine {
@@ -589,7 +590,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
-              webUrl: 'https://www.jumia.com.ng',
+              webUrl: WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
               brandOrGrade: item.brandOrGrade ?? 'Manufacturer Direct Spec',
             ),
           );
@@ -613,6 +614,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
+              webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
               brandOrGrade: item.brandOrGrade ?? 'Industrial Grade Standard',
             ),
           );
@@ -676,6 +678,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
+              webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
               brandOrGrade: item.brandOrGrade ?? 'Machinery Grade',
             ),
           );
@@ -702,7 +705,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
-              webUrl: 'https://www.jumia.com.ng',
+              webUrl: WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
               brandOrGrade: item.brandOrGrade ?? 'Authorized Manufacturer Direct',
             ),
           );
@@ -726,6 +729,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
+              webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
               brandOrGrade: item.brandOrGrade ?? 'Showroom Certified Spec',
             ),
           );
@@ -780,6 +784,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
+              webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
               brandOrGrade: item.brandOrGrade ?? 'Standard Brand Warranty',
             ),
           );
@@ -808,7 +813,9 @@ class DecisionEngine {
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: isStationeryOrElectronics ? 'https://www.jumia.com.ng' : null,
+            webUrl: isStationeryOrElectronics
+                ? WebSearchGroundingService.buildJumiaSearchUrl(item.productName)
+                : WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
             brandOrGrade: item.brandOrGrade ?? 'Supermarket Stock',
           ),
         );
@@ -861,6 +868,7 @@ class DecisionEngine {
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
+            webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
             brandOrGrade: item.brandOrGrade ?? 'Farm Fresh Daily Harvest',
           ),
         );
@@ -884,6 +892,7 @@ class DecisionEngine {
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
+            webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
             brandOrGrade: item.brandOrGrade ?? 'NAFDAC Approved',
           ),
         );
@@ -908,7 +917,9 @@ class DecisionEngine {
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: isOnline ? 'https://www.jumia.com.ng' : null,
+            webUrl: isOnline
+                ? WebSearchGroundingService.buildJumiaSearchUrl(item.productName)
+                : WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
             brandOrGrade: item.brandOrGrade ?? 'Manufacturer Sealed',
           ),
         );
@@ -932,6 +943,7 @@ class DecisionEngine {
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
+            webUrl: WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
             brandOrGrade: item.brandOrGrade,
           ),
         );
