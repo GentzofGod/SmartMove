@@ -59,7 +59,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
             ),
             SizedBox(height: 2),
             Text(
-              'Multi-plan scenario comparison and basket optimization',
+              'Multi-option scenario comparison and basket optimization',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -89,7 +89,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               unselectedLabelColor: AppColors.textSecondary,
               labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               tabs: [
-                const Tab(text: 'Compare Plans'),
+                const Tab(text: 'Compare Options'),
                 Tab(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -121,7 +121,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Tab 1: Compare Plans (Screen 7)
+          // Tab 1: Compare Options (Screen 7)
           _buildComparePlansTab(candidates, selectedPlan, decisionState),
 
           // Tab 2: Cart Menu (Active Basket & Item Management)
@@ -139,12 +139,12 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           child: ElevatedButton(
             onPressed: candidates.isNotEmpty && selectedPlan.id != 'plan-default'
                 ? () {
-                    // Lock in the selected plan to the active itinerary
+                    // Lock in the selected option to the active itinerary / acquisition process
                     ref.read(itineraryProvider.notifier).updateWithPlan(selectedPlan);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         backgroundColor: AppColors.primary,
-                        content: Text('Accepted ${selectedPlan.name}! Itinerary updated.'),
+                        content: Text('Proceeding with ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}! Loading acquisition process...'),
                       ),
                     );
                     context.push('/itinerary');
@@ -154,8 +154,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               fit: BoxFit.scaleDown,
               child: Text(
                 candidates.isNotEmpty && selectedPlan.id != 'plan-default'
-                    ? 'Accept ${selectedPlan.name} & View Itinerary'
-                    : 'Add Items to Cart to View Itinerary',
+                    ? 'Proceed with ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}'
+                    : 'Add Items to Cart to Proceed',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -166,6 +166,36 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         ),
       ),
     );
+  }
+
+  List<String> _getDynamicRefineSuggestions(DecisionLabState state) {
+    final items = state.activeItems;
+    final List<String> suggestions = [];
+
+    if (items.isNotEmpty) {
+      final first = items.first;
+      suggestions.add('Find cheaper alternative for ${first.productName}');
+
+      if (items.length > 1) {
+        final second = items[1];
+        suggestions.add('Compare nearby market price for ${second.productName}');
+        suggestions.add('Find single-hub seller with both ${first.productName} and ${second.productName}');
+      } else {
+        suggestions.add('Find verified platform traders for ${first.productName}');
+      }
+
+      if (state.budget > 0) {
+        suggestions.add('Adjust quantities to stay under ₦${state.budget.toStringAsFixed(0)}');
+      }
+
+      suggestions.add('I want to spend less on transport across options');
+    } else {
+      suggestions.add('Compare prices for Local Rice and Cooking Oil');
+      suggestions.add('Find nearest verified wholesale market');
+      suggestions.add('I want to spend less on transport');
+    }
+
+    return suggestions;
   }
 
   void _submitFollowUp(List<PlanCandidate> candidates, DecisionLabState state) {
@@ -329,12 +359,12 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'No Active Plans to Compare',
+                  'No Active Options to Compare',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Add commodities to your shopping basket to generate multi-market candidate plans and compare transport trade-offs.',
+                  'Add commodities to your shopping basket to generate multi-market candidate options and compare transport trade-offs.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.35),
                 ),
@@ -373,59 +403,6 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        // Shopping List Header Card
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    state.activeItems.isNotEmpty
-                        ? 'Active Basket'
-                        : 'Shopping Basket',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    state.activeItems.isNotEmpty
-                        ? '${state.activeItems.length} commodities'
-                        : '0 commodities',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                state.activeItems.isNotEmpty
-                    ? state.activeItems
-                        .map((i) => '${i.productName} (${i.quantity.toStringAsFixed(0)} ${i.unit})')
-                        .join(', ')
-                    : 'No items in basket yet. Search commodities, speak a list, or scan a paper note.',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
         // Section Title
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -610,14 +587,22 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                           color: isSelected ? AppColors.primary : AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${plan.estimatedHours} hrs  •  ${plan.stopCount} stops',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final planDistance = plan.stops.fold(0.0, (sum, s) => sum + s.distanceKm);
+                          if (planDistance <= 0) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              '${planDistance.toStringAsFixed(1)} km total distance',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const Divider(height: 16, color: AppColors.divider),
                       Text(
@@ -808,14 +793,22 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                         Text(selectedPlan.formattedTotalCost, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary)),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Expanded(child: Text('Trip Duration & Stops:', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                        const SizedBox(width: 8),
-                        Text('${selectedPlan.estimatedHours} hrs  •  ${selectedPlan.stopCount} stops', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      ],
+                    Builder(
+                      builder: (context) {
+                        final totalDist = selectedPlan.stops.fold(0.0, (sum, s) => sum + s.distanceKm);
+                        if (totalDist <= 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Expanded(child: Text('Total Route Distance:', style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                              const SizedBox(width: 8),
+                              Text('${totalDist.toStringAsFixed(1)} km', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -981,7 +974,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                 builder: (context) {
                   if (candidates.isEmpty) {
                     return const Text(
-                      'No candidate plans generated yet. Add commodities in the Cart Menu tab to compare plans.',
+                      'No candidate options generated yet. Add commodities in the Cart Menu tab to compare options.',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -1039,7 +1032,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       color: AppColors.primary, size: 18),
                   SizedBox(width: 8),
                   Text(
-                    'Ask Muse Spark to Refine Plan',
+                    'Ask Muse Spark to Refine Options',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -1055,46 +1048,23 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               ),
               const SizedBox(height: 10),
 
-              // Suggestion Chips
+              // Dynamic Suggestion Chips
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: [
-                  ActionChip(
-                    label: const Text(
-                      'I want to spend less on transport even if shopping bill is slightly higher',
-                      style: TextStyle(fontSize: 11),
+                children: _getDynamicRefineSuggestions(state).map((suggestion) {
+                  return ActionChip(
+                    label: Text(
+                      suggestion,
+                      style: const TextStyle(fontSize: 11),
                     ),
                     backgroundColor: AppColors.surface,
                     onPressed: () {
-                      _followUpController.text =
-                          'I want to spend less on transport even if the shopping bill is slightly higher';
+                      _followUpController.text = suggestion;
                       _submitFollowUp(candidates, state);
                     },
-                  ),
-                  ActionChip(
-                    label: const Text(
-                      'I need to finish faster before deadline',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    backgroundColor: AppColors.surface,
-                    onPressed: () {
-                      _followUpController.text = 'I need to finish faster before deadline';
-                      _submitFollowUp(candidates, state);
-                    },
-                  ),
-                  ActionChip(
-                    label: const Text(
-                      'Budget is tight, delay non-urgent items',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    backgroundColor: AppColors.surface,
-                    onPressed: () {
-                      _followUpController.text = 'Budget is tight, delay non-urgent items';
-                      _submitFollowUp(candidates, state);
-                    },
-                  ),
-                ],
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 10),
 
@@ -1872,7 +1842,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Add commodities to dynamically generate and compare candidate plans without fake defaults.',
+                  'Add commodities to dynamically generate and compare candidate options without fake defaults.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
                 ),
@@ -2065,7 +2035,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'Compare Generated Plans',
+                  'Compare Generated Options',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                 ),
               ),

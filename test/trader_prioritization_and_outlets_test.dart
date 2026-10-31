@@ -65,7 +65,7 @@ void main() {
       );
 
       expect(plans.isNotEmpty, true);
-      final planA = plans.firstWhere((p) => p.name == 'Plan A');
+      final planA = plans.firstWhere((p) => p.name == 'Option A');
       expect(planA.acquisitionSources.isNotEmpty, true);
 
       // Verify that rice and oil were mapped to Mama Bello

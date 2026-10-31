@@ -269,7 +269,7 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'AI Plan Proposal',
+                            'AI Sourcing Proposal',
                             style: TextStyle(
                               fontSize: 16.5,
                               fontWeight: FontWeight.w800,
@@ -532,7 +532,7 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                     ),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
                     label: const Text(
-                      'Confirm & Calculate Plans',
+                      'Confirm & Calculate Options',
                       style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                     ),
                   ),

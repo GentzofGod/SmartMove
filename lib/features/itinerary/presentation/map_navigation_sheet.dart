@@ -2,7 +2,18 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 
 class MapNavigationSheet extends StatelessWidget {
-  const MapNavigationSheet({super.key});
+  final String destinationTitle;
+  final String destinationAddress;
+  final String buyerAddress;
+  final double distanceKm;
+
+  const MapNavigationSheet({
+    super.key,
+    this.destinationTitle = 'Seller Outlet',
+    this.destinationAddress = 'Seller Location',
+    this.buyerAddress = 'Your Current Location',
+    this.distanceKm = 1.2,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -64,21 +75,23 @@ class MapNavigationSheet extends StatelessWidget {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              'En route to Market B',
+                              'En route to $destinationTitle',
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              '2.1 km  •  7 min remaining',
+                              distanceKm > 0
+                                  ? '${distanceKm.toStringAsFixed(1)} km away  •  $destinationAddress'
+                                  : destinationAddress,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Color(0xFFC0D5CB),
                                 fontSize: 12,
                               ),
@@ -114,26 +127,18 @@ class MapNavigationSheet extends StatelessWidget {
                     painter: _MapCanvasPainter(),
                   ),
 
-                  // Stop Pins
+                  // Destination Pin
                   Positioned(
                     top: 40,
-                    right: 60,
-                    child: _buildMapPin('Market B', Icons.store_outlined, AppColors.primary),
-                  ),
-                  Positioned(
-                    top: 140,
                     right: 40,
-                    child: _buildMapPin('Community Pharmacy', Icons.local_pharmacy_outlined, AppColors.blue),
+                    child: _buildMapPin(destinationTitle, Icons.storefront_outlined, AppColors.primary),
                   ),
-                  Positioned(
-                    bottom: 60,
-                    right: 80,
-                    child: _buildMapPin('Post Office', Icons.inventory_2_outlined, AppColors.amber),
-                  ),
+
+                  // Buyer Current Location Pin
                   Positioned(
                     bottom: 40,
-                    left: 50,
-                    child: _buildMapPin('You', Icons.my_location, AppColors.primaryDark),
+                    left: 40,
+                    child: _buildMapPin('You ($buyerAddress)', Icons.my_location, AppColors.primaryDark),
                   ),
 
                   // Map Floating Controls
@@ -181,7 +186,7 @@ class MapNavigationSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.turn_right_rounded,
+                    Icons.directions_outlined,
                     color: AppColors.primary,
                     size: 26,
                   ),
@@ -190,19 +195,19 @@ class MapNavigationSheet extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'Turn right in 300 m',
-                        style: TextStyle(
+                        'Proceed to $destinationTitle',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        'Lagos Rd / Commercial Avenue',
-                        style: TextStyle(
+                        destinationAddress,
+                        style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),

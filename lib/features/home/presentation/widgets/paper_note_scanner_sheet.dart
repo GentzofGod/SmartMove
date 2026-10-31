@@ -556,7 +556,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                 ),
                 icon: const Icon(Icons.auto_awesome, size: 18),
                 label: const Text(
-                  'Generate Plan Proposal from Note',
+                  'Generate Options Proposal from Note',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
               ),

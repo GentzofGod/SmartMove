@@ -89,7 +89,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify title and compact badge
-    expect(find.text('AI Plan Proposal'), findsOneWidget);
+    expect(find.text('AI Sourcing Proposal'), findsOneWidget);
     expect(find.text('✓ Multi-Source Grounded'), findsOneWidget);
 
     // Verify item title and no overflow
@@ -146,7 +146,7 @@ void main() {
     expect(find.text('Subtotal: ₦39,000'), findsOneWidget);
 
     // Tap confirm button
-    final confirmBtn = find.text('Confirm & Calculate Plans');
+    final confirmBtn = find.text('Confirm & Calculate Options');
     expect(confirmBtn, findsOneWidget);
     await tester.tap(confirmBtn);
     await tester.pumpAndSettle();

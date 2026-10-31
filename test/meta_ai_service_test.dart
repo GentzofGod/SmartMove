@@ -71,18 +71,18 @@ void main() {
       );
 
       final explanation = aiService.explainTradeOffs(
-        planA: plans.firstWhere((p) => p.name == 'Plan A'),
-        planB: plans.firstWhere((p) => p.name == 'Plan B'),
-        planC: plans.firstWhere((p) => p.name == 'Plan C'),
-        planD: plans.firstWhere((p) => p.name == 'Plan D'),
+        planA: plans.firstWhere((p) => p.name == 'Option A'),
+        planB: plans.firstWhere((p) => p.name == 'Option B'),
+        planC: plans.firstWhere((p) => p.name == 'Option C'),
+        planD: plans.firstWhere((p) => p.name == 'Option D'),
         budget: 15000,
       );
 
       expect(explanation.contains('Meta Muse Spark Insight'), true);
-      expect(explanation.contains('Plan A'), true);
-      expect(explanation.contains('Plan B'), true);
-      // Explains exact computed item savings between Plan B and Plan A
-      expect(explanation.contains('₦13,400') || explanation.contains('Plan A has the lowest total outlay'), true);
+      expect(explanation.contains('Option A'), true);
+      expect(explanation.contains('Option B'), true);
+      // Explains exact computed item savings between Option B and Option A
+      expect(explanation.contains('₦13,400') || explanation.contains('Option A has the lowest total outlay'), true);
     });
 
     test('6. Interprets user follow-up "spend less on transport even if shopping bill is slightly higher"', () {
@@ -100,7 +100,7 @@ void main() {
       );
 
       expect(result.targetPlanId, 'plan-b');
-      expect(result.interpretationExplanation.contains('Plan B cuts your transport cost'), true);
+      expect(result.interpretationExplanation.contains('Option B cuts your transport cost'), true);
       expect(result.suggestedMaxStops, 2);
     });
 

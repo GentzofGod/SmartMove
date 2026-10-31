@@ -179,7 +179,7 @@ class DecisionLabState {
     if (candidates.isEmpty) {
       return const PlanCandidate(
         id: 'plan-default',
-        name: 'Default Plan',
+        name: 'Default Option',
         tag: 'Balanced',
         itemCost: 0,
         transportCost: 0,
@@ -191,7 +191,7 @@ class DecisionLabState {
         isRecommended: true,
         satisfiedConstraints: [],
         violatedConstraints: [],
-        tradeOffExplanation: 'Default plan',
+        tradeOffExplanation: 'Default option',
         stops: [],
       );
     }

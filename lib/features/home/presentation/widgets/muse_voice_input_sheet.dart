@@ -669,7 +669,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                 ),
                 icon: const Icon(Icons.auto_awesome, size: 18),
                 label: const Text(
-                  'Generate Plan Proposal',
+                  'Generate Options Proposal',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
               ),

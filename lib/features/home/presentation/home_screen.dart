@@ -344,7 +344,7 @@ class HomeScreen extends ConsumerWidget {
                             SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'No active shopping plan yet',
+                                'No active shopping options yet',
                                 style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
@@ -370,11 +370,12 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Stat Metrics Row: Budget, Remaining Budget, Est. Time (Only when active plan & budget exists)
+              // Stat Metrics Row: Budget, Remaining Budget, Distance (Only when active plan & budget exists)
               if (decisionState.activeItems.isNotEmpty && decisionState.budget > 0) ...[
                 Builder(
                   builder: (context) {
                     final remainingBudget = (decisionState.budget - decisionState.selectedPlan.totalCost).clamp(0.0, double.infinity);
+                    final totalDist = decisionState.selectedPlan.stops.fold(0.0, (sum, s) => sum + s.distanceKm);
                     return Row(
                       children: [
                         Expanded(
@@ -399,9 +400,9 @@ class HomeScreen extends ConsumerWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: _buildMetricCard(
-                            label: 'Est. Time',
-                            value: '${decisionState.selectedPlan.estimatedHours} hrs',
-                            icon: Icons.schedule_outlined,
+                            label: 'Distance',
+                            value: totalDist > 0 ? '${totalDist.toStringAsFixed(1)} km' : 'Direct',
+                            icon: Icons.directions_outlined,
                             iconBg: const Color(0xFFDEEBFF),
                             iconColor: const Color(0xFF0052CC),
                           ),

@@ -3069,9 +3069,9 @@ class MetaAiService {
     );
   }
 
-  // --- 4. Muse Spark Plan Explainer (Referencing Verified Records Only) ---
+  // --- 4. Muse Spark Option Explainer (Referencing Verified Records Only) ---
 
-  /// Explains differences between calculated plans in clear, concise language
+  /// Explains differences between calculated options in clear, concise language
   /// Safeguard: Refers only to the calculated numbers passed from the application; never invents data.
   String explainTradeOffs({
     required PlanCandidate planA,
@@ -3081,14 +3081,12 @@ class MetaAiService {
     required double budget,
   }) {
     final diffSavings = planB.totalCost - planA.totalCost;
-    final timeSavedHours = planA.estimatedHours - planB.estimatedHours;
-    final timeSavedMins = (timeSavedHours * 60).round();
 
     if (budget < 12000) {
-      return 'Meta Muse Spark Insight: With your ₦${budget.toStringAsFixed(0)} budget, Plan D is the only safe option (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while completing high-priority errands on time (no price-drop claim made).';
+      return 'Meta Muse Spark Insight: With your ₦${budget.toStringAsFixed(0)} budget, Option D is the safest choice (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while prioritizing essential commodities (no price-drop claim made).';
     }
 
-    return 'Meta Muse Spark Insight: Plan A has the lowest total outlay (${planA.formattedTotalCost}) by splitting purchases across 2 markets, saving ₦${diffSavings.toStringAsFixed(0)} compared to Plan B. Conversely, Plan B saves $timeSavedMins minutes and cuts travel to 2 stops for ₦${planB.formattedTotalCost}.';
+    return 'Meta Muse Spark Insight: Option A has the lowest total outlay (${planA.formattedTotalCost}) by splitting purchases across open wholesale markets, saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B. Conversely, Option B provides consolidated single-hub sourcing with verified platform traders for ₦${planB.formattedTotalCost}.';
   }
 
   // --- 5. Muse Spark Proactive Optimization Assistant ---
@@ -3120,10 +3118,10 @@ class MetaAiService {
           id: 'tip-budget-safety',
           title: 'Budget Safety Alert',
           message:
-              'Plan A exceeds your budget by ₦${deficit.toStringAsFixed(0)}. Meta AI recommends switching to Plan D (${planD.formattedTotalCost}) to postpone non-urgent items and comfortably stay within budget.',
+              'Option A exceeds your budget by ₦${deficit.toStringAsFixed(0)}. Meta AI recommends switching to Option D (${planD.formattedTotalCost}) to postpone non-urgent items and comfortably stay within budget.',
           iconType: 'budget',
           potentialSavings: planA.totalCost - planD.totalCost,
-          actionLabel: 'Switch to Plan D',
+          actionLabel: 'Switch to Option D',
           targetPlanId: 'plan-d',
           delayNonUrgent: true,
         ),
@@ -3138,7 +3136,7 @@ class MetaAiService {
           id: 'tip-transit-saver',
           title: 'Transit Expense Saver',
           message:
-              'Consolidating your errands into a single commercial hub (Plan B) saves ₦${transitSavings.toStringAsFixed(0)} in travel fares and cuts travel time by 42 minutes.',
+              'Consolidating your purchases into a single commercial hub (Option B) saves ₦${transitSavings.toStringAsFixed(0)} in travel fares.',
           iconType: 'transport',
           potentialSavings: transitSavings,
           actionLabel: 'Apply Consolidated Route',
@@ -3148,16 +3146,15 @@ class MetaAiService {
     }
 
     // Tip 3: Express / Fast Turnaround
-    if (planC.estimatedHours < planA.estimatedHours) {
-      final timeSaved = ((planA.estimatedHours - planC.estimatedHours) * 60).round();
+    if (planC.itemCost < planA.itemCost || planC.transportCost <= planA.transportCost) {
       tips.add(
-        AiOptimizationTip(
+        const AiOptimizationTip(
           id: 'tip-time-express',
-          title: 'Fast Express Turnaround',
+          title: 'Express Walk-In Turnaround',
           message:
-              'In a rush? Plan C completes all high-priority commodity purchases in ${planC.estimatedHours}h, saving you $timeSaved minutes of travel delay.',
+              'In a rush? Option C completes all high-priority commodity purchases at neighborhood retail marts for immediate walk-in acquisition.',
           iconType: 'time',
-          actionLabel: 'Select Express Plan',
+          actionLabel: 'Select Express Option',
           targetPlanId: 'plan-c',
         ),
       );
@@ -3226,7 +3223,7 @@ class MetaAiService {
     if (lower.contains('hurry') || lower.contains('faster') || lower.contains('express') || lower.contains('quickest')) {
       return const AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI switched to Plan C (Express Route) to prioritize shortest duration and immediate deadline turnaround.',
+            'Meta AI switched to Option C (Express Walk-in) to prioritize rapid convenience and immediate acquisition.',
         selectedPlanId: 'plan-c',
         updatedTimeHours: 1.5,
       );
@@ -3236,7 +3233,7 @@ class MetaAiService {
     if (lower.contains('less transport') || lower.contains('cut transport') || lower.contains('fewer stops') || lower.contains('cheaper travel')) {
       return const AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI applied Plan B (Consolidated Stops) to minimize transport fares and transit legs.',
+            'Meta AI applied Option B (Consolidated Sourcing) to minimize transport fares and transit legs.',
         selectedPlanId: 'plan-b',
         updatedMaxStops: 2,
       );
@@ -3246,34 +3243,34 @@ class MetaAiService {
     if (lower.contains('delay') || lower.contains('non-essential') || lower.contains('postpone') || lower.contains('tight budget')) {
       return const AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI configured Plan D to postpone non-urgent items and protect your immediate cashflow.',
+            'Meta AI configured Option D to postpone non-urgent items and protect your immediate cashflow.',
         selectedPlanId: 'plan-d',
         updatedDelayNonUrgent: true,
       );
     }
 
-    // Command 6: Select specific plan
-    if (lower.contains('plan a')) {
+    // Command 6: Select specific plan/option
+    if (lower.contains('option a') || lower.contains('plan a')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Plan A (Lowest Total Product Cost).',
+        feedbackMessage: 'Meta AI selected Option A (Lowest Total Product Cost).',
         selectedPlanId: 'plan-a',
       );
     }
-    if (lower.contains('plan b')) {
+    if (lower.contains('option b') || lower.contains('plan b')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Plan B (Consolidated Single Hub).',
+        feedbackMessage: 'Meta AI selected Option B (Consolidated Single Hub).',
         selectedPlanId: 'plan-b',
       );
     }
-    if (lower.contains('plan c')) {
+    if (lower.contains('option c') || lower.contains('plan c')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Plan C (Express Shortest Duration).',
+        feedbackMessage: 'Meta AI selected Option C (Express Walk-In).',
         selectedPlanId: 'plan-c',
       );
     }
-    if (lower.contains('plan d')) {
+    if (lower.contains('option d') || lower.contains('plan d')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Plan D (Cashflow & Non-Urgent Delay).',
+        feedbackMessage: 'Meta AI selected Option D (Cashflow & Non-Urgent Delay).',
         selectedPlanId: 'plan-d',
       );
     }
@@ -3281,7 +3278,7 @@ class MetaAiService {
     // Rather than returning a fake coded fallback response, report an informative message
     return const AiCommandExecutionResult(
       feedbackMessage:
-          'Meta AI could not recognize this command. You can type commands like "Add 2kg rice", "Set budget to ₦20,000", or "Fastest route".',
+          'Meta AI could not recognize this command. You can type commands like "Add 2kg rice", "Set budget to ₦20,000", or "Select Option A".',
     );
   }
 
@@ -3299,7 +3296,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'No candidate plans are currently generated. Please add commodities to your cart first in the Cart Menu.',
+            'No candidate options are currently generated. Please add commodities to your cart first in the Cart Menu.',
         targetPlanId: '',
       );
     }
@@ -3325,7 +3322,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating errands into ${lowestTransportPlan.stopCount} stops, absorbing a small $diffText grocery difference.',
+            'Muse Spark interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating sourcing into a single verified trader hub, absorbing a small $diffText grocery difference.',
         targetPlanId: lowestTransportPlan.id,
         suggestedTransport: lowestTransportPlan.transportCost,
         suggestedMaxStops: lowestTransportPlan.stopCount,
@@ -3346,7 +3343,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Prioritize completion speed. ${fastestPlan.name} is an express route finishing in ${fastestPlan.estimatedHours} hours across ${fastestPlan.stopCount} stops, guaranteeing all high-priority deadlines are met.',
+            'Muse Spark interpreted your preference: Express convenience. ${fastestPlan.name} provides direct walk-in neighborhood retail sourcing for rapid acquisition.',
         targetPlanId: fastestPlan.id,
         suggestedMaxHours: fastestPlan.estimatedHours,
       );
@@ -3369,7 +3366,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'Muse Spark interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while completing high-priority essential staples within a strict budget.',
+            'Muse Spark interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while acquiring high-priority essential staples within a strict budget.',
         targetPlanId: cashflowPlan.id,
         suggestedDelayNonUrgent: true,
       );
@@ -3379,7 +3376,7 @@ class MetaAiService {
     return FollowUpInterpretation(
       userMessage: userFollowUp,
       interpretationExplanation:
-          'Could not interpret this adjustment. Please specify if you want to lower budget, reduce transit stops, save travel time, or choose a specific plan.',
+          'Could not interpret this adjustment. Please specify if you want to lower budget, find cheaper alternatives, or choose a specific option (e.g. Option A, Option B).',
       targetPlanId: '',
     );
   }

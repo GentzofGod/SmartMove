@@ -12,10 +12,10 @@ void main() {
         maxTimeHours: 3.0,
       );
 
-      // Plans A, B, C, D
+      // Options A, B, C, D
       expect(plans.length, 4);
 
-      final planA = plans.firstWhere((p) => p.name == 'Plan A');
+      final planA = plans.firstWhere((p) => p.name == 'Option A');
       expect(planA.itemCost, 11600.0);
       expect(planA.transportCost, 1800.0); // 1200 * 1.5
       expect(planA.totalCost, 13400.0);
@@ -23,18 +23,18 @@ void main() {
       expect(planA.isFeasibleDeadline, true); // 2.5 <= 3.0
       expect(planA.isRecommended, true);
 
-      final planB = plans.firstWhere((p) => p.name == 'Plan B');
+      final planB = plans.firstWhere((p) => p.name == 'Option B');
       expect(planB.itemCost, 12600.0);
       expect(planB.transportCost, 1200.0);
       expect(planB.totalCost, 13800.0);
       expect(planB.estimatedHours, 1.8);
       expect(planB.stopCount, 2);
 
-      final planC = plans.firstWhere((p) => p.name == 'Plan C');
+      final planC = plans.firstWhere((p) => p.name == 'Option C');
       expect(planC.estimatedHours, 1.2);
-      expect(planC.stopCount, 2);
+      expect(planC.stopCount, 1);
 
-      final planD = plans.firstWhere((p) => p.name == 'Plan D');
+      final planD = plans.firstWhere((p) => p.name == 'Option D');
       expect(planD.tag, 'Delay Non-Urgent');
       expect(planD.totalCost <= 15000, true);
     });
@@ -46,7 +46,7 @@ void main() {
         maxTimeHours: 3.0,
       );
 
-      final planA = plans.firstWhere((p) => p.name == 'Plan A');
+      final planA = plans.firstWhere((p) => p.name == 'Option A');
       expect(planA.totalCost, 13400.0);
       expect(planA.isFeasibleBudget, false); // 13400 > 11000
 
@@ -57,7 +57,7 @@ void main() {
         candidates: plans,
       );
       expect(insight.contains('Strict budget safety'), true);
-      expect(insight.contains('Plan D'), true);
+      expect(insight.contains('Option D'), true);
     });
 
     test('Meta AI Service parses prompt into structured items and package errand', () async {
@@ -124,8 +124,8 @@ void main() {
 
       expect(plans.length, 4);
 
-      // Plan A (Multi-market competitive pricing)
-      final planA = plans.firstWhere((p) => p.name == 'Plan A');
+      // Option A (Multi-market competitive pricing)
+      final planA = plans.firstWhere((p) => p.name == 'Option A');
       expect(planA.itemCost, 12350.0); // 13000 * 0.95
       expect(planA.transportCost, 2250.0); // 1500 * 1.5
       expect(planA.totalCost, 14600.0);
@@ -135,8 +135,8 @@ void main() {
       expect(planA.stops.any((s) => s.title.contains('Market')), true);
       expect(planA.stops.any((s) => s.title == 'Drop off Dry Cleaning'), true);
 
-      // Plan D (Postpones non-urgent low priority bread)
-      final planD = plans.firstWhere((p) => p.name == 'Plan D');
+      // Option D (Postpones non-urgent low priority bread)
+      final planD = plans.firstWhere((p) => p.name == 'Option D');
       expect(planD.itemCost, 11600.0); // 4400 (yam) + 7200 (beans), excluding bread
       expect(planD.isFeasibleBudget, true);
     });

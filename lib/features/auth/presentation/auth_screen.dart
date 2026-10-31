@@ -143,7 +143,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           Text(
                             _isSignUp
                                 ? 'Join SmartMove community today'
-                                : 'Log in to sync your plans & alerts',
+                                : 'Log in to sync your options & alerts',
                             style: const TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,

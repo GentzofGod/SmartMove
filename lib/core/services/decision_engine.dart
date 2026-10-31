@@ -154,23 +154,13 @@ class DecisionEngine {
       );
     } else {
       planAStopsList = defaultStops;
-      planBStopsList = [
-        defaultStops[0],
-        defaultStops[1], // Market B
-        defaultStops[3], // Jumia pickup
-        defaultStops[4], // Return home
-      ];
-      planCStopsList = [
-        defaultStops[0],
-        defaultStops[1],
-        defaultStops[4],
-      ];
-      planDStopsList = [
-        defaultStops[0],
-        defaultStops[1],
-        defaultStops[3],
-        defaultStops[4],
-      ];
+      planBStopsList = defaultStops.length > 1
+          ? [defaultStops[0], defaultStops[1]]
+          : defaultStops;
+      planCStopsList = defaultStops.take(1).toList();
+      planDStopsList = defaultStops.length > 1
+          ? [defaultStops[0], defaultStops[1]]
+          : defaultStops;
     }
 
     // Extract first non-shopping errand deadline if any (only if explicitly provided)
@@ -188,7 +178,7 @@ class DecisionEngine {
     final double planATimeCost = timeCostPerHour * 2.5;
     final double planATotal = planABaseItems + planATransport + planATimeCost;
     const double planAHours = 2.5;
-    final int planAStops = hasCustomItems && errands != null ? (planAStopsList.length - 2).clamp(2, 6) : 3;
+    final int planAStops = planAStopsList.length;
 
     final List<String> planASatisfied = [];
     final List<String> planAViolated = [];
@@ -214,10 +204,10 @@ class DecisionEngine {
 
     final planA = PlanCandidate(
       id: 'plan-a',
-      name: 'Plan A',
+      name: 'Option A',
       tag: 'Cheapest Basket',
       sourcingChannel: 'Open Wholesale Multi-Market',
-      easeOfAccess: 'Low Ease • Multi-Stall Trek (2.5 hrs • 3 stops)',
+      easeOfAccess: 'Low Ease • Multi-Stall Physical Trek',
       accessRating: 'Low Ease',
       itemCost: planABaseItems,
       transportCost: planATransport,
@@ -235,20 +225,20 @@ class DecisionEngine {
         'Prices reflect latest trader and community observations',
       ],
       tradeOffExplanation: delayNonUrgent
-          ? 'Delayed non-urgent purchases. Lowest total outlay (₦${planATotal.toStringAsFixed(0)}). Prioritizes registered traders across 2 competitive hubs.'
+          ? 'Delayed non-urgent purchases. Lowest total outlay (₦${planATotal.toStringAsFixed(0)}). Prioritizes registered traders across competitive hubs.'
           : hasCustomItems
-              ? 'Lowest shopping bill (₦${planABaseItems.toStringAsFixed(0)}). Prioritizes registered traders and wholesale stalls across $planAStops stops.'
-              : 'Lowest shopping bill (₦11,600). Visits Market B & C across 3 stops. Saves ₦800 overall compared to single-market shopping.',
+              ? 'Lowest shopping bill (₦${planABaseItems.toStringAsFixed(0)}). Prioritizes registered traders and wholesale stalls.'
+              : 'Lowest shopping bill (₦11,600). Visits Market B & C. Saves ₦800 overall compared to single-market shopping.',
       stops: planAStopsList,
       acquisitionSources: planASources,
     );
 
-    // 2. PLAN B: Lowest Transport Expense & Fewest Stops (Consolidated to Market B)
+    // 2. OPTION B: Lowest Transport Expense & Consolidated Hub
     final double planBTransport = baseTransportFare * 1.0;
     final double planBTimeCost = timeCostPerHour * 1.8;
     final double planBTotal = planBBaseItems + planBTransport + planBTimeCost;
     const double planBHours = 1.8;
-    final int planBStops = hasCustomItems && errands != null ? (planBStopsList.length - 2).clamp(1, 4) : 2;
+    final int planBStops = planBStopsList.length;
 
     final List<String> planBSatisfied = [];
     final List<String> planBViolated = [];
@@ -258,22 +248,22 @@ class DecisionEngine {
       planBViolated.add('Over budget by ₦${(planBTotal - userBudget).toStringAsFixed(0)}');
     }
     if (planBHours <= maxTimeHours) {
-      planBSatisfied.add('Fast completion before deadline (1.8h)');
+      planBSatisfied.add('Fast completion before deadline');
     } else {
       planBViolated.add('Exceeds available time');
     }
     if (planBStops <= maxStops) {
-      planBSatisfied.add('Fewest stops ($planBStops stops)');
+      planBSatisfied.add('Consolidated stops ($planBStops stops)');
     } else {
       planBViolated.add('Exceeds stop limit');
     }
 
     final planB = PlanCandidate(
       id: 'plan-b',
-      name: 'Plan B',
+      name: 'Option B',
       tag: 'Wholesale + In-App Chat',
       sourcingChannel: 'Verified Platform Traders',
-      easeOfAccess: 'Balanced Access • Single Hub Pickup (1.8 hrs • 2 stops)',
+      easeOfAccess: 'Balanced Access • Single Hub Pickup',
       accessRating: 'Balanced Access',
       itemCost: planBBaseItems,
       transportCost: planBTransport,
@@ -290,18 +280,18 @@ class DecisionEngine {
         'Transit fare is demo estimate (no routing provider connected)',
       ],
       tradeOffExplanation: (errandTitle != null)
-          ? 'Consolidates commodities to the closest registered trader market hub. Cuts transport expense to ₦${planBTransport.toStringAsFixed(0)} and saves travel time.'
+          ? 'Consolidates commodities to the closest registered trader market hub. Cuts transport expense to ₦${planBTransport.toStringAsFixed(0)}.'
           : 'Consolidates commodity purchases to a single major registered trader market hub. Cuts transport expense to ₦${planBTransport.toStringAsFixed(0)}.',
       stops: planBStopsList,
       acquisitionSources: planBSources,
     );
 
-    // 3. PLAN C: Shortest Estimated Duration (Express Single Hub)
+    // 3. OPTION C: Shortest Estimated Duration (Express Single Hub)
     final double planCTransport = baseTransportFare * 1.0;
     final double planCTimeCost = timeCostPerHour * 1.2;
     final double planCTotal = planCBaseItems + planCTransport + planCTimeCost;
     const double planCHours = 1.2;
-    final int planCStops = hasCustomItems && errands != null ? (planCStopsList.length - 2).clamp(1, 3) : 2;
+    final int planCStops = planCStopsList.length;
 
     final List<String> planCSatisfied = [];
     final List<String> planCViolated = [];
@@ -311,7 +301,7 @@ class DecisionEngine {
       planCViolated.add('Over budget by ₦${(planCTotal - userBudget).toStringAsFixed(0)}');
     }
     if (planCHours <= maxTimeHours) {
-      planCSatisfied.add('Shortest duration (1.2h express)');
+      planCSatisfied.add('Direct walk-in access');
     } else {
       planCViolated.add('Exceeds available time');
     }
@@ -323,10 +313,10 @@ class DecisionEngine {
 
     final planC = PlanCandidate(
       id: 'plan-c',
-      name: 'Plan C',
+      name: 'Option C',
       tag: 'Express Walk-In',
       sourcingChannel: 'Neighborhood Retail Mart',
-      easeOfAccess: 'High Ease • Express Walk-In (25 mins • 1 stop)',
+      easeOfAccess: 'High Ease • Neighborhood Walk-in',
       accessRating: 'High Ease',
       itemCost: planCBaseItems,
       transportCost: planCTransport,
@@ -343,17 +333,17 @@ class DecisionEngine {
         'Transit fare is demo estimate (no routing provider connected)',
       ],
       tradeOffExplanation:
-          'Express commercial run completed in 1.2 hrs. Premium convenience with ₦${planCBaseItems.toStringAsFixed(0)} items subtotal.',
+          'Express retail run with neighborhood convenience. Items subtotal ₦${planCBaseItems.toStringAsFixed(0)}.',
       stops: planCStopsList,
       acquisitionSources: planCSources,
     );
 
-    // 4. PLAN D: Delay Non-Urgent Purchases (Budget Protection)
+    // 4. OPTION D: Delay Non-Urgent Purchases (Budget Protection)
     final double planDTransport = baseTransportFare * 0.8;
     final double planDTimeCost = timeCostPerHour * 1.0;
     final double planDTotal = planDBaseItems + planDTransport + planDTimeCost;
     const double planDHours = 1.0;
-    final int planDStops = hasCustomItems && errands != null ? (planDStopsList.length - 2).clamp(1, 3) : 2;
+    final int planDStops = planDStopsList.length;
 
     final List<String> planDSatisfied = [
       'Strict cashflow budget safety (₦${planDTotal.toStringAsFixed(0)} total)',
@@ -369,10 +359,10 @@ class DecisionEngine {
 
     final planD = PlanCandidate(
       id: 'plan-d',
-      name: 'Plan D',
+      name: 'Option D',
       tag: 'Delay Non-Urgent',
       sourcingChannel: 'Doorstep Delivery & Essentials',
-      easeOfAccess: 'Maximum Ease • Minimum Effort (1.0 hr • 1 stop)',
+      easeOfAccess: 'Maximum Ease • Doorstep Delivery',
       accessRating: 'Maximum Ease',
       itemCost: planDBaseItems,
       transportCost: planDTransport,
@@ -967,26 +957,7 @@ class DecisionEngine {
     final List<ItineraryStop> stops = [];
     int stopIndex = 0;
 
-    // 1. Home Base (Start)
-    stops.add(
-      ItineraryStop(
-        id: '$planId-s0',
-        stopNumber: stopIndex++,
-        title: 'Start',
-        subtitle: (userLocation != null && userLocation.isSet)
-            ? userLocation.displayLocation
-            : 'Your Current Location',
-        location: (userLocation != null && userLocation.isSet)
-            ? userLocation.displayTown
-            : 'Home Base',
-        distanceKm: 0.0,
-        durationMinutes: 0,
-        timeWindow: '9:00 AM',
-        isCompleted: true,
-      ),
-    );
-
-    // 2. Shopping Stops with explicit outlet attribution
+    // Sourcing Stops with explicit outlet attribution
     if (sources.isNotEmpty) {
       if (isMultiMarket && sources.length > 1) {
         final half = (sources.length / 2).ceil();
@@ -1010,8 +981,8 @@ class DecisionEngine {
             subtitle: 'Acquire ${firstHalf.map((i) => i.commodityName).join(', ')}',
             location: stop1Primary.marketHubOrLocation,
             distanceKm: stop1Primary.dynamicDistanceKm,
-            durationMinutes: 35,
-            timeWindow: '9:20 AM - 9:55 AM',
+            durationMinutes: 0,
+            timeWindow: '',
             badgeText: stop1Primary.isPlatformRegisteredTrader
                 ? 'Platform Registered Trader'
                 : 'Best unit prices',
@@ -1042,8 +1013,8 @@ class DecisionEngine {
             subtitle: 'Acquire ${secondHalf.map((i) => i.commodityName).join(', ')}',
             location: stop2Primary.marketHubOrLocation,
             distanceKm: stop2Primary.dynamicDistanceKm,
-            durationMinutes: 30,
-            timeWindow: '10:15 AM - 10:45 AM',
+            durationMinutes: 0,
+            timeWindow: '',
             badgeText: stop2Primary.isPlatformRegisteredTrader
                 ? 'Platform Registered Trader'
                 : 'Competitive rate',
@@ -1078,8 +1049,8 @@ class DecisionEngine {
             subtitle: 'Acquire ${sources.take(3).map((i) => i.commodityName).join(', ')}${sources.length > 3 ? ' + more' : ''}',
             location: primary.marketHubOrLocation,
             distanceKm: primary.dynamicDistanceKm,
-            durationMinutes: isExpress ? 25 : 45,
-            timeWindow: '9:20 AM - 10:05 AM',
+            durationMinutes: 0,
+            timeWindow: '',
             badgeText: hasRegistered
                 ? 'Platform Registered Trader • Consolidated'
                 : (isExpress ? 'Express Convenience' : 'Single Stop Hub'),
@@ -1116,8 +1087,8 @@ class DecisionEngine {
           subtitle: 'Buy ${activeItems.take(3).map((i) => i.productName).join(', ')}${activeItems.length > 3 ? ' + more' : ''}',
           location: '$activeCity Commercial Hub',
           distanceKm: 1.2,
-          durationMinutes: isExpress ? 25 : 45,
-          timeWindow: '9:20 AM - 10:05 AM',
+          durationMinutes: 0,
+          timeWindow: '',
           badgeText: 'Single Stop Hub',
           estimatedCost: cost,
           taskItems: activeItems.map((i) => '${i.productName} (${i.quantity} ${i.unit}) - ₦${i.totalEstimatedCost.toStringAsFixed(0)}').toList(),
@@ -1126,7 +1097,7 @@ class DecisionEngine {
       );
     }
 
-    // 3. User Errands (Non-Shopping)
+    // User Errands (Non-Shopping)
     for (final errand in errands) {
       if (errand.shoppingItems.isNotEmpty && items.isNotEmpty) {
         continue;
@@ -1139,8 +1110,8 @@ class DecisionEngine {
           subtitle: errand.deadline != null ? 'Complete before ${errand.deadline}' : errand.category,
           location: errand.locationName,
           distanceKm: 1.5,
-          durationMinutes: errand.durationMinutes,
-          timeWindow: errand.scheduledTime,
+          durationMinutes: 0,
+          timeWindow: '',
           badgeText: errand.deadline != null ? 'Before ${errand.deadline} deadline' : null,
           estimatedCost: 0.0,
           taskItems: [errand.title],
@@ -1148,23 +1119,6 @@ class DecisionEngine {
         ),
       );
     }
-
-    // 4. Return Home
-    stops.add(
-      ItineraryStop(
-        id: '$planId-s$stopIndex',
-        stopNumber: stopIndex++,
-        title: 'End',
-        subtitle: 'Return Home',
-        location: (userLocation != null && userLocation.isSet)
-            ? userLocation.displayTown
-            : 'Home Base',
-        distanceKm: 1.8,
-        durationMinutes: 25,
-        timeWindow: '12:30 PM',
-        isCompleted: false,
-      ),
-    );
 
     return stops;
   }
@@ -1178,7 +1132,7 @@ class DecisionEngine {
     List<Errand>? errands,
   }) {
     if (candidates.isEmpty) {
-      return 'No candidate plans generated yet. Add commodities to your cart in the Cart Menu tab to calculate optimal plans.';
+      return 'No candidate options generated yet. Add commodities to your cart in the Cart Menu tab to calculate optimal options.';
     }
 
     final hasErrands = errands != null && errands.isNotEmpty;
@@ -1187,18 +1141,18 @@ class DecisionEngine {
 
     if (budget < 12000) {
       if (errandTitle != null && deadlineString != null) {
-        return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Plan D is recommended. Delaying non-urgent purchases keeps your spending within budget while ensuring $errandTitle is completed before $deadlineString (no price drop prediction made).";
+        return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Option D is recommended. Delaying non-urgent purchases keeps your spending within budget while ensuring $errandTitle is completed before $deadlineString (no price drop prediction made).";
       }
-      return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Plan D is recommended. Delaying non-urgent purchases keeps your spending within budget while prioritizing essential commodities (no price drop prediction made).";
+      return "Strict budget safety (₦${budget.toStringAsFixed(0)}): Option D is recommended. Delaying non-urgent purchases keeps your spending within budget while prioritizing essential commodities (no price drop prediction made).";
     } else if (timeAvailable < 2.0) {
       if (errandTitle != null && deadlineString != null) {
-        return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Plan C or Plan B is optimal to guarantee your $errandTitle is completed well before the $deadlineString deadline.";
+        return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Option C or Option B is optimal to guarantee your $errandTitle is completed well before the $deadlineString deadline.";
       }
-      return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Plan C or Plan B is optimal to complete all commodity purchases in a consolidated stop.";
+      return "Time critical (${timeAvailable.toStringAsFixed(1)} hrs): Option C or Option B is optimal to complete all commodity purchases in a consolidated stop.";
     } else if (transportCost > 2000) {
-      return "High transit expense: Consolidating stops in Plan B saves transit fares without adding significant travel delay.";
+      return "High transit expense: Consolidating stops in Option B saves transit fares without adding significant travel delay.";
     } else {
-      return "Optimal recommendation: Plan A delivers the lowest overall commodity basket cost for your ₦${budget.toStringAsFixed(0)} budget.";
+      return "Optimal recommendation: Option A delivers the lowest overall commodity basket cost for your ₦${budget.toStringAsFixed(0)} budget.";
     }
   }
 }

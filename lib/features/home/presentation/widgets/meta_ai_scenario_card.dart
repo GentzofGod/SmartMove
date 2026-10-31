@@ -191,7 +191,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Meta Muse Spark Planner',
+                        'Meta Muse Spark Options',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,

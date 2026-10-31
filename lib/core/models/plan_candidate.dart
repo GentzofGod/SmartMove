@@ -61,12 +61,12 @@ class PlanCandidate {
   String get displayEaseOfAccess =>
       easeOfAccess ??
       (id == 'plan-a'
-          ? 'Low Ease (2.5h • 3 stops • Multi-Stall Trek)'
+          ? 'Low Ease • Multi-Stall Physical Trek'
           : id == 'plan-b'
-              ? 'Balanced Access (1.8h • Single Hub • In-App Chat)'
+              ? 'Balanced Access • Single Hub Pickup'
               : id == 'plan-c'
-                  ? 'High Ease (25 mins • 1 walk-in stop)'
-                  : 'Maximum Ease (Zero travel • Doorstep delivery)');
+                  ? 'High Ease • Neighborhood Walk-in'
+                  : 'Maximum Ease • Doorstep Delivery');
 
   String get accessLevelLabel =>
       accessRating ??
