@@ -1,3 +1,5 @@
+import '../services/web_search_grounding_service.dart';
+
 enum CommodityPriority {
   high,
   medium,
@@ -28,6 +30,7 @@ class ShoppingItem {
   final String? webReferenceUrl;
   final List<String> referenceLinks;
   final String? matchedVendorName;
+  final List<LiveWebVendorResult> availableSourceQuotes;
 
   ShoppingItem({
     required this.id,
@@ -46,6 +49,7 @@ class ShoppingItem {
     this.webReferenceUrl,
     this.referenceLinks = const [],
     this.matchedVendorName,
+    this.availableSourceQuotes = const [],
   });
 
   double get totalEstimatedCost => quantity * estimatedUnitPrice;
@@ -67,6 +71,7 @@ class ShoppingItem {
     String? webReferenceUrl,
     List<String>? referenceLinks,
     String? matchedVendorName,
+    List<LiveWebVendorResult>? availableSourceQuotes,
   }) {
     return ShoppingItem(
       id: id ?? this.id,
@@ -85,6 +90,7 @@ class ShoppingItem {
       webReferenceUrl: webReferenceUrl ?? this.webReferenceUrl,
       referenceLinks: referenceLinks ?? this.referenceLinks,
       matchedVendorName: matchedVendorName ?? this.matchedVendorName,
+      availableSourceQuotes: availableSourceQuotes ?? this.availableSourceQuotes,
     );
   }
 }

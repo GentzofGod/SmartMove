@@ -3,14 +3,16 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/ai_proposal.dart';
 import '../../../../core/models/errand.dart';
 import '../../../../core/services/safe_outlet_launcher.dart';
+import '../../../../core/services/web_search_grounding_service.dart';
+import '../../../../core/services/meta_ai_service.dart';
 
 /// Modal bottom sheet for reviewing, adjusting, and confirming an AI Plan Proposal
 ///
-/// AI Safeguards implemented:
-/// - AI output is treated as a proposal, NEVER modifying state without confirmation.
-/// - Items, quantities, and budget are fully editable by the user before calculation.
-/// - Clarification questions for missing information are displayed with interactive resolution chips.
-/// - Non-AI fallback option is visibly provided.
+/// Features:
+/// - Derived prices from different sources (Jumia, Konga, Jiji, Local Markets) on each product
+/// - Interactive source switching to compare prices and pick the best choice
+/// - Smooth, unblocked scrolling with streamlined compact headers
+/// - Clean, non-overflowing hierarchical item cards
 class AiProposalReviewSheet extends StatefulWidget {
   final AiPlanProposal proposal;
   final Function(double confirmedBudget, List<ShoppingItem> confirmedItems, Errand? confirmedErrand) onConfirm;
@@ -42,6 +44,30 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
     _items = List.from(widget.proposal.shoppingItems);
     _errand = widget.proposal.deadlineErrand;
     _questions = List.from(widget.proposal.clarificationQuestions);
+    _ensureSourceQuotesForItems();
+  }
+
+  void _ensureSourceQuotesForItems() async {
+    bool hasUpdates = false;
+    for (int i = 0; i < _items.length; i++) {
+      if (_items[i].availableSourceQuotes.isEmpty) {
+        final quotes = await WebSearchGroundingService.fetchLiveWebVendors(
+          _items[i].productName,
+          benchmarkPrice: _items[i].estimatedUnitPrice,
+        );
+        if (quotes.isNotEmpty && mounted) {
+          _items[i] = _items[i].copyWith(
+            availableSourceQuotes: quotes,
+            matchedVendorName: _items[i].matchedVendorName ?? quotes.first.vendorName,
+            webReferenceUrl: _items[i].webReferenceUrl ?? quotes.first.targetUrl,
+          );
+          hasUpdates = true;
+        }
+      }
+    }
+    if (hasUpdates && mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -61,6 +87,18 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
   void _removeItem(int index) {
     setState(() {
       _items.removeAt(index);
+    });
+  }
+
+  void _selectSourceForItem(int itemIndex, LiveWebVendorResult vendor) {
+    setState(() {
+      final current = _items[itemIndex];
+      final newPrice = vendor.detectedPrice ?? current.estimatedUnitPrice;
+      _items[itemIndex] = current.copyWith(
+        estimatedUnitPrice: newPrice,
+        matchedVendorName: vendor.vendorName,
+        webReferenceUrl: vendor.targetUrl,
+      );
     });
   }
 
@@ -115,25 +153,42 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isNotEmpty) {
                 final qty = double.tryParse(qtyCtrl.text) ?? 1.0;
                 final unit = unitCtrl.text.trim().isEmpty ? 'item' : unitCtrl.text.trim();
                 final price = double.tryParse(priceCtrl.text) ?? 1000.0;
+                Navigator.pop(ctx);
+
+                final newItem = ShoppingItem(
+                  id: 'si-custom-${DateTime.now().millisecondsSinceEpoch}',
+                  productName: name,
+                  quantity: qty,
+                  unit: unit,
+                  estimatedUnitPrice: price,
+                );
 
                 setState(() {
-                  _items.add(
-                    ShoppingItem(
-                      id: 'si-custom-${DateTime.now().millisecondsSinceEpoch}',
-                      productName: name,
-                      quantity: qty,
-                      unit: unit,
-                      estimatedUnitPrice: price,
-                    ),
-                  );
+                  _items.add(newItem);
                 });
-                Navigator.pop(ctx);
+
+                final quotes = await WebSearchGroundingService.fetchLiveWebVendors(
+                  name,
+                  benchmarkPrice: price,
+                );
+                if (quotes.isNotEmpty && mounted) {
+                  final idx = _items.indexWhere((it) => it.id == newItem.id);
+                  if (idx != -1) {
+                    setState(() {
+                      _items[idx] = _items[idx].copyWith(
+                        availableSourceQuotes: quotes,
+                        matchedVendorName: quotes.first.vendorName,
+                        webReferenceUrl: quotes.first.targetUrl,
+                      );
+                    });
+                  }
+                }
               }
             },
             child: const Text('Add'),
@@ -146,85 +201,27 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
   double get _itemsTotal =>
       _items.fold(0.0, (sum, i) => sum + (i.quantity * i.estimatedUnitPrice));
 
-  void _showItemReferencesSheet(ShoppingItem item) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Store Reference Links: ${item.productName}',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Live web links gathered from multi-store search grounding to verify prices:',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              for (final link in item.referenceLinks) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppColors.primaryTint,
-                    child: Icon(Icons.storefront_outlined, size: 16, color: AppColors.primary),
-                  ),
-                  title: Text(
-                    link.contains('jumia')
-                        ? 'Jumia Online Store'
-                        : (link.contains('konga')
-                            ? 'Konga Online Mall'
-                            : (link.contains('jiji')
-                                ? 'Jiji Marketplace'
-                                : (link.contains('google.com/maps')
-                                    ? 'Google Maps Local Stores'
-                                    : 'External Store Listing'))),
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                  subtitle: Text(
-                    link,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  ),
-                  trailing: const Icon(Icons.open_in_new, size: 16, color: AppColors.primary),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    SafeOutletLauncher.openExternalWebUrl(
-                      context,
-                      url: link,
-                      outletName: item.productName,
-                    );
-                  },
-                ),
-                const Divider(height: 1),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
+  String _formatPrice(double price) {
+    return price.toStringAsFixed(0).replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
 
   @override
   Widget build(BuildContext context) {
+    final double budgetVal = double.tryParse(_budgetController.text) ?? widget.proposal.budget;
+    final bool isOverBudget = _itemsTotal > budgetVal && budgetVal > 0;
+
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
+        maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
       padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: 18,
+        right: 18,
+        top: 14,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -237,9 +234,9 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
           // Drag Handle
           Center(
             child: Container(
-              width: 40,
+              width: 38,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
@@ -247,47 +244,74 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
             ),
           ),
 
-          // Header
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryTint,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'AI Plan Proposal',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryTint,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      Text(
-                        'Extracted by ${widget.proposal.modelName}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                        ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: AppColors.primary,
+                        size: 20,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'AI Plan Proposal',
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            children: [
+                              Text(
+                                widget.proposal.modelName,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              if (widget.proposal.liveWebVendors.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F5E9),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFA5D6A7), width: 0.8),
+                                  ),
+                                  child: const Text(
+                                    '✓ Multi-Source Grounded',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close, size: 22),
@@ -295,122 +319,16 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
-          // Safeguard Banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Row(
-              children: const [
-                Icon(Icons.shield_outlined, size: 16, color: AppColors.primary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Review and adjust items before calculating authoritative plans.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Meta AI Live Cloud vs Status Indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: widget.proposal.hasError
-                  ? const Color(0xFFFFEBEE)
-                  : widget.proposal.liveWebVendors.isNotEmpty
-                      ? const Color(0xFFE8F5E9)
-                      : widget.proposal.isLiveCloud
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: widget.proposal.hasError
-                    ? const Color(0xFFFFCDD2)
-                    : widget.proposal.liveWebVendors.isNotEmpty
-                        ? const Color(0xFFA5D6A7)
-                        : widget.proposal.isLiveCloud
-                            ? const Color(0xFFA5D6A7)
-                            : const Color(0xFFA5D6A7),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  widget.proposal.hasError
-                      ? Icons.error_outline_rounded
-                      : (widget.proposal.liveWebVendors.isNotEmpty
-                          ? Icons.travel_explore_rounded
-                          : Icons.cloud_done_rounded),
-                  size: 16,
-                  color: widget.proposal.hasError
-                      ? AppColors.errorText
-                      : const Color(0xFF2E7D32),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.proposal.hasError
-                            ? 'Meta AI Notice'
-                            : (widget.proposal.liveWebVendors.isNotEmpty
-                                ? 'Multi-Store Grounded (Jumia • Konga • Jiji • Stores)'
-                                : (widget.proposal.isLiveCloud
-                                    ? 'Meta AI Live Cloud: Success'
-                                    : 'Meta AI Proposal Extracted')),
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: widget.proposal.hasError
-                              ? AppColors.errorText
-                              : const Color(0xFF2E7D32),
-                        ),
-                      ),
-                      Text(
-                        widget.proposal.hasError
-                            ? (widget.proposal.errorMessage ??
-                                'Commodities could not be automatically extracted.')
-                            : (widget.proposal.webSearchSummary ??
-                                (widget.proposal.isLiveCloud
-                                    ? 'Processed directly via Meta Muse Spark remote model.'
-                                    : 'Processed with Meta Muse Spark reasoning engine.')),
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: widget.proposal.hasError
-                              ? AppColors.errorText
-                              : const Color(0xFF1B5E20),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Scrollable Content
-          Flexible(
+          // Expanded Scrollable Area for shopping items
+          Expanded(
             child: ListView(
-              shrinkWrap: true,
               children: [
-                // Clarification Questions (if any)
+                // Clarification Questions (dismissible)
                 if (_questions.isNotEmpty) ...[
                   Container(
+                    margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF8E1),
@@ -421,17 +339,26 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: const [
-                            Icon(Icons.help_outline_rounded,
-                                color: Color(0xFFF57F17), size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              'Clarification Suggested by Muse Spark',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFE65100),
-                              ),
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.help_outline_rounded,
+                                    color: Color(0xFFF57F17), size: 16),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Clarification Suggested',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFE65100),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            InkWell(
+                              onTap: () => setState(() => _questions.clear()),
+                              child: const Icon(Icons.close, size: 16, color: Color(0xFFE65100)),
                             ),
                           ],
                         ),
@@ -440,7 +367,7 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                           Text(
                             q.question,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               color: Color(0xFF424242),
                             ),
                           ),
@@ -469,59 +396,77 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                               );
                             }).toList(),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                         ],
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
                 ],
 
-                // Budget Field
+                // Compact Budget & Outlay Bar
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Spending Budget:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Budget: ₦',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Flexible(
+                              child: SizedBox(
+                                height: 26,
+                                child: TextField(
+                                  controller: _budgetController,
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                                    isDense: true,
+                                    border: InputBorder.none,
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 6),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text(
-                            '₦ ',
+                            'Total: ',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                          SizedBox(
-                            width: 100,
-                            height: 36,
-                            child: TextField(
-                              controller: _budgetController,
-                              keyboardType: TextInputType.number,
-                              textAlign: TextAlign.end,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
-                              decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                isDense: true,
-                              ),
+                          Text(
+                            '₦${_formatPrice(_itemsTotal)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: isOverBudget ? AppColors.errorText : AppColors.primaryDark,
                             ),
                           ),
                         ],
@@ -529,23 +474,24 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
 
                 // Extracted Shopping Items Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Shopping Basket (${_items.length} items)',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    Expanded(
+                      child: Text(
+                        'Shopping Items (${_items.length})',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                     TextButton.icon(
                       onPressed: _addNewItemDialog,
-                      icon: const Icon(Icons.add, size: 16),
+                      icon: const Icon(Icons.add, size: 15),
                       label: const Text('Add Item', style: TextStyle(fontSize: 12)),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
@@ -558,226 +504,14 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
 
                 // Items List
                 for (int i = 0; i < _items.length; i++) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _items[i].productName,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              if (_items[i].brandOrGrade != null || _items[i].specification != null || (_items[i].preferredSellerType != null && _items[i].preferredSellerType != 'Any')) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  [
-                                    if (_items[i].brandOrGrade != null) 'Grade: ${_items[i].brandOrGrade}',
-                                    if (_items[i].specification != null) _items[i].specification!,
-                                    if (_items[i].preferredSellerType != null && _items[i].preferredSellerType != 'Any')
-                                      'Pref: ${_items[i].preferredSellerType}',
-                                  ].join(' • '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primaryDark,
-                                  ),
-                                ),
-                              ],
-                              Text(
-                                '₦${_items[i].estimatedUnitPrice.toStringAsFixed(0)} / ${_items[i].unit}  •  Subtotal: ₦${(_items[i].quantity * _items[i].estimatedUnitPrice).toStringAsFixed(0)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              if (_items[i].webReferenceUrl != null ||
-                                  _items[i].matchedVendorName != null ||
-                                  _items[i].referenceLinks.isNotEmpty) ...[
-                                const SizedBox(height: 5),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    InkWell(
-                                      onTap: () {
-                                        final url = _items[i].webReferenceUrl ??
-                                            (_items[i].referenceLinks.isNotEmpty
-                                                ? _items[i].referenceLinks.first
-                                                : null);
-                                        if (url != null) {
-                                          SafeOutletLauncher.openExternalWebUrl(
-                                            context,
-                                            url: url,
-                                            outletName: _items[i].matchedVendorName ??
-                                                'Store Catalog',
-                                          );
-                                        }
-                                      },
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primaryTint.withValues(alpha: 0.5),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(
-                                              color: AppColors.primary.withValues(alpha: 0.3),
-                                              width: 0.8),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.open_in_new,
-                                                size: 11, color: AppColors.primary),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              _items[i].matchedVendorName ?? 'Store Ref',
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppColors.primaryDark,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    if (_items[i].referenceLinks.length > 1) ...[
-                                      InkWell(
-                                        onTap: () =>
-                                            _showItemReferencesSheet(_items[i]),
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.shade100,
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                                color: Colors.grey.shade300,
-                                                width: 0.8),
-                                          ),
-                                          child: Text(
-                                            '+${_items[i].referenceLinks.length - 1} stores',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.grey.shade800,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Quantity adjuster
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, size: 20),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: AppColors.textSecondary,
-                              onPressed: () => _updateQuantity(i, -1),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                              child: Text(
-                                '${_items[i].quantity % 1 == 0 ? _items[i].quantity.toInt() : _items[i].quantity} ${_items[i].unit}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline, size: 20),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: AppColors.primary,
-                              onPressed: () => _updateQuantity(i, 1),
-                            ),
-                            const SizedBox(width: 6),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: AppColors.errorText,
-                              onPressed: () => _removeItem(i),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildItemCard(i, _items[i]),
                 ],
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // Total Items Cost Summary
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Expanded(
-                child: Text(
-                  'Estimated Basket Outlay:',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '₦${_itemsTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Actions
+          // Bottom Action Buttons
           Row(
             children: [
               Expanded(
@@ -797,19 +531,16 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                       ),
                     ),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Confirm & Calculate Plans',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
+                    label: const Text(
+                      'Confirm & Calculate Plans',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Center(
             child: TextButton(
               onPressed: () {
@@ -830,5 +561,295 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
       ),
     );
   }
-}
 
+  Widget _buildItemCard(int index, ShoppingItem item) {
+    final quotes = item.availableSourceQuotes;
+    final subtotal = item.quantity * item.estimatedUnitPrice;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: Product Name & Delete button (full width, never overflows)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  item.productName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _removeItem(index),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(3),
+                  child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Row 2: Price / Subtotal on left, Quantity stepper on right
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '₦${_formatPrice(item.estimatedUnitPrice)}',
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          ' / ${item.unit}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      'Subtotal: ₦${_formatPrice(subtotal)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Quantity Stepper
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => _updateQuantity(index, -1),
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(18)),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        child: Icon(Icons.remove, size: 15, color: AppColors.textSecondary),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: Text(
+                        '${item.quantity % 1 == 0 ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      key: const Key('stepper-add-btn'),
+                      onTap: () => _updateQuantity(index, 1),
+                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(18)),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        child: Icon(Icons.add, size: 15, color: AppColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Row 3: Prices Offered Across Different Sources
+          if (quotes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Prices Offered Across Sources:',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Tap to select',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: quotes.map((vendor) {
+                  final isSelected = item.matchedVendorName == vendor.vendorName ||
+                      (item.matchedVendorName == null && quotes.first == vendor);
+                  final priceText = vendor.detectedPrice != null
+                      ? '₦${_formatPrice(vendor.detectedPrice!)}'
+                      : vendor.priceDisplay;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: () => _selectSourceForItem(index, vendor),
+                      borderRadius: BorderRadius.circular(8),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected) ...[
+                              const Icon(Icons.check, size: 12, color: Colors.white),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              '${vendor.vendorName.split(' ').first}: $priceText',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                color: isSelected ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Links to inspect store page and open multi-vendor comparison
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final url = item.webReferenceUrl ??
+                          (quotes.isNotEmpty ? quotes.first.targetUrl : null);
+                      if (url != null) {
+                        SafeOutletLauncher.openExternalWebUrl(
+                          context,
+                          url: url,
+                          outletName: item.matchedVendorName ?? item.productName,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.open_in_new, size: 12),
+                    label: Text(
+                      'View ${item.matchedVendorName ?? 'Store'}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryDark,
+                      side: const BorderSide(color: AppColors.cardBorder),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final comparison = await const MetaAiService().conductLiveAiVendorComparison(
+                        item.productName,
+                        city: 'Local',
+                      );
+                      if (mounted) {
+                        SafeOutletLauncher.showMultiVendorComparisonSheet(
+                          context,
+                          comparison: comparison,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.tune_rounded, size: 12),
+                    label: const Text(
+                      'Compare All',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

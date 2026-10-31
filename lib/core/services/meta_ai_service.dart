@@ -1400,19 +1400,22 @@ class MetaAiService {
     final searchResultsByItem = <String, List<LiveWebVendorResult>>{};
     final allDiscoveredVendors = <LiveWebVendorResult>[];
 
-    // Layer 2: Search stores & e-commerce catalogs for each parsed item
-    for (final item in baseProposal.shoppingItems) {
-      try {
-        final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
-          item.productName,
-          city: city,
-        );
-        if (vendors.isNotEmpty) {
-          searchResultsByItem[item.productName] = vendors;
-          allDiscoveredVendors.addAll(vendors);
-        }
-      } catch (_) {}
-    }
+    // Layer 2: Search stores & e-commerce catalogs for each parsed item concurrently
+    await Future.wait(
+      baseProposal.shoppingItems.map((item) async {
+        try {
+          final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
+            item.productName,
+            city: city,
+            benchmarkPrice: item.estimatedUnitPrice,
+          );
+          if (vendors.isNotEmpty) {
+            searchResultsByItem[item.productName] = vendors;
+            allDiscoveredVendors.addAll(vendors);
+          }
+        } catch (_) {}
+      }),
+    );
 
     if (allDiscoveredVendors.isEmpty) {
       return baseProposal;
@@ -1557,6 +1560,7 @@ class MetaAiService {
                   WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: city),
                 ],
           matchedVendorName: bestVendor?.vendorName ?? 'Online / Store Reference',
+          availableSourceQuotes: vendors,
         ),
       );
     }
@@ -3386,7 +3390,13 @@ class MetaAiService {
     String? city,
   }) async {
     final clean = commodityName.trim();
-    final vendors = await WebSearchGroundingService.fetchLiveWebVendors(clean, city: city);
+    final basePlan = coordinatePriceResearch(clean);
+    final benchmarkPrice = (basePlan.estimatedBenchmarkMin + basePlan.estimatedBenchmarkMax) / 2;
+    final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
+      clean,
+      city: city,
+      benchmarkPrice: benchmarkPrice,
+    );
 
     final pricesWithVal = vendors
         .where((v) => v.detectedPrice != null && v.detectedPrice! > 0)
