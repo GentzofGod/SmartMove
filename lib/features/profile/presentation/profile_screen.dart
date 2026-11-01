@@ -438,7 +438,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Your application for "${userSession.businessName ?? "your store"}" at ${userSession.marketHub ?? "Bodija Market"} is pending review by platform administrators.',
+                            'Your application for "${userSession.businessName ?? "your store"}" at ${userSession.marketHub ?? (userSession.stallLocation ?? "your registered market")} is pending review by platform administrators.',
                             style: const TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF795548),
@@ -511,7 +511,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const Text('Market Hub: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                       Expanded(
                         child: Text(
-                          userSession.marketHub ?? 'Bodija Market',
+                          userSession.marketHub ?? (userSession.stallLocation ?? 'Local Store'),
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                         ),
@@ -878,7 +878,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     double? scannedLat = session.latitude;
     double? scannedLon = session.longitude;
     bool isScanningLocation = false;
-    String selectedHub = session.marketHub ?? 'Bodija Market';
+    final userLoc = ref.read(locationProvider);
+    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Kuto Market, Abeokuta');
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
     showModalBottomSheet(
@@ -948,14 +949,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: selectedHub,
-                      items: const [
+                      items: {
+                        selectedHub,
+                        if (session.marketHub != null && session.marketHub!.isNotEmpty) session.marketHub!,
+                        'Kuto Market, Abeokuta',
+                        'Itoku Market, Abeokuta',
+                        'Omida Market, Abeokuta',
                         'Bodija Market',
                         'Dugbe Market',
                         'Oje Market',
                         'Oja Oba Market',
                         'Gbagi Market',
+                        'Mile 12 Market, Lagos',
+                        'Computer Village, Lagos',
+                        'Wuse Market, Abuja',
                         'Online Store',
-                      ].map((hub) => DropdownMenuItem(value: hub, child: Text(hub))).toList(),
+                      }
+                          .where((h) => h.isNotEmpty)
+                          .map((hub) => DropdownMenuItem(value: hub, child: Text(hub)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setModalState(() => selectedHub = val);
                       },
@@ -1037,15 +1049,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   stallController.text = detailed;
                                   scannedLat = result.latitude;
                                   scannedLon = result.longitude;
-                                  const hubs = [
-                                    'Bodija Market',
-                                    'Dugbe Market',
-                                    'Oje Market',
-                                    'Oja Oba Market',
-                                    'Gbagi Market',
-                                    'Online Store',
-                                  ];
-                                  if (hubs.contains(result.closestHub)) {
+                                  if (result.closestHub.isNotEmpty) {
                                     selectedHub = result.closestHub;
                                   }
                                   if (context.mounted) {
@@ -1056,12 +1060,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ),
                                     );
                                   }
+                                } else {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Could not acquire your GPS location. Please check location permissions or enter stall address manually.'),
+                                        backgroundColor: AppColors.badgeErrorText,
+                                      ),
+                                    );
+                                  }
                                 }
-                              } catch (e) {
+                              } catch (_) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Could not scan GPS location: $e'),
+                                    const SnackBar(
+                                      content: Text('Location scan encountered an issue. Please enter your stall address manually.'),
                                       backgroundColor: AppColors.badgeErrorText,
                                     ),
                                   );
@@ -1220,7 +1233,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final bizController = TextEditingController(text: session.businessName ?? '');
     final phoneController = TextEditingController(text: session.phone ?? '');
     final stallController = TextEditingController(text: session.stallLocation ?? '');
-    String selectedHub = session.marketHub ?? 'Bodija Market';
+    final userLoc = ref.read(locationProvider);
+    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Kuto Market, Abeokuta');
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
     showModalBottomSheet(
@@ -1315,14 +1329,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: selectedHub,
-                      items: const [
+                      items: {
+                        selectedHub,
+                        if (session.marketHub != null && session.marketHub!.isNotEmpty) session.marketHub!,
+                        'Kuto Market, Abeokuta',
+                        'Itoku Market, Abeokuta',
+                        'Omida Market, Abeokuta',
                         'Bodija Market',
                         'Dugbe Market',
                         'Oje Market',
                         'Oja Oba Market',
                         'Gbagi Market',
+                        'Mile 12 Market, Lagos',
+                        'Computer Village, Lagos',
+                        'Wuse Market, Abuja',
                         'Online Store',
-                      ].map((hub) => DropdownMenuItem(value: hub, child: Text(hub))).toList(),
+                      }
+                          .where((h) => h.isNotEmpty)
+                          .map((hub) => DropdownMenuItem(value: hub, child: Text(hub)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setModalState(() => selectedHub = val);
                       },

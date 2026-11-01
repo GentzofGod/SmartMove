@@ -1535,7 +1535,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                             );
                             const aiService = MetaAiService();
                             final loc = ref.read(locationProvider);
-                            final userCity = loc.city.isNotEmpty ? loc.city : (loc.town.isNotEmpty ? loc.town : 'Ibadan');
+                            final userCity = loc.city.isNotEmpty ? loc.city : (loc.town.isNotEmpty ? loc.town : null);
                             final comparison = await aiService.conductLiveAiVendorComparison(
                               source.commodityName,
                               city: userCity,

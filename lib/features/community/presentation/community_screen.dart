@@ -455,7 +455,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
-                      children: ['Groceries', 'Electronics', 'Pharmacy', 'Others'].map((cat) {
+                      children: (ref.read(categoriesProvider).isNotEmpty
+                              ? ref.read(categoriesProvider).map((c) => c.name).toList()
+                              : ['Groceries', 'Electronics', 'Pharmacy', 'Others'])
+                          .map((cat) {
                         final isSel = category == cat;
                         return ChoiceChip(
                           label: Text(cat),
@@ -808,7 +811,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           ),
         ),
 
-        // 2. Single-line Category Filter Chips (replacing double line filter)
+        // 2. Single-line Category Filter Chips (powered dynamically by categoriesProvider)
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -817,14 +820,19 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             child: Row(
               children: [
                 _buildCategoryChip('All', Icons.grid_view_rounded),
-                const SizedBox(width: 8),
-                _buildCategoryChip('Groceries', Icons.shopping_basket_outlined),
-                const SizedBox(width: 8),
-                _buildCategoryChip('Electronics', Icons.devices_rounded),
-                const SizedBox(width: 8),
-                _buildCategoryChip('Pharmacy', Icons.medical_services_outlined),
-                const SizedBox(width: 8),
-                _buildCategoryChip('Others', Icons.category_outlined),
+                for (final cat in ref.watch(categoriesProvider)) ...[
+                  const SizedBox(width: 8),
+                  _buildCategoryChip(
+                    cat.name,
+                    cat.slug == 'groceries'
+                        ? Icons.shopping_basket_outlined
+                        : (cat.slug == 'electronics'
+                            ? Icons.devices_rounded
+                            : (cat.slug == 'pharmacy'
+                                ? Icons.medical_services_outlined
+                                : Icons.category_outlined)),
+                  ),
+                ],
               ],
             ),
           ),

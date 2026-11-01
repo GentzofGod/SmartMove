@@ -168,9 +168,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Welcome message should NOT contain "fresh, genuine stock"
+      // Messages should not contain fake simulated trader auto-replies
       expect(find.textContaining('fresh, genuine stock'), findsNothing);
-      expect(find.textContaining('Thank you for inquiring about Lathe High-Speed Steel'), findsOneWidget);
+      expect(find.textContaining('Lathe High-Speed Steel'), findsWidgets);
+      expect(find.textContaining('Messages sync directly to the backend database'), findsOneWidget);
 
       // Call button should be HIDDEN because contactPhone is null
       expect(find.byTooltip('Call Trader'), findsNothing);

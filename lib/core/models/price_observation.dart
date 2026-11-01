@@ -68,6 +68,8 @@ class PriceObservation {
   final String? imageUrl;
   final bool isFlaggedAnomaly;
   final String? anomalyReason;
+  final double? latitude;
+  final double? longitude;
 
   const PriceObservation({
     required this.id,
@@ -92,6 +94,8 @@ class PriceObservation {
     this.imageUrl,
     this.isFlaggedAnomaly = false,
     this.anomalyReason,
+    this.latitude,
+    this.longitude,
   });
 
   bool get isConfirmed =>
@@ -155,6 +159,8 @@ class PriceObservation {
     String? imageUrl,
     bool? isFlaggedAnomaly,
     String? anomalyReason,
+    double? latitude,
+    double? longitude,
   }) {
     return PriceObservation(
       id: id ?? this.id,
@@ -180,6 +186,82 @@ class PriceObservation {
       imageUrl: imageUrl ?? this.imageUrl,
       isFlaggedAnomaly: isFlaggedAnomaly ?? this.isFlaggedAnomaly,
       anomalyReason: anomalyReason ?? this.anomalyReason,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'productId': productId,
+        'productName': productName,
+        'sellerName': sellerName,
+        'marketLocation': marketLocation,
+        'price': price,
+        'unit': unit,
+        'timestamp': timestamp.toIso8601String(),
+        'sourceType': sourceType.name,
+        'submitterName': submitterName,
+        'submitterRole': submitterRole,
+        'isVerified': isVerified,
+        'notes': notes,
+        'channel': channel,
+        'brandOrGrade': brandOrGrade,
+        'inStock': inStock,
+        'standardizedUnitPrice': standardizedUnitPrice,
+        'baseUnit': baseUnit,
+        'category': category,
+        'imageUrl': imageUrl,
+        'isFlaggedAnomaly': isFlaggedAnomaly,
+        'anomalyReason': anomalyReason,
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+
+  factory PriceObservation.fromJson(Map<String, dynamic> json) {
+    ObservationSource source = ObservationSource.communityReported;
+    final sourceVal = json['sourceType']?.toString() ?? json['source_type']?.toString();
+    for (final s in ObservationSource.values) {
+      if (s.name == sourceVal || s.toString() == sourceVal) {
+        source = s;
+        break;
+      }
+    }
+    if (sourceVal == 'trader_confirmed') source = ObservationSource.traderConfirmed;
+    if (sourceVal == 'trader_provided') source = ObservationSource.traderProvided;
+    if (sourceVal == 'simulated_demo') source = ObservationSource.simulatedDemo;
+    if (sourceVal == 'online_grounded') source = ObservationSource.onlineGrounded;
+
+    DateTime ts = DateTime.now();
+    if (json['timestamp'] != null || json['created_at'] != null) {
+      ts = DateTime.tryParse((json['timestamp'] ?? json['created_at']).toString()) ?? DateTime.now();
+    }
+
+    return PriceObservation(
+      id: json['id']?.toString() ?? 'obs-${DateTime.now().millisecondsSinceEpoch}',
+      productId: (json['productId'] ?? json['product_id'])?.toString() ?? 'p-custom',
+      productName: (json['productName'] ?? json['product_name'])?.toString() ?? '',
+      sellerName: (json['sellerName'] ?? json['seller_name'])?.toString() ?? 'Local Vendor',
+      marketLocation: (json['marketLocation'] ?? json['market_location'])?.toString() ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      unit: json['unit']?.toString() ?? '1kg',
+      timestamp: ts,
+      sourceType: source,
+      submitterName: (json['submitterName'] ?? json['submitter_name'])?.toString() ?? 'Community Member',
+      submitterRole: (json['submitterRole'] ?? json['submitter_role'])?.toString() ?? 'Customer',
+      isVerified: (json['isVerified'] ?? json['is_verified']) as bool? ?? false,
+      notes: json['notes']?.toString(),
+      channel: json['channel']?.toString() ?? 'Local Market',
+      brandOrGrade: (json['brandOrGrade'] ?? json['brand_or_grade'])?.toString(),
+      inStock: (json['inStock'] ?? json['in_stock']) as bool? ?? true,
+      standardizedUnitPrice: ((json['standardizedUnitPrice'] ?? json['standardized_unit_price']) as num?)?.toDouble(),
+      baseUnit: (json['baseUnit'] ?? json['base_unit'])?.toString() ?? 'kg',
+      category: json['category']?.toString() ?? 'Groceries',
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
+      isFlaggedAnomaly: (json['isFlaggedAnomaly'] ?? json['is_flagged_anomaly']) as bool? ?? false,
+      anomalyReason: (json['anomalyReason'] ?? json['anomaly_reason'])?.toString(),
+      latitude: ((json['latitude'] ?? json['lat']) as num?)?.toDouble(),
+      longitude: ((json['longitude'] ?? json['lng'] ?? json['lon']) as num?)?.toDouble(),
     );
   }
 }

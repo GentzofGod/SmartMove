@@ -29,8 +29,11 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     final brandController = TextEditingController();
     final notesController = TextEditingController();
     String channel = userSession.sellerChannel ?? 'Local Market';
-    String selectedCategory = 'Groceries';
-    final categories = ['Groceries', 'Electronics', 'Pharmacy', 'Others'];
+    final categories = ref.read(categoriesProvider).map((c) => c.name).toList();
+    if (categories.isEmpty) {
+      categories.addAll(['Groceries', 'Electronics', 'Pharmacy', 'Others']);
+    }
+    String selectedCategory = categories.first;
     bool inStock = true;
 
     showModalBottomSheet(
@@ -440,7 +443,10 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                   submitterRole: 'Trader',
                                   channel: channel,
                                   brandOrGrade: finalBrand,
-                                  notes: finalNotes,
+                                  notes: finalNotes ?? userSession.stallLocation,
+                                  marketLocation: userSession.marketHub ?? userSession.stallLocation ?? 'Local Store',
+                                  latitude: userSession.latitude,
+                                  longitude: userSession.longitude,
                                   inStock: inStock,
                                 );
                             Navigator.pop(bottomCtx);
@@ -509,16 +515,20 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
   }
 
   void _showEditObservationDialog(BuildContext context, PriceObservation obs) {
+    final userSession = ref.read(authProvider);
     final productController = TextEditingController(text: obs.productName);
     final priceController =
         TextEditingController(text: obs.price.toStringAsFixed(0));
     final unitController = TextEditingController(text: obs.unit);
     final brandController = TextEditingController(text: obs.brandOrGrade ?? '');
     final notesController = TextEditingController(text: obs.notes ?? '');
-    final categories = ['Groceries', 'Electronics', 'Pharmacy', 'Others'];
+    final categories = ref.read(categoriesProvider).map((c) => c.name).toList();
+    if (categories.isEmpty) {
+      categories.addAll(['Groceries', 'Electronics', 'Pharmacy', 'Others']);
+    }
     String selectedCategory = categories.contains(obs.category)
         ? obs.category
-        : 'Groceries';
+        : (categories.isNotEmpty ? categories.first : 'Groceries');
     bool inStock = obs.inStock;
 
     showModalBottomSheet(
@@ -893,8 +903,11 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                   unit: unit,
                                   category: selectedCategory,
                                   brandOrGrade: finalBrand,
-                                  notes: finalNotes,
+                                  notes: finalNotes ?? obs.notes,
                                   inStock: inStock,
+                                  marketLocation: userSession.marketHub ?? obs.marketLocation,
+                                  latitude: userSession.latitude ?? obs.latitude,
+                                  longitude: userSession.longitude ?? obs.longitude,
                                 );
                             Navigator.pop(bottomCtx);
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -931,7 +944,8 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
         TextEditingController(text: session.businessName ?? '');
     final phoneController =
         TextEditingController(text: session.phone ?? '');
-    String selectedHub = session.marketHub ?? 'Bodija Market';
+    final userLoc = ref.read(locationProvider);
+    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Kuto Market, Abeokuta');
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
     showModalBottomSheet(
@@ -1032,14 +1046,23 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
                         initialValue: selectedHub,
-                        items: const [
+                        items: {
+                          selectedHub,
+                          if (session.marketHub != null && session.marketHub!.isNotEmpty) session.marketHub!,
+                          'Kuto Market, Abeokuta',
+                          'Itoku Market, Abeokuta',
+                          'Omida Market, Abeokuta',
                           'Bodija Market',
                           'Dugbe Market',
                           'Oje Market',
                           'Oja Oba Market',
                           'Gbagi Market',
+                          'Mile 12 Market, Lagos',
+                          'Computer Village, Lagos',
+                          'Wuse Market, Abuja',
                           'Online Store',
-                        ]
+                        }
+                            .where((h) => h.isNotEmpty)
                             .map((hub) => DropdownMenuItem(
                                 value: hub, child: Text(hub)))
                             .toList(),
@@ -1199,7 +1222,8 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     double? scannedLat = session.latitude;
     double? scannedLon = session.longitude;
     bool isScanningLocation = false;
-    String selectedHub = session.marketHub ?? 'Bodija Market';
+    final userLoc = ref.read(locationProvider);
+    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Kuto Market, Abeokuta');
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
     showModalBottomSheet(
@@ -1273,14 +1297,23 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
                         initialValue: selectedHub,
-                        items: const [
+                        items: {
+                          selectedHub,
+                          if (session.marketHub != null && session.marketHub!.isNotEmpty) session.marketHub!,
+                          'Kuto Market, Abeokuta',
+                          'Itoku Market, Abeokuta',
+                          'Omida Market, Abeokuta',
                           'Bodija Market',
                           'Dugbe Market',
                           'Oje Market',
                           'Oja Oba Market',
                           'Gbagi Market',
+                          'Mile 12 Market, Lagos',
+                          'Computer Village, Lagos',
+                          'Wuse Market, Abuja',
                           'Online Store',
-                        ]
+                        }
+                            .where((h) => h.isNotEmpty)
                             .map((hub) => DropdownMenuItem(
                                 value: hub, child: Text(hub)))
                             .toList(),
@@ -1347,15 +1380,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                     stallController.text = detailed;
                                     scannedLat = result.latitude;
                                     scannedLon = result.longitude;
-                                    const hubs = [
-                                      'Bodija Market',
-                                      'Dugbe Market',
-                                      'Oje Market',
-                                      'Oja Oba Market',
-                                      'Gbagi Market',
-                                      'Online Store',
-                                    ];
-                                    if (hubs.contains(result.closestHub)) {
+                                    if (result.closestHub.isNotEmpty) {
                                       selectedHub = result.closestHub;
                                     }
                                     if (context.mounted) {
@@ -1368,14 +1393,23 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         ),
                                       );
                                     }
+                                  } else {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Could not acquire your GPS location. Please check location permissions or enter stall address manually.'),
+                                          backgroundColor: AppColors.badgeErrorText,
+                                        ),
+                                      );
+                                    }
                                   }
-                                } catch (e) {
+                                } catch (_) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context)
                                         .showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
-                                            'Could not scan GPS location: $e'),
+                                            'Location scan encountered an issue. Please enter your stall address manually.'),
                                         backgroundColor:
                                             AppColors.badgeErrorText,
                                       ),
@@ -1636,8 +1670,229 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     );
   }
 
+  void _showSellerReplySheet(
+    BuildContext context,
+    UserSession userSession,
+    String conversationKey,
+    List<TraderChatMessage> initialMessages,
+  ) {
+    final replyController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalCtx) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final chats = ref.watch(traderChatProvider);
+            final messages = chats[conversationKey] ?? initialMessages;
+            final commodityName = messages.isNotEmpty ? messages.first.commodityName : null;
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.75,
+                  child: Column(
+                    children: [
+                      Center(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 10),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryTint,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.chat_rounded, color: AppColors.primary, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    commodityName != null ? 'Inquiry: $commodityName' : 'Customer Inquiry',
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const Text(
+                                    'Live Trader Negotiation & Direct Messaging',
+                                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(modalCtx),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: messages.isEmpty
+                            ? const Center(
+                                child: Text('No messages in this conversation yet.'),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: messages.length,
+                                itemBuilder: (ctx, i) {
+                                  final msg = messages[i];
+                                  final isFromSeller = msg.isTrader;
+
+                                  return Align(
+                                    alignment: isFromSeller
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 10),
+                                      padding: const EdgeInsets.all(12),
+                                      constraints: BoxConstraints(
+                                        maxWidth: MediaQuery.of(context).size.width * 0.78,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isFromSeller
+                                            ? AppColors.primary
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: isFromSeller
+                                            ? CrossAxisAlignment.end
+                                            : CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isFromSeller ? 'You (${msg.senderName})' : msg.senderName,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: isFromSeller
+                                                  ? Colors.white70
+                                                  : AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            msg.text,
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              color: isFromSeller ? Colors.white : AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          if (msg.proposedPrice != null) ...[
+                                            const SizedBox(height: 4),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: isFromSeller
+                                                    ? Colors.white.withValues(alpha: 0.2)
+                                                    : AppColors.primaryTint,
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'Offer: ₦${msg.proposedPrice!.toStringAsFixed(0)}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isFromSeller ? Colors.white : AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: replyController,
+                                decoration: InputDecoration(
+                                  hintText: 'Type your reply or counter-offer...',
+                                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textTertiary),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: const BorderSide(color: AppColors.primary),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              style: IconButton.styleFrom(backgroundColor: AppColors.primary),
+                              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                              onPressed: () {
+                                final text = replyController.text.trim();
+                                if (text.isEmpty) return;
+                                replyController.clear();
+                                ref.read(traderChatProvider.notifier).sendTraderReply(
+                                      traderName: userSession.businessName ?? userSession.displayName,
+                                      replyText: text,
+                                      commodityName: commodityName,
+                                    );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildApprovedSellerView(
       UserSession userSession, List<PriceObservation> myObservations) {
+    final allChats = ref.watch(traderChatProvider);
+    final myStoreName = (userSession.businessName ?? userSession.displayName).toLowerCase().trim();
+    final storeInquiries = allChats.entries.where((e) {
+      final key = e.key.toLowerCase().trim();
+      return key == myStoreName || key.contains(myStoreName) || myStoreName.contains(key);
+    }).toList();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1729,7 +1984,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           fontSize: 12, color: AppColors.textSecondary)),
                   Expanded(
                     child: Text(
-                      userSession.marketHub ?? 'Bodija Market',
+                      userSession.marketHub ?? (userSession.stallLocation ?? 'Local Store'),
                       style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -1889,6 +2144,162 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 20),
+
+        // Customer Inquiries & Live Chat Section
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded,
+                          color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Customer Inquiries (${storeInquiries.length})',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (storeInquiries.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.badgeSuccessBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Live Supabase Synced',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (storeInquiries.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.mark_chat_read_outlined,
+                          color: AppColors.textTertiary, size: 22),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'No customer messages yet. Price inquiries and direct buyer negotiations sent to your stall will appear here.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Column(
+                  children: storeInquiries.map((entry) {
+                    final lastMsg = entry.value.isNotEmpty ? entry.value.last : null;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppColors.primaryTint,
+                            child: Icon(Icons.person, color: AppColors.primary, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      lastMsg?.senderName ?? 'Customer',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700, fontSize: 13),
+                                    ),
+                                    if (lastMsg?.commodityName != null) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.cardBorder,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          lastMsg!.commodityName!,
+                                          style: const TextStyle(
+                                              fontSize: 9.5, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  lastMsg?.text ?? 'New conversation',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () => _showSellerReplySheet(
+                                context, userSession, entry.key, entry.value),
+                            child: const Text('Reply',
+                                style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
 
@@ -2174,7 +2585,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Your verification application for "${userSession.businessName ?? "Your Store"}" at ${userSession.marketHub ?? "Bodija Market"} has been submitted.\n\nMarket hub administrators review physical stall location and seller contact before granting price publication permissions.',
+                'Your verification application for "${userSession.businessName ?? "Your Store"}" at ${userSession.marketHub ?? (userSession.stallLocation ?? "your registered market")} has been submitted.\n\nMarket hub administrators review physical stall location and seller contact before granting price publication permissions.',
                 style: const TextStyle(
                     fontSize: 13, color: Color(0xFF795548), height: 1.4),
               ),
@@ -2194,7 +2605,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                             fontWeight: FontWeight.w700, fontSize: 13)),
                     const SizedBox(height: 4),
                     Text(
-                        'Market Hub: ${userSession.marketHub ?? "Bodija Market"}',
+                        'Market Hub: ${userSession.marketHub ?? (userSession.stallLocation ?? "Your Market")}',
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.textSecondary)),
                     const SizedBox(height: 4),

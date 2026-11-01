@@ -8,7 +8,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?logo=dart)](https://dart.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Database-3ECF8E?logo=supabase)](https://supabase.com)
 [![Meta AI](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%20%26%20Voice%20%26%20Vision-0668E1?logo=meta)](https://about.meta.com)
-[![Tests](https://img.shields.io/badge/Tests-214%20Passing-success?logo=checkmarx)](test/)
+[![Tests](https://img.shields.io/badge/Tests-222%20Passing-success?logo=checkmarx)](test/)
 [![Analyzer](https://img.shields.io/badge/Analyzer-0%20Issues-success)](lib/)
 
 ---
@@ -131,6 +131,26 @@ SmartMove has undergone continuous iterative development and real-world hardenin
 - **Meta Transcription Endpoint Integration**: Uploads the WAV payload with audio metadata headers to the backend proxy directing to Meta's `muse-voice-transcribe-1.0` ASR endpoint.
 - **Editable Chat Input Field Insertion**: Injects the returned transcript directly into the chat input field on the home screen, keeping the input focused and allowing the user to review, edit, or adjust the prompt before sending.
 
+### 19. 🎯 Zero Fake Data & True-to-Life Geolocation Scanning
+- **Eliminated False Bodija Coordinates**: Purged hardcoded defaults across the codebase that mistakenly assumed all Nigerian users or sellers were in Ibadan at Bodija Market (`7.4243, 3.9168`), which previously led to jarring synthetic ~66km distance estimates for Abeokuta residents.
+- **Granular Multi-City Hub Directory**: Added comprehensive market hubs and coordinates for **Abeokuta** (*Kuto Market, Itoku Market, Omida Market, Lafenwa, Ibara*), **Lagos** (*Mile 12, Oyingbo, Tejuosho, Balogun, Alaba*), **Abuja** (*Wuse 2, Utako*), and **Ibadan** (*Dugbe, Bodija, Oje, Oja Oba, Gbagi*).
+- **Cleansed Synthetic Nomenclature**: Completely removed synthetic `"Commercial Hub"` naming in favor of authentic market names and local store areas.
+- **Uncalibrated Stall Detection**: When a seller has not yet calibrated precise GPS coordinates, `SellerLocationMapSheet` renders a clear, transparent **`Stall GPS Not Yet Calibrated`** card with one-tap Chat & Buy and Call actions rather than generating artificial pins or misleading distance calculations.
+
+### 20. 🗂️ Dynamic Multi-Tier Commodity Categories & SuperAdmin Category Editor
+- **Dynamic Category Administration**: SuperAdmin and Admin users can now create, edit, and delete commodity categories dynamically via dedicated dialogs in the SuperAdmin console (`/superadmin`).
+- **Full-Stack Synchronization**: Category modifications update live Riverpod state (`categoriesProvider`), persist directly to Supabase (`categories` table), and cache locally via `SharedPreferences`.
+- **Instant Omnichannel Propagation**: Real-time propagation immediately updates category pills on the Discover page, single-line category filter chips on the Community feed, and category dropdowns on the Seller Portal listing sheets.
+
+### 21. 💬 Real Persistent Two-Way Buyer-Seller Chat & Trader Inquiry Inbox
+- **Zero Automated Simulations**: Removed canned 600ms fake auto-replies, replacing them with authentic persistent two-way messaging between shoppers and verified merchants.
+- **Dual-Layer Persistence**: Powered by Supabase (`negotiation_messages` table) with instant offline cache in `SharedPreferences`.
+- **Seller Portal Inquiries Inbox**: Added a dedicated **Customer Inquiries & Live Chat** card in `SellerPortalScreen` where verified traders can review buyer inquiries/offers and reply directly with confirmed pricing and stall directions.
+
+### 22. 🛡️ User-Friendly, Respectful Error Handling & Anomaly Reporting
+- **Polite Human-Centered Messaging**: Eliminated raw technical exceptions (`$e`), stack trace dumps, and cryptic toasts across the app.
+- **Clear Actionable Guidance**: Polished user feedback across GPS scanning, camera/gallery receipt OCR failures, external navigation launchers, and empty search results.
+
 ---
 
 ## 🌟 Core Pillars & Key Features
@@ -189,14 +209,16 @@ Evaluates and re-ranks options across 6 weighted criteria based on user priority
 - **Grounded Price History**: Draws real historical price trendlines strictly when 3 or more verified time-stamped observations exist. When data is limited, it provides an honest empty state rather than inventing fake curves.
 - **Category & Channel Filters**: Browse seamlessly by `'All'`, `'Groceries'`, `'Electronics'`, `'Pharmacy'`, or `'Others'`.
 
-### 5. 💬 In-App Trader Chat & Negotiation
-- Shoppers can make direct price offers and check stock availability with market traders in real time.
-- Embedded negotiation drawer displays active listing unit rates, counter-offer proposals, and delivery coordination.
+### 5. 💬 In-App Trader Chat & Direct Negotiation
+- **Authentic Two-Way Messaging**: Real persistent chat backed by Supabase and local cache—zero simulated auto-replies.
+- **Dedicated Seller Inquiries Inbox**: Market traders review customer inquiries, send counter-offers, and confirm stall inventory directly from their Seller Portal.
+- Embedded negotiation drawer displays active listing unit rates, counter-offer proposals, and delivery coordination with real-time status tracking.
 
 ### 6. 🛡️ Role-Based Access Control & Dedicated SuperAdmin Panel
 Strict separation of concerns ensures normal shoppers and guests see only customer-facing workflows, while administrators have a dedicated back-office control panel:
 - **Platform Analytics**: Total users, active listings, pending trader applications, and flagged anomalies.
 - **Trader Verification**: Review seller documents, market hub assignments, and stall locations to approve or reject trader credentials.
+- **Dynamic Category Administration**: Create, edit, and delete commodity categories dynamically with instant live sync across user discovery, community feeds, and merchant portals.
 - **Content Moderation & Anomaly Resolution**: Inspect user-flagged price outliers and resolve price discrepancies.
 - **Catalog Management**: Directly edit, verify, or deactivate marketplace listings.
 - **Database Role Synchronization**: Safe admin role syncing with Cloud Supabase.

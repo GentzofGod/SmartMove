@@ -1591,7 +1591,7 @@ class MetaAiService {
                   snippet:
                       '${obs.marketLocation} • ${obs.inStock ? "In Stock" : "Out of Stock"}${obs.brandOrGrade != null ? " • Brand: ${obs.brandOrGrade}" : ""} (Direct In-App Contact)',
                   targetUrl:
-                      'smartmove://seller?name=${Uri.encodeComponent(obs.sellerName)}&product=${Uri.encodeComponent(obs.productName)}',
+                      'smartmove://seller?name=${Uri.encodeComponent(obs.sellerName)}&product=${Uri.encodeComponent(obs.productName)}&location=${Uri.encodeComponent(obs.marketLocation)}&lat=${obs.latitude ?? ""}&lng=${obs.longitude ?? ""}',
                   detectedPrice: obs.price,
                   priceDisplay: obs.formattedPrice,
                   channel: obs.channel,
@@ -3688,10 +3688,10 @@ class MetaAiService {
           'Meta AI Verified Local Inventory Priority: Found ${inAppVendors.length} active in-app seller quote(s) for "$clean" in local physical hubs (${inAppVendors.first.vendorName} at ${inAppVendors.first.priceDisplay}). Online stores (Jumia, Konga) are ranked below as secondary alternatives.';
     } else if (isElectronics) {
       recommendation =
-          'Meta AI Price Intelligence: For $clean, Konga and Jiji offer competitive merchant listings, while Jumia provides verified manufacturer warranty with door-to-door delivery. For immediate inspection, local electronics dealers in ${city ?? 'Ibadan'} allow in-person testing before payment.';
+          'Meta AI Price Intelligence: For $clean, Konga and Jiji offer competitive merchant listings, while Jumia provides verified manufacturer warranty with door-to-door delivery. For immediate inspection, local electronics dealers in ${city ?? 'your local area'} allow in-person testing before payment.';
     } else if (isHardware) {
       recommendation =
-          'Meta AI Industrial Intelligence: For $clean, Jiji and specialized engineering importers provide direct machine-shop pricing, while Jumia offers standardized tool sets. Verify OEM chuck and spindle specifications with local machinists in ${city ?? 'Ibadan'}.';
+          'Meta AI Industrial Intelligence: For $clean, Jiji and specialized engineering importers provide direct machine-shop pricing, while Jumia offers standardized tool sets. Verify OEM chuck and spindle specifications with local machinists in ${city ?? 'your local area'}.';
     } else {
       recommendation =
           'Meta AI Commodity Intelligence: For $clean, open wholesale markets offer the lowest bulk cash prices (~5-8% savings), whereas online platforms like Jumia and Supermart provide convenient delivery with pre-packaged quality assurance.';

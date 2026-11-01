@@ -1364,39 +1364,62 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
   // Tab 3: Categories & Markets Governance
   // --------------------------------------------------------------------------
   Widget _buildCategoriesAndMarketsTab() {
-    final categories = [
-      ('Grains & Flours', 'Rice, Beans, Garri, Semovita, Wheat', 8, 'c-grains'),
-      ('Tubers & Roots', 'Benue Yam, Cassava, Sweet Potatoes', 4, 'c-tubers'),
-      ('Cooking Oils', 'Kings Pure Vegetable Oil, Epo Pupa Palm Oil', 6, 'c-oils'),
-      ('Provisions & Dairy', 'Peak Milk, Sugar, Indomie, Detergent', 12, 'c-provisions'),
-      ('Vegetables & Spices', 'Jos Tomatoes, Onions, Pepper, Plantain', 5, 'c-veggies'),
-    ];
+    final liveCategories = ref.watch(categoriesProvider);
+    final allObservations = ref.watch(communityProvider);
 
     final marketHubs = [
+      ('Kuto Market', 'Abeokuta Market District', '98 Verified Stalls', 'Open Market'),
       ('Bodija Market', 'Ibadan Wholesale Hub', '142 Verified Stalls', 'Open Market'),
-      ('Dugbe Commercial Hub', 'Supermarket & Tech District', '48 Retail Stores', 'SMB Store'),
-      ('Oje Market', 'Traditional Herbs & Bulk Foods', '65 Local Vendors', 'Local Market'),
-      ('Omi Adio Wholesale', 'Farmgate Produce Hub', '32 Direct Farmers', 'Farmgate'),
+      ('Mile 12 Market', 'Lagos Produce Wholesale', '210 Verified Stalls', 'Open Market'),
+      ('Computer Village', 'Ikeja Tech District', '115 Verified Outlets', 'Electronics Hub'),
+      ('Dugbe Market & Commercial Hub', 'Supermarket & Tech District', '48 Retail Stores', 'SMB Store'),
+      ('Wuse Market', 'Abuja Central District', '84 Verified Stalls', 'Open Market'),
+      ('Oje Market', 'Traditional Bulk Produce', '65 Local Vendors', 'Local Market'),
     ];
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text(
-          'Managed Commodity Categories',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Managed Commodity Categories',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Active categories configured across local markets and listings.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Category',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF673AB7),
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => _showAddCategoryDialog(context),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
-        const Text(
-          'Active categories configured for Nigerian local markets and pricing audits.',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        for (final cat in categories)
+        for (final cat in liveCategories)
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
@@ -1421,38 +1444,59 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        cat.$1,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              cat.name,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${allObservations.where((o) => o.category.toLowerCase() == cat.name.toLowerCase()).length} items',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (cat.description != null && cat.description!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          cat.description!,
+                          style: const TextStyle(
+                              fontSize: 11.5, color: AppColors.textSecondary),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        cat.$2,
-                        style: const TextStyle(
-                            fontSize: 11.5, color: AppColors.textSecondary),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Active (${cat.$3} items)',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF2E7D32),
-                    ),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF673AB7)),
+                  tooltip: 'Edit Category',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _showEditCategoryDialog(context, cat),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFC62828)),
+                  tooltip: 'Delete Category',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _showDeleteCategoryDialog(context, cat),
                 ),
               ],
             ),
@@ -1535,6 +1579,203 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
             ),
           ),
       ],
+    );
+  }
+
+  void _showAddCategoryDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.category_rounded, color: Color(0xFF673AB7)),
+            SizedBox(width: 8),
+            Text('Add Commodity Category',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                hintText: 'e.g. Footwear & Bags',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                hintText: 'e.g. Leather shoes, sandals, handbags, school bags',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF673AB7),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid category name'),
+                    backgroundColor: Color(0xFFC62828),
+                  ),
+                );
+                return;
+              }
+              ref.read(categoriesProvider.notifier).addCategory(
+                    name: name,
+                    description: descCtrl.text.trim(),
+                  );
+              Navigator.pop(dialogCtx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Category "$name" created successfully!'),
+                  backgroundColor: AppColors.primary,
+                ),
+              );
+            },
+            child: const Text('Create Category'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCategoryDialog(BuildContext context, CommodityCategory cat) {
+    final nameCtrl = TextEditingController(text: cat.name);
+    final descCtrl = TextEditingController(text: cat.description ?? '');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.edit_note_rounded, color: Color(0xFF673AB7)),
+            const SizedBox(width: 8),
+            Text('Edit ${cat.name}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF673AB7),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final newName = nameCtrl.text.trim();
+              if (newName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Category name cannot be empty'),
+                    backgroundColor: Color(0xFFC62828),
+                  ),
+                );
+                return;
+              }
+              ref.read(categoriesProvider.notifier).updateCategory(
+                    id: cat.id,
+                    name: newName,
+                    description: descCtrl.text.trim(),
+                  );
+              Navigator.pop(dialogCtx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Category updated to "$newName"!'),
+                  backgroundColor: AppColors.primary,
+                ),
+              );
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteCategoryDialog(BuildContext context, CommodityCategory cat) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Category',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: Text(
+          'Are you sure you want to delete "${cat.name}"?\n\nExisting listings in this category will remain available, but shoppers will no longer see this category filter.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC62828),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              ref.read(categoriesProvider.notifier).deleteCategory(cat.id);
+              Navigator.pop(dialogCtx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Category "${cat.name}" deleted.'),
+                  backgroundColor: const Color(0xFFC62828),
+                ),
+              );
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -45,6 +45,8 @@ class SellerLocationMapSheet extends ConsumerStatefulWidget {
       sellerName: obs.sellerName,
       marketLocation: obs.marketLocation,
       stallLocation: obs.notes,
+      sellerLat: obs.latitude,
+      sellerLng: obs.longitude,
       productName: obs.productName,
       price: obs.price,
       unit: obs.unit,
@@ -118,6 +120,14 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
     'oje': LatLng(7.3871, 3.9110),
     'oja oba': LatLng(7.3752, 3.8963),
     'gbagi': LatLng(7.3965, 3.9638),
+    'abeokuta': LatLng(7.1475, 3.3619),
+    'kuto': LatLng(7.1420, 3.3550),
+    'itoku': LatLng(7.1550, 3.3400),
+    'omida': LatLng(7.1480, 3.3450),
+    'lafenwa': LatLng(7.1700, 3.3300),
+    'ibara': LatLng(7.1557, 3.3451),
+    'sagamu': LatLng(6.8400, 3.6500),
+    'ijebu': LatLng(6.8200, 3.9200),
     'mile 12': LatLng(6.6020, 3.3900),
     'oyingbo': LatLng(6.4950, 3.3780),
     'tejuosho': LatLng(6.5150, 3.3640),
@@ -141,20 +151,64 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
     super.dispose();
   }
 
-  LatLng _resolveSellerCoordinates() {
+  LatLng? _resolveSellerCoordinates() {
     if (widget.sellerLat != null && widget.sellerLng != null && widget.sellerLat != 0.0) {
       return LatLng(widget.sellerLat!, widget.sellerLng!);
     }
 
-    final query = '${widget.marketLocation} ${widget.sellerName}'.toLowerCase();
+    // 1. Try extracting explicit Lat / Lon from stallLocation or marketLocation string
+    final marketString = '${widget.stallLocation ?? ""} ${widget.marketLocation}'.trim();
+    final coordMatch = RegExp(r'Lat:\s*([0-9.-]+).*?Lon:\s*([0-9.-]+)', caseSensitive: false).firstMatch(marketString);
+    if (coordMatch != null) {
+      final lat = double.tryParse(coordMatch.group(1) ?? '');
+      final lon = double.tryParse(coordMatch.group(2) ?? '');
+      if (lat != null && lon != null && lat != 0.0) {
+        return LatLng(lat, lon);
+      }
+    }
+
+    // 2. Try looking up seller in sellerApplicationsProvider or currentUser session
+    try {
+      final applications = ref.read(sellerApplicationsProvider);
+      final sName = widget.sellerName.toLowerCase().trim();
+      for (final a in applications) {
+        if (a.businessName.toLowerCase().trim() == sName ||
+            a.applicantName.toLowerCase().trim() == sName) {
+          if (a.latitude != null && a.longitude != null && a.latitude != 0.0) {
+            return LatLng(a.latitude!, a.longitude!);
+          }
+        }
+      }
+
+      final session = ref.read(authProvider);
+      if (session.businessName?.toLowerCase().trim() == sName || session.displayName.toLowerCase().trim() == sName) {
+        if (session.latitude != null && session.longitude != null && session.latitude != 0.0) {
+          return LatLng(session.latitude!, session.longitude!);
+        }
+      }
+    } catch (_) {}
+
+    // 3. Match market location against known hub coordinates
+    final marketQuery = marketString.toLowerCase();
     for (final entry in _hubCoordinates.entries) {
-      if (query.contains(entry.key)) {
+      if (marketQuery.contains(entry.key)) {
         return entry.value;
       }
     }
 
-    // Default to Bodija Market, Ibadan if unrecognized
-    return const LatLng(7.4243, 3.9168);
+    // 4. City-level resolution if market location mentions a known city
+    if (marketQuery.contains('abeokuta') || marketQuery.contains('ogun')) {
+      return const LatLng(7.1475, 3.3619);
+    }
+    if (marketQuery.contains('lagos') || marketQuery.contains('ikeja')) {
+      return const LatLng(6.6020, 3.3515);
+    }
+    if (marketQuery.contains('abuja') || marketQuery.contains('fct')) {
+      return const LatLng(9.0765, 7.3986);
+    }
+
+    // Return null if coordinates are unknown so UI reports accurately without fake fallback
+    return null;
   }
 
   Future<void> _openExternalNavigation(LatLng sellerPos) async {
@@ -206,7 +260,7 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
     final buyerPos = buyerLocation.isSet ? LatLng(buyerLocation.latitude, buyerLocation.longitude) : null;
 
     double? distanceKm;
-    if (buyerPos != null) {
+    if (buyerPos != null && sellerPos != null) {
       distanceKm = LocationService.calculateDistanceKm(
         lat1: buyerPos.latitude,
         lon1: buyerPos.longitude,
@@ -301,7 +355,8 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
 
             // Interactive OpenStreetMap Canvas
             Expanded(
-              child: Stack(
+              child: sellerPos != null
+                  ? Stack(
                 children: [
                   FlutterMap(
                     mapController: _mapController,
@@ -451,6 +506,49 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                     ),
                   ),
                 ],
+              )
+            : Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFF8E1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.location_off_rounded,
+                            color: Color(0xFFF57F17), size: 40),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Stall GPS Not Yet Calibrated',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${widget.sellerName} is listed at "${widget.marketLocation}", but precise GPS stall coordinates have not been submitted.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                            height: 1.4),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Contact the seller via In-App Chat or Phone Call below for direct stall directions.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                            height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
 
@@ -490,7 +588,7 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                               ),
                               Text(
-                                '${widget.marketLocation} • ${distanceKm != null ? "${distanceKm.toStringAsFixed(1)} km away" : "Nearby commercial hub"}',
+                                '${widget.marketLocation} • ${distanceKm != null ? "${distanceKm.toStringAsFixed(1)} km away" : "Physical Store"}',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                               ),
                             ],
@@ -560,7 +658,9 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                               side: const BorderSide(color: AppColors.primary),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            onPressed: () => _openExternalNavigation(sellerPos),
+                            onPressed: sellerPos != null
+                                ? () => _openExternalNavigation(sellerPos)
+                                : null,
                             icon: const Icon(Icons.directions_outlined, size: 18),
                             label: const Text('Directions', style: TextStyle(fontWeight: FontWeight.w700)),
                           ),

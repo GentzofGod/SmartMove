@@ -712,9 +712,9 @@ class SafeOutletLauncher {
         } catch (_) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 backgroundColor: AppColors.errorText,
-                content: Text('Could not launch URL: $url'),
+                content: Text('Could not open external store link. Please verify internet connection or browser settings.'),
               ),
             );
           }

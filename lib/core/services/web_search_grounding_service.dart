@@ -206,17 +206,29 @@ class WebSearchGroundingService {
     String? storeType,
   }) {
     final clean = cleanSearchQuery(commodityName);
-    final targetCity = (city != null && city.trim().isNotEmpty) ? city.trim() : 'Ibadan';
+    final String targetCity;
+    if (city != null && city.trim().isNotEmpty) {
+      final trimmed = city.trim();
+      targetCity = trimmed.toLowerCase().contains('nigeria') ? trimmed : '$trimmed Nigeria';
+    } else {
+      targetCity = 'Nigeria';
+    }
     final query = storeType != null
-        ? '$storeType in $targetCity Nigeria'
-        : '$clean stores in $targetCity Nigeria';
+        ? '$storeType in $targetCity'
+        : '$clean stores in $targetCity';
     return 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}';
   }
 
   /// Builds an open web search query to compare quotes across Nigerian retailers
   static String buildGeneralWebSearchUrl(String commodityName, {String? city}) {
     final clean = cleanSearchQuery(commodityName);
-    final targetCity = (city != null && city.trim().isNotEmpty) ? city.trim() : 'Nigeria';
+    final String targetCity;
+    if (city != null && city.trim().isNotEmpty) {
+      final trimmed = city.trim();
+      targetCity = trimmed.toLowerCase().contains('nigeria') ? trimmed : '$trimmed Nigeria';
+    } else {
+      targetCity = 'Nigeria';
+    }
     final query = 'buy $clean price in $targetCity';
     return 'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
   }
@@ -229,7 +241,13 @@ class WebSearchGroundingService {
   }) async {
     final clean = cleanSearchQuery(commodityName);
     if (clean.isEmpty) return const [];
-    final targetCity = (city != null && city.trim().isNotEmpty) ? city.trim() : 'Ibadan';
+    final String targetCity;
+    if (city != null && city.trim().isNotEmpty) {
+      final trimmed = city.trim();
+      targetCity = trimmed.toLowerCase().contains('nigeria') ? trimmed : '$trimmed Nigeria';
+    } else {
+      targetCity = 'Nigeria';
+    }
 
     final results = <LiveWebVendorResult>[];
 

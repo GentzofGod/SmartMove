@@ -29,14 +29,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   ComparisonSortPreference _sortPreference = ComparisonSortPreference.cheapestUnitPrice;
   final TextEditingController _searchController = TextEditingController();
 
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'All', 'icon': Icons.grid_view_rounded},
-    {'name': 'Groceries', 'icon': Icons.local_grocery_store_outlined},
-    {'name': 'Electronics', 'icon': Icons.devices_outlined},
-    {'name': 'Pharmacy', 'icon': Icons.local_pharmacy_outlined},
-    {'name': 'Others', 'icon': Icons.more_horiz_rounded},
-  ];
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -409,7 +401,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
             child: Row(
-              children: _categories.map((cat) {
+              children: [
+                {'name': 'All', 'icon': Icons.grid_view_rounded},
+                ...ref.watch(categoriesProvider).map((c) => {
+                      'name': c.name,
+                      'icon': c.slug == 'groceries'
+                          ? Icons.local_grocery_store_outlined
+                          : (c.slug == 'electronics'
+                              ? Icons.devices_outlined
+                              : (c.slug == 'pharmacy'
+                                  ? Icons.local_pharmacy_outlined
+                                  : Icons.more_horiz_rounded)),
+                    }),
+              ].map((cat) {
                 final isSelected = _selectedCategory == cat['name'];
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),

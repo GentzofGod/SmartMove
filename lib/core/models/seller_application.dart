@@ -100,7 +100,7 @@ class SellerApplication {
         businessName:
             (json['businessName'] ?? json['business_name']) as String? ?? '',
         marketHub:
-            (json['marketHub'] ?? json['market_hub']) as String? ?? 'Bodija Market',
+            (json['marketHub'] ?? json['market_hub']) as String? ?? 'Local Market',
         sellerChannel:
             (json['sellerChannel'] ?? json['seller_channel']) as String? ?? 'Local Market',
         stallLocation:

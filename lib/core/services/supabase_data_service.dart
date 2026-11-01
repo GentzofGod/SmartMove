@@ -4,6 +4,7 @@ import '../models/price_observation.dart';
 import '../models/commodity_category.dart';
 import '../models/errand.dart';
 import '../models/seller_application.dart';
+import '../models/trader_chat_message.dart';
 
 class SupabaseDataService {
   static SupabaseClient? get _client {
@@ -59,6 +60,48 @@ class SupabaseDataService {
       }).toList();
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Create a new commodity category (SuperAdmin)
+  static Future<bool> insertCategory(CommodityCategory category) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      await client.from('commodity_categories').insert(category.toDbMap());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update an existing category (SuperAdmin)
+  static Future<bool> updateCategory(CommodityCategory category) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      await client
+          .from('commodity_categories')
+          .update(category.toDbMap())
+          .eq('id', category.id);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete a category (SuperAdmin)
+  static Future<bool> deleteCategory(String categoryId) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      await client.from('commodity_categories').delete().eq('id', categoryId);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -153,6 +196,11 @@ class SupabaseDataService {
         final isFlagged = map['is_flagged_anomaly'] as bool? ?? false;
         final anomalyReason = map['anomaly_reason']?.toString();
 
+        final category = map['category']?.toString() ?? 'Groceries';
+        final imageUrl = map['image_url']?.toString();
+        final latitude = ((map['latitude'] ?? map['lat']) as num?)?.toDouble();
+        final longitude = ((map['longitude'] ?? map['lng'] ?? map['lon']) as num?)?.toDouble();
+
         return PriceObservation(
           id: map['id']?.toString() ?? 'obs-unknown',
           productId: map['product_id']?.toString() ?? 'p-custom',
@@ -172,8 +220,12 @@ class SupabaseDataService {
           inStock: inStock,
           standardizedUnitPrice: standardizedUnitPrice,
           baseUnit: baseUnit,
+          category: category,
+          imageUrl: imageUrl,
           isFlaggedAnomaly: isFlagged,
           anomalyReason: anomalyReason,
+          latitude: latitude,
+          longitude: longitude,
         );
       }).toList();
     } catch (_) {
@@ -196,6 +248,10 @@ class SupabaseDataService {
     String baseUnit = 'kg',
     String? marketLocation,
     String? notes,
+    String category = 'Groceries',
+    String? imageUrl,
+    double? latitude,
+    double? longitude,
   }) async {
     final client = _client;
     if (client == null) return false;
@@ -209,7 +265,7 @@ class SupabaseDataService {
 
       final user = client.auth.currentUser;
 
-      await client.from('price_observations').insert({
+      final payload = <String, dynamic>{
         'product_name': productName,
         'seller_name': sellerName,
         'market_location': marketLocation ?? sellerName,
@@ -226,7 +282,65 @@ class SupabaseDataService {
         'in_stock': inStock,
         'standardized_unit_price': standardizedUnitPrice,
         'base_unit': baseUnit,
-      });
+        'category': category,
+      };
+
+      if (imageUrl != null) payload['image_url'] = imageUrl;
+      if (latitude != null) payload['latitude'] = latitude;
+      if (longitude != null) payload['longitude'] = longitude;
+
+      await client.from('price_observations').insert(payload);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetch chat / negotiation messages between buyer and seller from Supabase
+  static Future<List<TraderChatMessage>?> fetchChatMessages(String conversationKey) async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final response = await client
+          .from('negotiation_messages')
+          .select()
+          .eq('conversation_key', conversationKey)
+          .order('created_at', ascending: true);
+
+      final List<dynamic> data = response as List<dynamic>;
+      if (data.isEmpty) return const <TraderChatMessage>[];
+
+      return data.map((json) {
+        return TraderChatMessage.fromJson(json as Map<String, dynamic>);
+      }).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Insert a chat message between buyer and seller into Supabase
+  static Future<bool> sendChatMessage(
+    TraderChatMessage message, {
+    required String conversationKey,
+    required String commodityName,
+  }) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final user = client.auth.currentUser;
+      final payload = <String, dynamic>{
+        'conversation_key': conversationKey,
+        'sender_id': user?.id ?? (message.isTrader ? 'seller-user' : 'buyer-user'),
+        'sender_name': message.senderName,
+        'is_trader': message.isTrader,
+        'message_text': message.text,
+        'proposed_price': message.proposedPrice,
+        'commodity_name': commodityName,
+        'created_at': message.timestamp.toIso8601String(),
+      };
+      await client.from('negotiation_messages').insert(payload);
       return true;
     } catch (_) {
       return false;

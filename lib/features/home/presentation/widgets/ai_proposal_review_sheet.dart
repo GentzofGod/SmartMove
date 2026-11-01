@@ -842,10 +842,32 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                       final isSmartMoveSeller = (item.matchedVendorName?.contains('In-App Verified') ?? false) ||
                           (url?.startsWith('smartmove://') ?? false);
                       if (isSmartMoveSeller) {
+                        final uri = url != null ? Uri.tryParse(url) : null;
+                        final parsedLocation = uri?.queryParameters['location'];
+                        final parsedLat = double.tryParse(uri?.queryParameters['lat'] ?? '');
+                        final parsedLng = double.tryParse(uri?.queryParameters['lng'] ?? '');
+
+                        final matchingQuote = quotes.where((q) => q.targetUrl.startsWith('smartmove://')).firstOrNull;
+                        final snippetLocation = matchingQuote?.snippet.split(' • ').firstOrNull;
+
+                        final cleanedSellerName = (item.matchedVendorName ?? 'Verified Trader')
+                            .replaceAll(' (In-App Verified)', '')
+                            .trim();
+                        final obs = widget.inAppObservations?.where(
+                          (o) => o.sellerName.toLowerCase().trim() == cleanedSellerName.toLowerCase(),
+                        ).firstOrNull;
+
+                        final effectiveMarket = obs?.marketLocation ??
+                            parsedLocation ??
+                            snippetLocation ??
+                            'Local Market';
+
                         SellerLocationMapSheet.show(
                           context,
-                          sellerName: (item.matchedVendorName ?? 'Verified Trader').replaceAll(' (In-App Verified)', ''),
-                          marketLocation: 'Bodija Market',
+                          sellerName: cleanedSellerName,
+                          marketLocation: effectiveMarket,
+                          sellerLat: obs?.latitude ?? parsedLat,
+                          sellerLng: obs?.longitude ?? parsedLng,
                           productName: item.productName,
                           price: item.estimatedUnitPrice,
                           unit: item.unit,

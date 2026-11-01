@@ -588,15 +588,12 @@ class AuthService {
       role: role,
       businessName: matchedApp?.businessName ??
           (isTrader ? '${email.split('@').first} Enterprise' : null),
-      marketHub: matchedApp?.marketHub ?? (isTrader ? 'Bodija Market' : null),
+      marketHub: matchedApp?.marketHub,
       sellerChannel:
           matchedApp?.sellerChannel ?? (isTrader ? 'Local Market' : null),
-      stallLocation: matchedApp?.stallLocation ??
-          (isTrader
-              ? 'Stall 14, Grain Section, Bodija Market, Ibadan'
-              : null),
-      latitude: matchedApp?.latitude ?? (isTrader ? 7.4343 : null),
-      longitude: matchedApp?.longitude ?? (isTrader ? 3.9056 : null),
+      stallLocation: matchedApp?.stallLocation,
+      latitude: matchedApp?.latitude,
+      longitude: matchedApp?.longitude,
       phone: matchedApp?.phone,
       sellerApplicationStatus: matchedApp != null
           ? matchedApp.status

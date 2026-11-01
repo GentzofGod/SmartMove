@@ -143,49 +143,7 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
   Widget build(BuildContext context) {
     final traderKey = widget.source.outletName;
     final chatState = ref.watch(traderChatProvider);
-    final lowerItem = widget.source.commodityName.toLowerCase();
-    final isHardware = lowerItem.contains('lathe') ||
-        lowerItem.contains('spare') ||
-        lowerItem.contains('tool') ||
-        lowerItem.contains('part') ||
-        lowerItem.contains('bearing') ||
-        lowerItem.contains('machine') ||
-        lowerItem.contains('hardware') ||
-        lowerItem.contains('cable') ||
-        lowerItem.contains('phone');
-    final isAppliances = lowerItem.contains('cooker') ||
-        lowerItem.contains('kettle') ||
-        lowerItem.contains('iron') ||
-        lowerItem.contains('blender') ||
-        lowerItem.contains('microwave') ||
-        lowerItem.contains('appliance') ||
-        lowerItem.contains('electronics') ||
-        lowerItem.contains('fan') ||
-        lowerItem.contains('tv');
-    final isProduce = lowerItem.contains('tomato') ||
-        lowerItem.contains('pepper') ||
-        lowerItem.contains('egg') ||
-        lowerItem.contains('yam') ||
-        lowerItem.contains('vegetable') ||
-        lowerItem.contains('fruit');
-
-    final welcomeText = isHardware
-        ? 'Hello! Thank you for inquiring about ${widget.source.commodityName}. We have this item available in stock at ${widget.source.marketHubOrLocation}. Listed at ₦${widget.source.unitPrice.toStringAsFixed(0)} per ${widget.source.unit}. How can we assist you with this specification or order?'
-        : (isAppliances
-            ? 'Hello! Thank you for inquiring about ${widget.source.commodityName}. We have warrantied stock available at ${widget.source.marketHubOrLocation} (₦${widget.source.unitPrice.toStringAsFixed(0)} per ${widget.source.unit}). Feel free to ask questions or submit an offer.'
-            : (isProduce
-                ? 'Welcome! We have fresh, genuine harvest of ${widget.source.commodityName} at ${widget.source.marketHubOrLocation}. Listed at ₦${widget.source.unitPrice.toStringAsFixed(0)} per ${widget.source.unit}. How many ${widget.source.unit} are you looking to buy?'
-                : 'Welcome! We have quality stock of ${widget.source.commodityName} available at ${widget.source.marketHubOrLocation} (₦${widget.source.unitPrice.toStringAsFixed(0)} per ${widget.source.unit}). Feel free to submit an offer or ask any questions.'));
-
-    final messages = chatState[traderKey] ?? [
-      TraderChatMessage(
-        id: 'init-msg',
-        senderName: widget.source.outletName,
-        isTrader: true,
-        text: welcomeText,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-      ),
-    ];
+    final messages = chatState[traderKey] ?? const <TraderChatMessage>[];
 
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
@@ -372,60 +330,126 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
 
           // Messages List
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (ctx, idx) {
-                final msg = messages[idx];
-                final isCustomer = !msg.isTrader;
-
-                return Align(
-                  alignment: isCustomer ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.78,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isCustomer ? AppColors.primary : const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(14),
-                        topRight: const Radius.circular(14),
-                        bottomLeft: Radius.circular(isCustomer ? 14 : 2),
-                        bottomRight: Radius.circular(isCustomer ? 2 : 14),
+            child: messages.isEmpty
+                ? Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryTint,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.chat_bubble_outline_rounded,
+                                size: 28, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Direct Chat with ${widget.source.outletName}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Send a direct message or tap "Make Offer" to negotiate on ${widget.source.commodityName}.\nMessages sync directly to the backend database.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 11.5, color: AppColors.textSecondary, height: 1.3),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment:
-                          isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          msg.text,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isCustomer ? Colors.white : AppColors.textPrimary,
-                            height: 1.35,
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length,
+                    itemBuilder: (ctx, idx) {
+                      final msg = messages[idx];
+                      final isCustomer = !msg.isTrader;
+
+                      return Align(
+                        alignment: isCustomer ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.78,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isCustomer ? AppColors.primary : const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(14),
+                              topRight: const Radius.circular(14),
+                              bottomLeft: Radius.circular(isCustomer ? 14 : 2),
+                              bottomRight: Radius.circular(isCustomer ? 2 : 14),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment:
+                                isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                msg.text,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isCustomer ? Colors.white : AppColors.textPrimary,
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      color: isCustomer
+                                          ? Colors.white.withValues(alpha: 0.75)
+                                          : AppColors.textTertiary,
+                                    ),
+                                  ),
+                                  if (isCustomer) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.done_all_rounded,
+                                        size: 11, color: Colors.white70),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            color: isCustomer
-                                ? Colors.white.withValues(alpha: 0.75)
-                                : AppColors.textTertiary,
-                          ),
-                        ),
-                      ],
+                      );
+                    },
+                  ),
+          ),
+          if (messages.isNotEmpty && !messages.last.isTrader)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: const Color(0xFFF8F9FA),
+              child: const Row(
+                children: [
+                  Icon(Icons.schedule_rounded, size: 13, color: AppColors.textTertiary),
+                  SizedBox(width: 6),
+                  Text(
+                    'Delivered to seller • Awaiting trader reply',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          ),
 
           // Input & Quick Negotiation Actions Bar
           Container(

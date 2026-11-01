@@ -65,11 +65,11 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
         });
         await _analyzeCurrentNote();
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not access camera/gallery: $e'),
+          const SnackBar(
+            content: Text('Could not access camera or gallery. Please check permissions and try again.'),
             backgroundColor: AppColors.errorText,
           ),
         );

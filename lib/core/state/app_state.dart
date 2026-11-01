@@ -5,6 +5,10 @@ import '../models/product.dart';
 import '../models/price_observation.dart';
 import '../models/seller_application.dart';
 import '../models/store_edit_request.dart';
+import '../models/commodity_category.dart';
+import '../models/trader_chat_message.dart';
+export '../models/trader_chat_message.dart';
+export '../models/commodity_category.dart';
 import '../models/errand.dart';
 import '../models/itinerary_stop.dart';
 import '../models/plan_candidate.dart';
@@ -487,32 +491,176 @@ final decisionLabProvider =
   DecisionLabNotifier.new,
 );
 
-// --- Trader Negotiation Chat State ---
-class TraderChatMessage {
-  final String id;
-  final String senderName;
-  final bool isTrader;
-  final String text;
-  final DateTime timestamp;
-  final double? proposedPrice;
+// --- Categories State ---
+class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
+  static const _cacheKey = 'smartmove_categories_cache_v2';
 
-  const TraderChatMessage({
-    required this.id,
-    required this.senderName,
-    required this.isTrader,
-    required this.text,
-    required this.timestamp,
-    this.proposedPrice,
-  });
+  @override
+  List<CommodityCategory> build() {
+    _loadFromCacheAndLive();
+    return _defaultCategories;
+  }
+
+  static const List<CommodityCategory> _defaultCategories = [
+    CommodityCategory(
+      id: 'cat-groceries',
+      name: 'Groceries',
+      slug: 'groceries',
+      iconName: 'shopping_basket_outlined',
+      description: 'Foodstuffs, staples, grains, and provisions',
+      displayOrder: 1,
+    ),
+    CommodityCategory(
+      id: 'cat-electronics',
+      name: 'Electronics',
+      slug: 'electronics',
+      iconName: 'electrical_services_outlined',
+      description: 'Home appliances, gadgets, spares, and hardware',
+      displayOrder: 2,
+    ),
+    CommodityCategory(
+      id: 'cat-pharmacy',
+      name: 'Pharmacy',
+      slug: 'pharmacy',
+      iconName: 'medication_outlined',
+      description: 'Healthcare, medicines, OTC drugs, and hygiene',
+      displayOrder: 3,
+    ),
+    CommodityCategory(
+      id: 'cat-others',
+      name: 'Others',
+      slug: 'others',
+      iconName: 'more_horiz_outlined',
+      description: 'Household items, clothing, and general commodities',
+      displayOrder: 4,
+    ),
+  ];
+
+  Future<void> _loadFromCacheAndLive() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(_cacheKey);
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        final decoded = jsonDecode(cachedJson) as List<dynamic>;
+        if (decoded.isNotEmpty) {
+          state = decoded
+              .map((j) => CommodityCategory.fromJson(j as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (_) {}
+
+    final live = await SupabaseDataService.fetchCategories();
+    if (live != null && live.isNotEmpty) {
+      state = live;
+      _persist(live);
+    }
+  }
+
+  Future<void> _persist(List<CommodityCategory> categories) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = jsonEncode(categories.map((c) => c.toJson()).toList());
+      await prefs.setString(_cacheKey, jsonStr);
+    } catch (_) {}
+  }
+
+  void addCategory({
+    required String name,
+    String? description,
+    String? iconName,
+  }) {
+    final slug = name.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    final newCat = CommodityCategory(
+      id: 'cat-${DateTime.now().millisecondsSinceEpoch}',
+      name: name.trim(),
+      slug: slug,
+      description: description?.trim() ?? 'Managed market category',
+      iconName: iconName ?? 'inventory_2_outlined',
+      displayOrder: state.length + 1,
+      isActive: true,
+    );
+    state = [...state, newCat];
+    _persist(state);
+    SupabaseDataService.insertCategory(newCat);
+  }
+
+  void updateCategory({
+    required String id,
+    required String name,
+    String? description,
+    String? iconName,
+    bool? isActive,
+  }) {
+    state = [
+      for (final cat in state)
+        if (cat.id == id)
+          cat.copyWith(
+            name: name.trim(),
+            description: description?.trim() ?? cat.description,
+            iconName: iconName ?? cat.iconName,
+            isActive: isActive ?? cat.isActive,
+          )
+        else
+          cat,
+    ];
+    _persist(state);
+    final updated = state.firstWhere((c) => c.id == id);
+    SupabaseDataService.updateCategory(updated);
+  }
+
+  void deleteCategory(String id) {
+    state = state.where((c) => c.id != id).toList();
+    _persist(state);
+    SupabaseDataService.deleteCategory(id);
+  }
 }
 
+final categoriesProvider =
+    NotifierProvider<CategoriesNotifier, List<CommodityCategory>>(
+  CategoriesNotifier.new,
+);
+
+// --- Trader Negotiation Chat State ---
 class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> {
+  static const _chatCacheKey = 'smartmove_chat_history_v2';
+
   @override
   Map<String, List<TraderChatMessage>> build() {
+    _loadFromCache();
     return {};
   }
 
-  void sendCustomerMessage({
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_chatCacheKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final restored = <String, List<TraderChatMessage>>{};
+        decoded.forEach((key, val) {
+          final list = (val as List<dynamic>)
+              .map((item) => TraderChatMessage.fromJson(item as Map<String, dynamic>))
+              .toList();
+          restored[key] = list;
+        });
+        state = restored;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(Map<String, List<TraderChatMessage>> map) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encodable = <String, dynamic>{};
+      map.forEach((k, v) {
+        encodable[k] = v.map((msg) => msg.toJson()).toList();
+      });
+      await prefs.setString(_chatCacheKey, jsonEncode(encodable));
+    } catch (_) {}
+  }
+
+  Future<void> sendCustomerMessage({
     required String traderName,
     required String commodityName,
     required double quantity,
@@ -520,147 +668,77 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
     required double listedPrice,
     required String messageText,
     double? proposedPrice,
-  }) {
+  }) async {
     final now = DateTime.now();
     final currentHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
 
-    // Initial greeting if history was empty
-    if (currentHistory.isEmpty) {
-      final lowerItem = commodityName.toLowerCase();
-      final isHardwareOrSpares = lowerItem.contains('lathe') ||
-          lowerItem.contains('spare') ||
-          lowerItem.contains('tool') ||
-          lowerItem.contains('bearing') ||
-          lowerItem.contains('cutter') ||
-          lowerItem.contains('hardware') ||
-          lowerItem.contains('machine');
-      final isElectronicsOrAppliances = lowerItem.contains('cooker') ||
-          lowerItem.contains('kettle') ||
-          lowerItem.contains('iron') ||
-          lowerItem.contains('blender') ||
-          lowerItem.contains('microwave') ||
-          lowerItem.contains('appliance') ||
-          lowerItem.contains('electronics') ||
-          lowerItem.contains('fan') ||
-          lowerItem.contains('tv');
-      final isProduce = lowerItem.contains('tomato') ||
-          lowerItem.contains('pepper') ||
-          lowerItem.contains('egg') ||
-          lowerItem.contains('yam') ||
-          lowerItem.contains('vegetable') ||
-          lowerItem.contains('fruit');
+    final userSession = ref.read(authProvider);
+    final senderName = userSession.displayName.isNotEmpty
+        ? userSession.displayName
+        : 'Customer';
 
-      final welcomeText = isHardwareOrSpares
-          ? 'Hello! Thank you for inquiring about $commodityName. We have genuine stock ready. How can we assist you with this specification or order?'
-          : (isElectronicsOrAppliances
-              ? 'Hello! We have authentic, warrantied stock of $commodityName ready for you. How can we assist you today?'
-              : (isProduce
-                  ? 'Welcome! We have fresh, genuine harvest of $commodityName ready for you. How can I serve you today?'
-                  : 'Welcome! We have verified stock of $commodityName ready for you. How can I serve you today?'));
-
-      currentHistory.add(
-        TraderChatMessage(
-          id: 'welcome-${now.millisecondsSinceEpoch}',
-          senderName: traderName,
-          isTrader: true,
-          text: welcomeText,
-          timestamp: now.subtract(const Duration(minutes: 1)),
-        ),
-      );
-    }
-
-    // Append customer message
-    currentHistory.add(
-      TraderChatMessage(
-        id: 'cust-${now.millisecondsSinceEpoch}',
-        senderName: 'You',
-        isTrader: false,
-        text: messageText,
-        timestamp: now,
-        proposedPrice: proposedPrice,
-      ),
+    final customerMsg = TraderChatMessage(
+      id: 'cust-${now.millisecondsSinceEpoch}',
+      senderName: senderName,
+      isTrader: false,
+      text: messageText,
+      timestamp: now,
+      proposedPrice: proposedPrice,
+      conversationKey: traderName,
+      commodityName: commodityName,
     );
 
-    state = {
+    currentHistory.add(customerMsg);
+
+    final newState = {
       ...state,
       traderName: currentHistory,
     };
+    state = newState;
+    _persist(newState);
 
-    // Simulate responsive trader reply
-    _simulateTraderReply(
-      traderName: traderName,
+    // Sync to Supabase backend database
+    SupabaseDataService.sendChatMessage(
+      customerMsg,
+      conversationKey: traderName,
       commodityName: commodityName,
-      quantity: quantity,
-      listedPrice: listedPrice,
-      unit: unit,
-      proposedPrice: proposedPrice,
-      customerQuery: messageText,
     );
   }
 
-  void _simulateTraderReply({
+  Future<void> sendTraderReply({
     required String traderName,
-    required String commodityName,
-    required double quantity,
-    required double listedPrice,
-    required String unit,
-    double? proposedPrice,
-    required String customerQuery,
-  }) {
-    final totalListed = listedPrice * quantity;
-    final qtyDisplay = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
-    String replyText;
+    required String replyText,
+    String? customerName,
+    String? commodityName,
+  }) async {
+    final now = DateTime.now();
+    final currentHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
 
-    if (proposedPrice != null) {
-      final discountPct = (totalListed - proposedPrice) / (totalListed > 0 ? totalListed : 1.0);
-      if (discountPct <= 0) {
-        replyText = 'Deal agreed! I appreciate your patronage for $qtyDisplay $unit of $commodityName. I will prepare your order for pickup right away.';
-      } else if (discountPct <= 0.15) {
-        replyText = 'Deal agreed! As a valued SmartMove customer, I accept your offer of ₦${proposedPrice.toStringAsFixed(0)} for $qtyDisplay $unit of $commodityName. Please come to my stall for prompt pickup!';
-      } else {
-        final fairCounter = (totalListed * 0.90).roundToDouble();
-        replyText = '₦${proposedPrice.toStringAsFixed(0)} is below our cost price for Grade A $commodityName. The best discount I can offer today is ₦${fairCounter.toStringAsFixed(0)} for the $qtyDisplay $unit. Would that work for you?';
-      }
-    } else {
-      final lower = customerQuery.toLowerCase();
-      if (lower.contains('bulk') || lower.contains('discount')) {
-        replyText = 'Yes! For purchases of 5 or more units, we offer up to 8% discount. How many $unit do you need in total?';
-      } else if (lower.contains('quality') || lower.contains('grade')) {
-        final isProduce = commodityName.toLowerCase().contains('egg') ||
-            commodityName.toLowerCase().contains('tomato') ||
-            commodityName.toLowerCase().contains('pepper') ||
-            commodityName.toLowerCase().contains('yam') ||
-            commodityName.toLowerCase().contains('fruit');
-        replyText = isProduce
-            ? 'All our $commodityName is Grade A certified and freshly harvested. You can inspect it when you arrive.'
-            : 'All our $commodityName is authentic, high-quality specification. You are welcome to inspect it upon pickup.';
-      } else if (lower.contains('pickup') || lower.contains('hold') || lower.contains('minutes')) {
-        replyText = 'Certainly! I will set aside your $qtyDisplay $unit of $commodityName now. Please ask for my stall when you arrive at the market.';
-      } else if (lower.contains('deliver')) {
-        replyText = 'Yes, dispatch riders are available at our hub for delivery within the city. Delivery fee depends on your destination.';
-      } else if (lower.contains('cash') || lower.contains('transfer')) {
-        replyText = 'We accept both instant bank transfer and cash on physical pickup at our stall.';
-      } else {
-        replyText = 'Thank you for your message! Our $commodityName is in stock and available at ₦${listedPrice.toStringAsFixed(0)} per $unit. We look forward to fulfilling your order!';
-      }
-    }
+    final traderMsg = TraderChatMessage(
+      id: 'trader-${now.millisecondsSinceEpoch}',
+      senderName: traderName,
+      isTrader: true,
+      text: replyText,
+      timestamp: now,
+      conversationKey: traderName,
+      commodityName: commodityName,
+    );
 
-    Future.delayed(const Duration(milliseconds: 600), () {
-      final updatedHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
-      updatedHistory.add(
-        TraderChatMessage(
-          id: 'trader-${DateTime.now().millisecondsSinceEpoch}',
-          senderName: traderName,
-          isTrader: true,
-          text: replyText,
-          timestamp: DateTime.now(),
-        ),
-      );
-      state = {
-        ...state,
-        traderName: updatedHistory,
-      };
-    });
+    currentHistory.add(traderMsg);
+
+    final newState = {
+      ...state,
+      traderName: currentHistory,
+    };
+    state = newState;
+    _persist(newState);
+
+    // Sync to Supabase backend database
+    SupabaseDataService.sendChatMessage(
+      traderMsg,
+      conversationKey: traderName,
+      commodityName: commodityName ?? 'Commodity',
+    );
   }
 }
 
@@ -671,17 +749,44 @@ final traderChatProvider =
 
 // --- Community Observations State ---
 class CommunityNotifier extends Notifier<List<PriceObservation>> {
+  static const _obsCacheKey = 'smartmove_observations_cache_v2';
+
   @override
   List<PriceObservation> build() {
-    _fetchLive();
+    _loadFromCacheAndLive();
     return [];
   }
 
-  Future<void> _fetchLive() async {
+  Future<void> _loadFromCacheAndLive() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(_obsCacheKey);
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        final decoded = jsonDecode(cachedJson) as List<dynamic>;
+        if (decoded.isNotEmpty) {
+          state = decoded
+              .map((j) => PriceObservation.fromJson(j as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (_) {}
+
     final live = await SupabaseDataService.fetchObservations();
-    if (live != null) {
-      state = live;
+    if (live != null && live.isNotEmpty) {
+      // Merge live with any local user-created listings not yet in live
+      final liveIds = live.map((o) => o.id).toSet();
+      final localOnly = state.where((o) => !liveIds.contains(o.id)).toList();
+      state = [...localOnly, ...live];
+      _persist(state);
     }
+  }
+
+  Future<void> _persist(List<PriceObservation> list) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = jsonEncode(list.map((o) => o.toJson()).toList());
+      await prefs.setString(_obsCacheKey, jsonStr);
+    } catch (_) {}
   }
 
   void addObservation({
@@ -699,6 +804,8 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     String? notes,
     String category = 'Groceries',
     String? imageUrl,
+    double? latitude,
+    double? longitude,
   }) {
     final multiplier = CommodityComparisonService.calculateUnitMultiplier(
       unit,
@@ -736,8 +843,11 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       baseUnit: baseUnit,
       category: category,
       imageUrl: imageUrl,
+      latitude: latitude,
+      longitude: longitude,
     );
     state = [newObs, ...state];
+    _persist(state);
 
     // Asynchronously sync to Cloud Supabase
     SupabaseDataService.insertObservation(
@@ -754,6 +864,10 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       baseUnit: baseUnit,
       marketLocation: marketLocation,
       notes: notes,
+      category: category,
+      imageUrl: imageUrl,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
@@ -771,6 +885,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
         else
           o,
     ];
+    _persist(state);
   }
 
   void updateListingPrice(String id, double newPrice) {
@@ -790,6 +905,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
         else
           o,
     ];
+    _persist(state);
   }
 
   void updateListingDetails({
@@ -805,6 +921,8 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     String? marketLocation,
     String? category,
     String? imageUrl,
+    double? latitude,
+    double? longitude,
   }) {
     state = [
       for (final o in state)
@@ -821,6 +939,8 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
             marketLocation: marketLocation ?? o.marketLocation,
             category: category ?? o.category,
             imageUrl: imageUrl ?? o.imageUrl,
+            latitude: latitude ?? o.latitude,
+            longitude: longitude ?? o.longitude,
             timestamp: DateTime.now(),
             standardizedUnitPrice: () {
               final effectiveUnit = unit ?? o.unit;
@@ -834,6 +954,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
         else
           o,
     ];
+    _persist(state);
   }
 
   void toggleListingStock(String id) {
@@ -847,10 +968,12 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
         else
           o,
     ];
+    _persist(state);
   }
 
   void deleteListing(String id) {
     state = state.where((o) => o.id != id).toList();
+    _persist(state);
   }
 
   void flagListingAnomaly(String id, {required bool isAnomalous, String? reason}) {
@@ -864,6 +987,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
         else
           o,
     ];
+    _persist(state);
   }
 
   void reportListing({
@@ -986,7 +1110,8 @@ class AuthNotifier extends Notifier<UserSession> {
     String? defaultChannel = state.sellerChannel;
     if (newRole == 'Trader' && (defaultBiz == null || defaultBiz.isEmpty)) {
       defaultBiz = '${state.displayName}\'s Store';
-      defaultHub = defaultHub ?? 'Bodija Market';
+      final loc = ref.read(locationProvider);
+      defaultHub = defaultHub ?? (loc.isSet ? loc.displayLocation : 'Local Market');
       defaultChannel = defaultChannel ?? 'Local Market';
     }
     state = state.copyWith(
@@ -1431,7 +1556,7 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
       applicantEmail: seller.email,
       currentBusinessName: seller.businessName ?? '',
       proposedBusinessName: proposedBusinessName,
-      currentMarketHub: seller.marketHub ?? 'Bodija Market',
+      currentMarketHub: seller.marketHub ?? (seller.stallLocation ?? 'Local Market'),
       proposedMarketHub: proposedMarketHub,
       currentStallLocation: seller.stallLocation,
       proposedStallLocation: proposedStallLocation,

@@ -176,7 +176,7 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
             const SizedBox(height: 20),
 
             const Text(
-              'Or Choose Commercial Hub',
+              'Or Choose Market Hub',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -227,7 +227,7 @@ class _LocationPickerSheetState extends ConsumerState<LocationPickerSheet> {
                       ),
                     ),
                     subtitle: Text(
-                      '${hub.town.isNotEmpty && hub.town != hub.city ? "${hub.town}, " : ""}${hub.city} • Commercial Hub',
+                      '${hub.town.isNotEmpty && hub.town != hub.city ? "${hub.town}, " : ""}${hub.city} • Market Hub',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,

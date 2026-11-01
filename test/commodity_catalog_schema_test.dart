@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:smartmove/core/models/commodity_category.dart';
 import 'package:smartmove/core/models/product.dart';
 import 'package:smartmove/core/models/price_observation.dart';
 import 'package:smartmove/core/state/app_state.dart';

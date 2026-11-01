@@ -163,14 +163,14 @@ void main() {
   });
 
   group('In-App Trader Chat & Negotiation Tests', () {
-    test('TraderChatNotifier handles customer offers and generates realistic replies', () async {
+    test('TraderChatNotifier handles customer offers and persists real trader replies', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
       final notifier = container.read(traderChatProvider.notifier);
 
-      // 1. Initial message with offer within 10% discount
-      notifier.sendCustomerMessage(
+      // 1. Initial message from customer
+      await notifier.sendCustomerMessage(
         traderName: 'Mama Bello Grains & Oil Enterprise',
         commodityName: 'Rice (50kg bag)',
         quantity: 1,
@@ -181,27 +181,31 @@ void main() {
       );
 
       var history = container.read(traderChatProvider)['Mama Bello Grains & Oil Enterprise']!;
-      expect(history.length, 2); // Initial greeting + customer message
+      expect(history.length, 1);
       expect(history.last.isTrader, false);
       expect(history.last.proposedPrice, 74000);
 
-      // Wait for simulated trader response delay
-      await Future.delayed(const Duration(milliseconds: 700));
+      // 2. Real trader reply sent from seller portal / backend
+      await notifier.sendTraderReply(
+        traderName: 'Mama Bello Grains & Oil Enterprise',
+        replyText: 'Deal agreed! You can pick it up at Stall 14.',
+        commodityName: 'Rice (50kg bag)',
+      );
 
       history = container.read(traderChatProvider)['Mama Bello Grains & Oil Enterprise']!;
-      expect(history.length, 3);
+      expect(history.length, 2);
       expect(history.last.isTrader, true);
       expect(history.last.text.toLowerCase(), contains('deal agreed'));
     });
 
-    test('TraderChatNotifier counter-offers when customer requests an excessive discount', () async {
+    test('TraderChatNotifier handles real counter-offers from trader', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
       final notifier = container.read(traderChatProvider.notifier);
 
       // Customer offers ₦40,000 for a ₦78,000 item (almost 50% off!)
-      notifier.sendCustomerMessage(
+      await notifier.sendCustomerMessage(
         traderName: 'Mama Bello Grains & Oil Enterprise',
         commodityName: 'Rice (50kg bag)',
         quantity: 1,
@@ -211,11 +215,15 @@ void main() {
         proposedPrice: 40000,
       );
 
-      await Future.delayed(const Duration(milliseconds: 700));
+      // Trader responds with real counter-offer
+      await notifier.sendTraderReply(
+        traderName: 'Mama Bello Grains & Oil Enterprise',
+        replyText: 'That offer is below our cost price. The lowest we can do is ₦74,000.',
+        commodityName: 'Rice (50kg bag)',
+      );
 
       final history = container.read(traderChatProvider)['Mama Bello Grains & Oil Enterprise']!;
       expect(history.last.isTrader, true);
-      // Trader should decline below cost price and counter-offer
       expect(history.last.text.toLowerCase(), contains('below our cost price'));
     });
   });

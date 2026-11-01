@@ -408,9 +408,20 @@ class DecisionEngine {
         ? items.where((i) => i.priority != ErrandPriority.low).toList()
         : items;
 
-    final userCity = (userLocation != null && userLocation.isSet && userLocation.city.isNotEmpty)
-        ? userLocation.city.toLowerCase()
-        : 'ibadan';
+    final displayCity = (userLocation != null &&
+            userLocation.isSet &&
+            userLocation.town.isNotEmpty &&
+            userLocation.town != 'Local Area')
+        ? userLocation.town
+        : ((userLocation != null &&
+                userLocation.isSet &&
+                userLocation.city.isNotEmpty)
+            ? userLocation.city
+            : 'Local');
+
+    final userCity = (userLocation != null && userLocation.isSet)
+        ? '${userLocation.town} ${userLocation.city}'.toLowerCase()
+        : 'local';
 
     // Get approved platform registered traders (only those actually registered and approved)
     final approvedTraders = registeredTraders
@@ -421,10 +432,42 @@ class DecisionEngine {
     final effectiveTraders = approvedTraders;
 
     // Reference coordinates for regional hubs
-    final double defaultMarketALat = userCity.contains('lagos') ? 6.5150 : 7.3876;
-    final double defaultMarketALon = userCity.contains('lagos') ? 3.3640 : 3.8767; // Dugbe / Tejuosho
-    final double defaultMarketBLat = userCity.contains('lagos') ? 6.6020 : 7.4343;
-    final double defaultMarketBLon = userCity.contains('lagos') ? 3.3900 : 3.9056; // Bodija / Mile 12
+    final double defaultMarketALat;
+    final double defaultMarketALon;
+    final double defaultMarketBLat;
+    final double defaultMarketBLon;
+
+    if (userCity.contains('lagos')) {
+      defaultMarketALat = 6.5150;
+      defaultMarketALon = 3.3640;
+      defaultMarketBLat = 6.6020;
+      defaultMarketBLon = 3.3900;
+    } else if (userCity.contains('abeokuta') || userCity.contains('ogun')) {
+      defaultMarketALat = 7.1420;
+      defaultMarketALon = 3.3550; // Kuto Market
+      defaultMarketBLat = 7.1480;
+      defaultMarketBLon = 3.3450; // Omida Market
+    } else if (userCity.contains('ibadan') || userCity.contains('oyo')) {
+      defaultMarketALat = 7.3876;
+      defaultMarketALon = 3.8767; // Dugbe Market
+      defaultMarketBLat = 7.4343;
+      defaultMarketBLon = 3.9056; // Bodija Market
+    } else if (userCity.contains('abuja')) {
+      defaultMarketALat = 9.0765;
+      defaultMarketALon = 7.3986; // Wuse 2
+      defaultMarketBLat = 9.0700;
+      defaultMarketBLon = 7.4390; // Utako
+    } else if (userLocation != null && userLocation.isSet) {
+      defaultMarketALat = userLocation.latitude + 0.008;
+      defaultMarketALon = userLocation.longitude + 0.008;
+      defaultMarketBLat = userLocation.latitude - 0.008;
+      defaultMarketBLon = userLocation.longitude - 0.008;
+    } else {
+      defaultMarketALat = 7.3876;
+      defaultMarketALon = 3.8767;
+      defaultMarketBLat = 7.4343;
+      defaultMarketBLon = 3.9056;
+    }
 
     final double distanceHubA = (userLocation != null && userLocation.isSet)
         ? LocationService.calculateDistanceKm(
@@ -597,14 +640,14 @@ class DecisionEngine {
               totalCost: (item.totalEstimatedCost * 1.08).roundToDouble(),
               outletName: '${item.productName} Hardware Mart',
               channel: AcquisitionChannel.retailStore,
-              marketHubOrLocation: '$userCity Commercial Hardware Zone',
+              marketHubOrLocation: '$displayCity Hardware Zone',
               latitude: defaultMarketALat,
               longitude: defaultMarketALon,
               dynamicDistanceKm: distanceHubA,
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
-              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
+              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
               brandOrGrade: item.brandOrGrade ?? 'Industrial Grade Standard',
             ),
           );
@@ -652,14 +695,14 @@ class DecisionEngine {
                   : 'Precision Engineering & Machine Spares Hub')
               : (userCity.contains('lagos')
                   ? 'Ladipo Machine Tools & Auto Spares Line'
-                  : '$userCity Machine Tools & Spares Line');
+                  : '$displayCity Machine Tools & Spares Line');
           final location = isPlanB
               ? (userCity.contains('lagos')
                   ? 'Coker Commercial Equipment Zone'
-                  : '$userCity Central Engineering District')
+                  : '$displayCity Central Engineering District')
               : (userCity.contains('lagos')
                   ? 'Ladipo Central Wholesale Market'
-                  : '$userCity Central Wholesale Market');
+                  : '$displayCity Central Wholesale Market');
 
           sources.add(
             ItemAcquisitionSource(
@@ -679,7 +722,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
-              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
+              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
               brandOrGrade: item.brandOrGrade ?? 'Machinery Grade',
             ),
           );
@@ -773,10 +816,10 @@ class DecisionEngine {
           // Physical electronics & appliance arcade
           final outlet = userCity.contains('lagos')
               ? 'Alaba International Electronics & Appliance Hub'
-              : '$userCity Electronics & Home Appliances Mart';
+              : '$displayCity Electronics & Home Appliances Mart';
           final location = userCity.contains('lagos')
               ? 'Alaba Commercial Electronics District'
-              : '$userCity Commercial Electronics District';
+              : '$displayCity Commercial Electronics District';
 
           sources.add(
             ItemAcquisitionSource(
@@ -796,7 +839,7 @@ class DecisionEngine {
               isPlatformRegisteredTrader: false,
               contactPhone: null,
               whatsappNumber: null,
-              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
+              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
               brandOrGrade: item.brandOrGrade ?? 'Standard Brand Warranty',
             ),
           );
@@ -818,7 +861,7 @@ class DecisionEngine {
                     ? '${item.productName} Express Mart'
                     : 'Local Supermarket Express'),
             channel: AcquisitionChannel.retailStore,
-            marketHubOrLocation: '$userCity Commercial Express Center',
+            marketHubOrLocation: '$displayCity Express Center',
             latitude: defaultMarketALat,
             longitude: defaultMarketALon,
             dynamicDistanceKm: distanceHubA,
@@ -827,14 +870,14 @@ class DecisionEngine {
             whatsappNumber: null,
             webUrl: isStationeryOrElectronics
                 ? WebSearchGroundingService.buildJumiaSearchUrl(item.productName)
-                : (item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity)),
+                : (item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity)),
             brandOrGrade: item.brandOrGrade ?? 'Supermarket Stock',
           ),
         );
       } else if (isFoodStaple && matchedTrader != null) {
         // Platform Registered Food Trader Prioritized!
         final outletName = matchedTrader.businessName;
-        final stallLocation = matchedTrader.stallLocation ?? (matchedTrader.marketHub.isNotEmpty ? matchedTrader.marketHub : '$userCity Central Market');
+        final stallLocation = matchedTrader.stallLocation ?? (matchedTrader.marketHub.isNotEmpty ? matchedTrader.marketHub : '$displayCity Central Market');
         final phone = matchedTrader.phone.isNotEmpty ? matchedTrader.phone : null;
         final traderLat = matchedTrader.latitude ?? defaultMarketBLat;
         final traderLon = matchedTrader.longitude ?? defaultMarketBLon;
@@ -880,16 +923,16 @@ class DecisionEngine {
             unit: item.unit,
             unitPrice: (item.estimatedUnitPrice * (planId == 'plan-a' ? 0.96 : 1.02)).roundToDouble(),
             totalCost: (item.totalEstimatedCost * (planId == 'plan-a' ? 0.96 : 1.02)).roundToDouble(),
-            outletName: '$userCity Fresh Produce Stalls',
+            outletName: '$displayCity Fresh Produce Stalls',
             channel: AcquisitionChannel.physicalMarketHub,
-            marketHubOrLocation: '$userCity Agro Market Sector',
+            marketHubOrLocation: '$displayCity Agro Market Sector',
             latitude: defaultMarketBLat,
             longitude: defaultMarketBLon,
             dynamicDistanceKm: distanceHubB,
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
+            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
             brandOrGrade: item.brandOrGrade ?? 'Farm Fresh Daily Harvest',
           ),
         );
@@ -906,14 +949,14 @@ class DecisionEngine {
             totalCost: item.totalEstimatedCost,
             outletName: 'Community Licensed Pharmacy',
             channel: AcquisitionChannel.retailStore,
-            marketHubOrLocation: '$userCity Healthcare & Pharmacy Line',
+            marketHubOrLocation: '$displayCity Healthcare & Pharmacy Line',
             latitude: defaultMarketALat,
             longitude: defaultMarketALon,
             dynamicDistanceKm: distanceHubA,
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
+            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
             brandOrGrade: item.brandOrGrade ?? 'NAFDAC Approved',
           ),
         );
@@ -929,9 +972,9 @@ class DecisionEngine {
             unit: item.unit,
             unitPrice: (item.estimatedUnitPrice * (isOnline ? 1.05 : 1.0)).roundToDouble(),
             totalCost: (item.totalEstimatedCost * (isOnline ? 1.05 : 1.0)).roundToDouble(),
-            outletName: isOnline ? 'Jumia Express Store' : '$userCity Commercial Stationers',
+            outletName: isOnline ? 'Jumia Express Store' : '$displayCity Commercial Stationers',
             channel: isOnline ? AcquisitionChannel.ecommercePlatform : AcquisitionChannel.retailStore,
-            marketHubOrLocation: isOnline ? 'Online / Jumia Express Delivery' : '$userCity Commercial District',
+            marketHubOrLocation: isOnline ? 'Online / Jumia Express Delivery' : '$displayCity Commercial District',
             latitude: defaultMarketALat,
             longitude: defaultMarketALon,
             dynamicDistanceKm: isOnline ? 0.0 : distanceHubA,
@@ -940,7 +983,7 @@ class DecisionEngine {
             whatsappNumber: null,
             webUrl: isOnline
                 ? WebSearchGroundingService.buildJumiaSearchUrl(item.productName)
-                : (item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity)),
+                : (item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity)),
             brandOrGrade: item.brandOrGrade ?? 'Manufacturer Sealed',
           ),
         );
@@ -957,14 +1000,14 @@ class DecisionEngine {
             totalCost: item.totalEstimatedCost,
             outletName: '${item.productName} Market Vendor',
             channel: AcquisitionChannel.physicalMarketHub,
-            marketHubOrLocation: '$userCity Central Wholesale Market',
+            marketHubOrLocation: '$displayCity Central Wholesale Market',
             latitude: defaultMarketALat,
             longitude: defaultMarketALon,
             dynamicDistanceKm: distanceHubA,
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: userCity),
+            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
             brandOrGrade: item.brandOrGrade,
           ),
         );
@@ -1107,16 +1150,20 @@ class DecisionEngine {
           ? items.where((i) => i.priority != ErrandPriority.low).toList()
           : items;
       final cost = activeItems.fold(0.0, (s, i) => s + i.totalEstimatedCost);
-      final activeCity = (userLocation != null && userLocation.city.isNotEmpty)
-          ? userLocation.city
-          : 'Central';
+      final activeCity = (userLocation != null &&
+              userLocation.town.isNotEmpty &&
+              userLocation.town != 'Local Area')
+          ? userLocation.town
+          : ((userLocation != null && userLocation.city.isNotEmpty)
+              ? userLocation.city
+              : 'Local');
       stops.add(
         ItineraryStop(
           id: '$planId-s$stopIndex',
           stopNumber: stopIndex++,
-          title: isExpress ? 'Express Mart' : 'Central Market Hub',
+          title: isExpress ? 'Express Mart' : '$activeCity Central Market',
           subtitle: 'Buy ${activeItems.take(3).map((i) => i.productName).join(', ')}${activeItems.length > 3 ? ' + more' : ''}',
-          location: '$activeCity Commercial Hub',
+          location: '$activeCity Market Area',
           distanceKm: 1.2,
           durationMinutes: 0,
           timeWindow: '',
