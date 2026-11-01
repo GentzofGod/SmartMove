@@ -12,6 +12,7 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/admin/presentation/superadmin_panel_screen.dart';
+import '../../features/legal/presentation/legal_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -87,6 +88,14 @@ final appRouter = GoRouter(
       path: '/superadmin',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const SuperAdminPanelScreen(),
+    ),
+    GoRoute(
+      path: '/legal',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final tabParam = state.uri.queryParameters['tab'];
+        return LegalScreen(initialTab: tabParam);
+      },
     ),
   ],
 );

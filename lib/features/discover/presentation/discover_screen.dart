@@ -9,6 +9,7 @@ import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
+import '../../../core/localization/app_language.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 import '../../home/presentation/widgets/paper_note_scanner_sheet.dart';
 import 'product_detail_sheet.dart';
@@ -281,17 +282,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              'Discover',
-              style: TextStyle(
+              AppStrings.tr(ref, 'navDiscover'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
-            SizedBox(height: 2),
-            Text(
+            const SizedBox(height: 2),
+            const Text(
               'Find the best prices near you',
               style: TextStyle(
                 fontSize: 12,
@@ -324,7 +325,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 controller: _searchController,
                 onChanged: (val) => ref.read(productsProvider.notifier).search(val),
                 decoration: InputDecoration(
-                  hintText: 'Search for a product (e.g. rice, eggs...)',
+                  hintText: AppStrings.tr(ref, 'searchCommodities'),
                   hintStyle: const TextStyle(
                     color: AppColors.textTertiary,
                     fontSize: 14,

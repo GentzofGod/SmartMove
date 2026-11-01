@@ -159,7 +159,7 @@ class HomeScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Good morning, ${userSession.displayName}',
+                    '${AppStrings.greeting(ref)}, ${userSession.displayName}',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -261,10 +261,10 @@ class HomeScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
-                                    "Commodity Price Optimizer",
-                                    style: TextStyle(
+                                    AppStrings.tr(ref, 'priceOptimizer'),
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.textPrimary,
@@ -339,14 +339,14 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ] else ...[
                         Row(
-                          children: const [
-                            Icon(Icons.shopping_bag_outlined,
+                          children: [
+                            const Icon(Icons.shopping_bag_outlined,
                                 size: 16, color: AppColors.textSecondary),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'No active shopping options yet',
-                                style: TextStyle(
+                                AppStrings.tr(ref, 'noActiveOptions'),
+                                style: const TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textPrimary,
@@ -412,11 +412,11 @@ class HomeScreen extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Recent Price Changes',
+                        AppStrings.tr(ref, 'recentObservations'),
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -567,11 +567,11 @@ class HomeScreen extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Recent Price Changes',
+                        AppStrings.tr(ref, 'recentObservations'),
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -670,10 +670,10 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Compare Commodity Prices',
-                            style: TextStyle(
+                            AppStrings.tr(ref, 'comparePrices'),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary,

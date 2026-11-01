@@ -49,17 +49,17 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              'Price Lab',
-              style: TextStyle(
+              AppStrings.tr(ref, 'navPriceLab'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
-            SizedBox(height: 2),
-            Text(
+            const SizedBox(height: 2),
+            const Text(
               'Multi-option scenario comparison and basket optimization',
               style: TextStyle(
                 fontSize: 12,
@@ -96,7 +96,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Cart Menu'),
+                      Text(AppStrings.tr(ref, 'activeBasket')),
                       if (decisionState.activeItems.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Container(

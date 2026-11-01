@@ -61,9 +61,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Profile & Settings',
-          style: TextStyle(
+        title: Text(
+          AppStrings.tr(ref, 'profileAndSettings'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -748,7 +748,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   key: const ValueKey('menu_language'),
                   icon: Icons.language_outlined,
-                  title: 'Language',
+                  title: AppStrings.tr(ref, 'language'),
                   trailingText: ref.watch(appLanguageProvider),
                   onTap: () => _showLanguageSelectorSheet(context),
                 ),
@@ -756,14 +756,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   key: const ValueKey('menu_data_privacy'),
                   icon: Icons.security_outlined,
-                  title: 'Data & Privacy',
+                  title: AppStrings.tr(ref, 'dataAndPrivacy'),
                   onTap: () => _showDataAndPrivacySheet(context),
+                ),
+                const Divider(height: 1, indent: 56, color: AppColors.divider),
+                _buildMenuItem(
+                  key: const ValueKey('menu_legal_terms'),
+                  icon: Icons.gavel_outlined,
+                  title: AppStrings.tr(ref, 'legalAndTerms'),
+                  trailingText: 'NDPA / FCCPC',
+                  onTap: () => context.push('/legal'),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
                 _buildMenuItem(
                   key: const ValueKey('menu_help_support'),
                   icon: Icons.help_outline_rounded,
-                  title: 'Help & Support',
+                  title: AppStrings.tr(ref, 'helpAndSupport'),
                   trailingText: 'FAQs & Desk',
                   onTap: () => _showHelpAndSupportSheet(context),
                 ),
@@ -771,7 +779,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   key: const ValueKey('menu_app_guide'),
                   icon: Icons.school_outlined,
-                  title: 'App Guide & Tour',
+                  title: AppStrings.tr(ref, 'appGuide'),
                   trailingText: 'Replay',
                   onTap: () => context.push('/onboarding'),
                 ),
@@ -779,7 +787,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   key: const ValueKey('menu_about_smartmove'),
                   icon: Icons.info_outline_rounded,
-                  title: 'About SmartMove',
+                  title: AppStrings.tr(ref, 'aboutSmartMove'),
                   trailingText: 'v1.2.0',
                   onTap: () => _showAboutSmartMoveDialog(context),
                 ),
@@ -1700,6 +1708,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         );
                       }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('btn_open_full_privacy_policy'),
+                    icon: const Icon(Icons.description_outlined, size: 18),
+                    label: const Text('Read Full NDPA Privacy Policy'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(bottomSheetContext);
+                      context.push('/legal?tab=privacy');
                     },
                   ),
                 ),

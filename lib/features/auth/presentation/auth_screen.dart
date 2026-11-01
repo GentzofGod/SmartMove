@@ -425,6 +425,53 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Terms of Service & Privacy Policy Note
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'By continuing, you agree to SmartMove\'s ',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary),
+                      ),
+                      InkWell(
+                        key: const ValueKey('btn_auth_terms_link'),
+                        onTap: () => context.push('/legal?tab=terms'),
+                        child: const Text(
+                          'Terms of Service',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        ' & ',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary),
+                      ),
+                      InkWell(
+                        key: const ValueKey('btn_auth_privacy_link'),
+                        onTap: () => context.push('/legal?tab=privacy'),
+                        child: const Text(
+                          'Privacy Policy (NDPA)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
               ],
             ),
           ),

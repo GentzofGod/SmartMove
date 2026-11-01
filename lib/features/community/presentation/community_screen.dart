@@ -8,6 +8,7 @@ import '../../../core/models/seller_application.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/localization/app_language.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   final int initialTab;
@@ -451,17 +452,17 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              'Community & Sellers',
-              style: TextStyle(
+              AppStrings.tr(ref, 'navCommunity'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
-            SizedBox(height: 2),
-            Text(
+            const SizedBox(height: 2),
+            const Text(
               'Verified commodity prices across online & local markets.',
               style: TextStyle(
                 fontSize: 12,
@@ -501,9 +502,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           indicatorColor: AppColors.primary,
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-          tabs: const [
-            Tab(text: 'Price Feed'),
-            Tab(text: 'Seller Portal'),
+          tabs: [
+            Tab(text: AppStrings.tr(ref, 'priceFeed')),
+            Tab(text: AppStrings.tr(ref, 'sellerPortal')),
           ],
         ),
       ),

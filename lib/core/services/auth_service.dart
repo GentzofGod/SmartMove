@@ -200,28 +200,56 @@ class AuthService {
     return null;
   }
 
-  /// Restore persisted user session on app launch and sync live role from Supabase
-  static Future<UserSession> restorePersistedSession() async {
-    UserSession? cached;
+  /// Immediately load from local SharedPreferences without any network latency
+  static Future<UserSession?> getPersistedSessionOnly() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionJson = prefs.getString(_sessionStorageKey);
-      if (sessionJson != null) {
+      if (sessionJson != null && sessionJson.isNotEmpty) {
         final decoded = jsonDecode(sessionJson) as Map<String, dynamic>;
-        cached = UserSession.fromJson(decoded);
+        return UserSession.fromJson(decoded);
       }
     } catch (_) {}
+    return null;
+  }
 
-    // Check if live Supabase has a logged in user and fetch fresh profile & role
-    final client = _client;
-    if (client != null) {
-      final user = client.auth.currentUser;
-      if (user != null) {
-        final liveSession = await fetchLiveSessionForUser(user);
-        if (liveSession != null) {
-          return liveSession;
+  /// Restore persisted user session on app launch and sync live role from Supabase
+  static Future<UserSession> restorePersistedSession() async {
+    final cached = await getPersistedSessionOnly();
+
+    // If we have a cached logged-in user (not guest), return it immediately and attempt non-blocking sync
+    if (cached != null && !cached.isGuest) {
+      final client = _client;
+      if (client != null) {
+        final user = client.auth.currentUser;
+        if (user != null) {
+          try {
+            final liveSession = await fetchLiveSessionForUser(user)
+                .timeout(const Duration(milliseconds: 2500));
+            if (liveSession != null) {
+              return liveSession;
+            }
+          } catch (_) {
+            // Offline or timeout: safely preserve the cached authenticated session!
+          }
         }
       }
+      return cached;
+    }
+
+    // If cache is empty or guest, check if live Supabase has a valid session
+    final client = _client;
+    if (client != null) {
+      try {
+        final user = client.auth.currentUser;
+        if (user != null) {
+          final liveSession = await fetchLiveSessionForUser(user)
+              .timeout(const Duration(milliseconds: 2500));
+          if (liveSession != null) {
+            return liveSession;
+          }
+        }
+      } catch (_) {}
     }
 
     if (cached != null) {
@@ -386,8 +414,18 @@ class AuthService {
           return session;
         }
       } catch (e) {
-        // If Supabase credentials fails, throw user-friendly error
-        throw Exception(e.toString());
+        final errStr = e.toString().toLowerCase();
+        final isNetworkError = errStr.contains('socket') ||
+            errStr.contains('clientexception') ||
+            errStr.contains('failed host lookup') ||
+            errStr.contains('network') ||
+            errStr.contains('timeout') ||
+            errStr.contains('connection');
+        if (!isNetworkError) {
+          // If Supabase invalid credentials/auth error, throw user-friendly error
+          throw Exception(e.toString());
+        }
+        // If offline/network unreachable, proceed gracefully to offline local authentication
       }
     }
 

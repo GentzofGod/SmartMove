@@ -24,9 +24,9 @@ class ItineraryScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Acquisition Process',
-              style: TextStyle(
+            Text(
+              AppStrings.tr(ref, 'acquisitionProcess'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,

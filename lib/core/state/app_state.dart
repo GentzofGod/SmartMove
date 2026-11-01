@@ -861,8 +861,15 @@ final communityProvider =
 
 // --- Auth State ---
 class AuthNotifier extends Notifier<UserSession> {
+  final UserSession? _initialSession;
+  AuthNotifier([this._initialSession]);
+
   @override
   UserSession build() {
+    final initial = _initialSession;
+    if (initial != null) {
+      return initial;
+    }
     _restoreSession();
     return UserSession.guest;
   }

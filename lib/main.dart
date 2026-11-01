@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/services/auth_service.dart';
+import 'core/state/app_state.dart';
 import 'core/localization/app_language.dart';
 
 void main() async {
@@ -13,6 +14,15 @@ void main() async {
   String initialLanguage = 'English';
   try {
     initialLanguage = await AppLanguageNotifier.getPersistedLanguage();
+  } catch (_) {}
+
+  // Pre-load saved authenticated session for offline resilience and zero guest flicker
+  UserSession initialSession = UserSession.guest;
+  try {
+    final cachedSession = await AuthService.getPersistedSessionOnly();
+    if (cachedSession != null) {
+      initialSession = cachedSession;
+    }
   } catch (_) {}
 
   // Initialize Cloud Supabase when keys are provided via --dart-define-from-file=.env
@@ -36,6 +46,7 @@ void main() async {
     ProviderScope(
       overrides: [
         appLanguageProvider.overrideWith(() => AppLanguageNotifier(initialLanguage)),
+        authProvider.overrideWith(() => AuthNotifier(initialSession)),
       ],
       child: const SmartMoveApp(),
     ),
