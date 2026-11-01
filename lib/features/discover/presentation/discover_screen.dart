@@ -13,6 +13,7 @@ import '../../../core/localization/app_language.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 import '../../home/presentation/widgets/paper_note_scanner_sheet.dart';
 import 'product_detail_sheet.dart';
+import '../../../core/presentation/widgets/commodity_image_widget.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -164,7 +165,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
     const aiService = MetaAiService();
     final town = ref.read(locationProvider).displayTown;
-    final plan = await aiService.queryAiPriceResearch(query, city: town);
+    final observations = ref.read(communityProvider);
+    final plan = await aiService.queryAiPriceResearch(
+      query,
+      city: town,
+      inAppObservations: observations,
+    );
 
     if (!context.mounted) return;
     messenger.hideCurrentSnackBar();
@@ -722,20 +728,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                     ),
                     child: Row(
                     children: [
-                      // Product Icon Box
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: AppColors.primary,
-                          size: 26,
-                        ),
+                      // Product Commodity Image / Icon
+                      CommodityImageWidget(
+                        commodityName: p.name,
+                        imageUrl: p.imageUrl,
+                        size: 52,
+                        borderRadius: 14,
                       ),
                       const SizedBox(width: 14),
 

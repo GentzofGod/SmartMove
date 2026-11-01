@@ -697,6 +697,8 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     bool inStock = true,
     String? marketLocation,
     String? notes,
+    String category = 'Groceries',
+    String? imageUrl,
   }) {
     final multiplier = CommodityComparisonService.calculateUnitMultiplier(
       unit,
@@ -732,6 +734,8 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       inStock: inStock,
       standardizedUnitPrice: computedUnitPrice,
       baseUnit: baseUnit,
+      category: category,
+      imageUrl: imageUrl,
     );
     state = [newObs, ...state];
 
@@ -790,6 +794,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
 
   void updateListingDetails({
     required String id,
+    String? productName,
     required double price,
     String? unit,
     String? brandOrGrade,
@@ -798,11 +803,14 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     String? channel,
     String? sellerName,
     String? marketLocation,
+    String? category,
+    String? imageUrl,
   }) {
     state = [
       for (final o in state)
         if (o.id == id)
           o.copyWith(
+            productName: productName ?? o.productName,
             price: price,
             unit: unit ?? o.unit,
             brandOrGrade: brandOrGrade ?? o.brandOrGrade,
@@ -811,12 +819,15 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
             channel: channel ?? o.channel,
             sellerName: sellerName ?? o.sellerName,
             marketLocation: marketLocation ?? o.marketLocation,
+            category: category ?? o.category,
+            imageUrl: imageUrl ?? o.imageUrl,
             timestamp: DateTime.now(),
             standardizedUnitPrice: () {
               final effectiveUnit = unit ?? o.unit;
+              final effectiveName = productName ?? o.productName;
               final mult = CommodityComparisonService.calculateUnitMultiplier(
                   effectiveUnit,
-                  commodityName: o.productName);
+                  commodityName: effectiveName);
               return mult > 0 ? (price / mult) : price;
             }(),
           )
@@ -983,12 +994,18 @@ class AuthNotifier extends Notifier<UserSession> {
     String? marketHub,
     String? sellerChannel,
     String? phone,
+    String? stallLocation,
+    bool? hasPendingStoreEdit,
+    String? pendingStoreEditSummary,
   }) {
     state = state.copyWith(
       businessName: businessName ?? state.businessName,
       marketHub: marketHub ?? state.marketHub,
       sellerChannel: sellerChannel ?? state.sellerChannel,
       phone: phone ?? state.phone,
+      stallLocation: stallLocation ?? state.stallLocation,
+      hasPendingStoreEdit: hasPendingStoreEdit ?? state.hasPendingStoreEdit,
+      pendingStoreEditSummary: pendingStoreEditSummary ?? state.pendingStoreEditSummary,
     );
     AuthService.persistSession(state);
   }
@@ -1307,6 +1324,45 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       }
     }
   }
+
+  void updateApplicationStoreDetails({
+    required String userId,
+    required String userEmail,
+    required String businessName,
+    required String marketHub,
+    String? stallLocation,
+    required String phone,
+    required String sellerChannel,
+  }) {
+    state = [
+      for (final app in state)
+        if (app.userId == userId ||
+            (userEmail.isNotEmpty &&
+                app.applicantEmail.trim().toLowerCase() ==
+                    userEmail.trim().toLowerCase()))
+          app.copyWith(
+            businessName: businessName,
+            marketHub: marketHub,
+            stallLocation: stallLocation ?? app.stallLocation,
+            phone: phone,
+            sellerChannel: sellerChannel,
+          )
+        else
+          app,
+    ];
+    _persist(state);
+
+    AuthService.saveApprovedTraderProfile(
+      email: userEmail,
+      userId: userId,
+      displayName: businessName,
+      businessName: businessName,
+      marketHub: marketHub,
+      sellerChannel: sellerChannel,
+      stallLocation: stallLocation,
+      phone: phone,
+    );
+  }
 }
 
 final sellerApplicationsProvider =
@@ -1399,6 +1455,16 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
     _persist(state);
 
     if (approvedReq != null) {
+      ref.read(sellerApplicationsProvider.notifier).updateApplicationStoreDetails(
+            userId: approvedReq!.sellerId,
+            userEmail: approvedReq!.applicantEmail,
+            businessName: approvedReq!.proposedBusinessName,
+            marketHub: approvedReq!.proposedMarketHub,
+            stallLocation: approvedReq!.proposedStallLocation,
+            phone: approvedReq!.proposedPhone,
+            sellerChannel: approvedReq!.proposedSellerChannel,
+          );
+
       final currentUser = ref.read(authProvider);
       if (currentUser.id == approvedReq!.sellerId ||
           (currentUser.email.isNotEmpty &&
@@ -1432,11 +1498,28 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
     _persist(state);
 
     if (rejectedReq != null) {
+      ref.read(sellerApplicationsProvider.notifier).updateApplicationStoreDetails(
+            userId: rejectedReq!.sellerId,
+            userEmail: rejectedReq!.applicantEmail,
+            businessName: rejectedReq!.currentBusinessName,
+            marketHub: rejectedReq!.currentMarketHub,
+            stallLocation: rejectedReq!.currentStallLocation,
+            phone: rejectedReq!.currentPhone ?? '',
+            sellerChannel: rejectedReq!.currentSellerChannel,
+          );
+
       final currentUser = ref.read(authProvider);
       if (currentUser.id == rejectedReq!.sellerId ||
           (currentUser.email.isNotEmpty &&
               currentUser.email.trim().toLowerCase() ==
                   rejectedReq!.applicantEmail.trim().toLowerCase())) {
+        ref.read(authProvider.notifier).applyApprovedStoreEdit(
+              businessName: rejectedReq!.currentBusinessName,
+              marketHub: rejectedReq!.currentMarketHub,
+              stallLocation: rejectedReq!.currentStallLocation,
+              phone: rejectedReq!.currentPhone ?? '',
+              sellerChannel: rejectedReq!.currentSellerChannel,
+            );
         ref.read(authProvider.notifier).setPendingStoreEdit(false, null);
       }
     }

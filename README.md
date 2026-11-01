@@ -8,7 +8,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?logo=dart)](https://dart.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Database-3ECF8E?logo=supabase)](https://supabase.com)
 [![Meta AI](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%20%26%20Voice%20%26%20Vision-0668E1?logo=meta)](https://about.meta.com)
-[![Tests](https://img.shields.io/badge/Tests-150%20Passing-success?logo=checkmarx)](test/)
+[![Tests](https://img.shields.io/badge/Tests-207%20Passing-success?logo=checkmarx)](test/)
 [![Analyzer](https://img.shields.io/badge/Analyzer-0%20Issues-success)](lib/)
 
 ---
@@ -24,6 +24,87 @@ In emerging markets and fast-paced urban centers like Lagos and Ibadan, Nigeria,
 3. **Multi-Criteria Seller Matrix**: Compares Local Open Markets, SMB Neighborhood Stores, and Online Retailers across landed costs, delivery fees, transit duration, quality grades, reputation, and return policies.
 4. **Transparent Market Intelligence**: Standardizes prices per base unit (₦/kg, ₦/L, ₦/piece), tracks crowdsourced seller observations, and provides genuine historical price trendlines.
 5. **Role-Based Commerce & Moderation**: Empowers verified market traders to publish live inventory and negotiate directly with shoppers, while a dedicated SuperAdmin control panel oversees content moderation, anomaly detection, and seller verification.
+
+---
+
+## 🚀 Recent Features & Major Upgrades
+
+SmartMove has undergone continuous iterative development and real-world hardening, delivering enterprise-grade commerce workflows, vernacular acoustic intelligence, and seamless offline reliability:
+
+### 1. 🏪 Comprehensive Seller Inventory & Listing Management
+- **1-Tap Stock Switch**: Directly on each commodity listing card in the seller portal, market traders can toggle between **`In Stock`** (green badge) and **`Out of Stock`** (red badge) with a single tap, updating the live community feed instantly.
+- **Modify Existing Quotes**: Full editing modal (`Icons.edit_outlined`) enabling verified sellers to update commodity names, prices, units, brands, categories, and descriptive notes with automated recalculation of standardized unit prices (₦/kg, ₦/L).
+- **Delete Listings with Confirmation**: Safe deletion modal preventing accidental de-listing while enabling quick cleanup of discontinued inventory.
+- **Mandatory Category Classification**: Clear classification across `Groceries`, `Electronics`, `Pharmacy`, and `Others` on all listing forms and card tags.
+
+### 2. ✨ AI Auto-Fill & Refinement for Seller Listings
+- **One-Tap Listing Assistant (`Icons.auto_awesome`)**: Powered by [`MetaAiService.refineSellerListing()`](lib/core/services/meta_ai_service.dart), traders can paste raw colloquial notes (*e.g., "50kg Mama Gold rice 85000 fresh stock in Bodija warehouse"*) or tap AI Refine.
+- **Intelligent Field Extraction & Normalization**: Automatically standardizes:
+  - **Commodity / Product Name** (*e.g., Parboiled Rice*)
+  - **Standardized Packaging Unit** (*e.g., 50kg bag, 25L jerrycan, paint rubber, 1 derica, piece*)
+  - **Category** (*Groceries*, *Electronics*, *Pharmacy*, *Others*)
+  - **Price Amount** (safely separating prices from metric units like `1.5L` or `500mg`)
+  - **Recognized Commercial Brands** (*Mama Gold, Golden Penny, Dangote, Binatone, Emzor, May & Baker, Panadol, Peak, Haier, etc.*)
+  - **Polished Trader Notes** for shopper clarity.
+
+### 3. 🖼️ Rich Commodity & Product Imagery (`CommodityImageWidget`)
+- **Visual Commodity Representation**: Integrated across `ProductDetailSheet`, `DiscoverScreen`, `HomeScreen`, and `SellerPortalScreen`.
+- **Curated Nigerian Market Photography**: High-resolution photography for staple local commodities including *Rice, Brown Beans, Garri/Cassava, Palm Oil, Vegetable Oil, Yam/Tuber, Fresh Tomatoes, Onions, Eggs, Titus Fish, Chicken/Meat, Cookers, Blenders, and Cement*.
+- **Graceful Vector Fallbacks**: Tinted category badges with contextual icons when operating offline or when custom photography is unavailable.
+- **Remote Custom Network Image Support**: Allows verified stores and online platforms to supply external product image URLs.
+
+### 4. 🌍 Real-Time Multilingual Localization (16 Languages, No Restart)
+- **Instant Reactive Translation**: Swaps the entire app interface dynamically without requiring an app restart or reload across **16 supported languages**:
+  - *English, Nigerian Pidgin, Yoruba, Hausa, Igbo, French, Spanish, Arabic, German, Portuguese, Swahili, Hindi, Chinese, Bengali, Japanese, Russian*.
+  - Powered by Riverpod reactive state (`appLanguageProvider`) and localized string matrices (`AppStrings`).
+- **First-Launch Language Preference Onboarding**: Prompts new users to select their preferred regional dialect or international language upon first opening the app, persisted locally via `SharedPreferences`.
+- **Full Legal & Regulatory Translation**: Terms & Conditions, Privacy Policy, and NDPA/FCCPC data protection charters are fully translated and accessible in offline mode.
+
+### 5. 📶 Offline Session Persistence & SharedPreferences Upgrades
+- **Persistent User Sessions**: User accounts, trader profiles, and roles persist reliably across app restarts and network dropouts via robust local `SharedPreferences` caching, eliminating unintended fallbacks to Guest mode.
+- **Offline Mode Readiness**: Saved price observations, catalog items, and regulatory screens are accessible without an active internet connection.
+
+### 6. 📍 High-Precision Geolocation & Reverse Geocoding
+- **Granular Seller Location Capture**: Automatically detects exact stall numbers, line names, market hubs, and streets (*e.g., "Stall B4, Grain Section, Bodija Market"*), replacing raw latitude/longitude numbers with readable physical addresses for buyer navigation.
+- **High-Accuracy GPS Scanning**: Captures 7-decimal place coordinates (`NUMERIC(10, 7)`) for accurate walking and transit route calculations.
+
+### 7. 🛡️ Store Profile Verification & Governance Workflow
+- **Marketplace Credibility Protection**: Modifications to approved seller business names, stall locations, or market hubs submit a verification request (`store_edit_requests`) to prevent fraudulent bait-and-switch behavior.
+- **SuperAdmin Moderation Pipeline**: Administrators review and approve profile changes before they reflect publicly on live listings.
+- **Isolated Seller Portal Entry**: Seller portal management is housed securely on the authenticated trader profile, eliminating misplaced portal buttons from customer discovery feeds.
+
+### 8. 🔒 Token-Based Password Recovery
+- **6-Digit OTP Token Verification**: Replaces fragile email confirmation links with quick, high-deliverability 6-digit numeric tokens stored securely in `public.password_resets`.
+
+### 9. 🎙️ Acoustic Dialect Normalizer & Speech Accuracy Fix
+- **Intelligent Phonetic Normalizer**: Solves mobile OS STT acoustic bias (where Nigerian terms are forced into English lookalikes like *garri* $\rightarrow$ *"carry"*, *shinkafa* $\rightarrow$ *"she car far"*, *kongo* $\rightarrow$ *"can go"*) by running an acoustic phonetic cleanser before search processing.
+
+### 10. 🎨 UI Polish, Accessibility & Safe Area Protection
+- **Vertically Expandable Homepage Prompt**: Replaced redundant "Custom Prompt" buttons with a clean, dynamic multi-line text input (`minLines: 1`, `maxLines: 5`).
+- **Device Safe Area Optimization**: Polished top and bottom padding across heterogeneous notch, hole-punch, and navigation bar configurations.
+- **Sign-Out Confirmation Dialog**: Prevents accidental session termination.
+- **Streamlined User-Friendly Terminology**: Replaced technical model codenames (*Muse Spark*, *Muse Vision*, *Muse Voice*) with intuitive, user-friendly labels (*AI Planning Assistant*, *Smart Vision Scanner*, *Voice Assistant*).
+
+### 11. 🗺️ Interactive Open-Source OpenStreetMap & Leaflet Map View (`SellerLocationMapSheet`)
+- **Zero API Key Requirement**: Built using `flutter_map` and `latlong2` rendering standard, fast, open-source OpenStreetMap raster tiles (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) without Google Maps billing or restrictive API keys.
+- **Interactive Stall & Route Visualization**: Renders buyer GPS location (`Icons.person_pin`), seller stall location (`Icons.location_on_rounded`), and a dashed connection polyline with live geodesic distance estimation (km).
+- **Physical Stall Navigation Controls**: Includes in-map Zoom (+/-), Recenter on Seller Stall, Turn-by-Turn GPS navigation launcher (`geo:` / `google.navigation:` / Google Maps web fallback), and instant attribution badging.
+
+### 12. 📍 Direct In-App Seller Selection, Physical Stall Navigation & Chat-and-Buy
+- **Locate on Map & Chat & Buy Action Row**: Accessible directly on every commodity listing card across `CommunityScreen`, `DiscoverScreen` (`ProductDetailSheet`), and the live multi-vendor comparison sheets.
+- **Instant Trader Negotiation**: 1-tap launcher initializing `TraderNegotiationSheet` with pre-filled commodity name, standardized unit, base price, and seller identity for instant bargaining or stock confirmation.
+
+### 13. 🧠 Meta AI In-App Verified Sellers Database Combing Priority
+- **Verified Trader Inventory First**: When Meta AI conducts price research on the Homepage or Explore tab (`MetaAiService.conductLiveAiVendorComparison` / `queryAiPriceResearch` / `parseToProposal`), the system combs through the active in-app verified sellers database first.
+- **Top-Ranked Placement**: Local verified sellers are placed at the very top of vendor options with a distinctive `SmartMove Verified Seller` badge and green physical market indicator before external online stores like Jumia, Konga, or Jiji appear.
+- **AI Recommendation Highlights**: AI synthesized advice explicitly prioritizes verified in-app market traders for immediate physical pickup and direct bargaining over external online delivery lead times.
+
+### 14. 📑 Streamlined Community Feed (Two-Segment Tabs & Single-Line Category Filter Chips)
+- **Eliminated Double Line Filter**: Removed the cumbersome stacked channel and source filter rows in favor of a clean, modern layout.
+- **Role-Separated 2-Segment Control**: Two top-level tabs displaying live item counts:
+  - **`Verified Sellers (N)`**: Listings from registered market traders with confirmed stalls.
+  - **`Community Reports (N)`**: Crowdsourced price reports submitted by community shoppers.
+- **Single-Line Category Filter Chips**: Clean horizontal category row (`All`, `Groceries`, `Electronics`, `Pharmacy`, `Others`) with contextual category icons, instant counts, and empty-state resilience.
 
 ---
 
@@ -185,17 +266,24 @@ SmartMove uses **Cloud Supabase** (PostgreSQL with Row Level Security) for persi
 ├─────────────────────┬──────────────────────┬───────────────────────────┤
 │      products       │  price_observations  │    seller_applications    │
 │  • id (UUID/Text)   │  • id (UUID)         │  • id (UUID)              │
-│  • name, category   │  • product_id        │  • user_id                │
-│  • lowest_price     │  • seller_name       │  • business_name          │
+│  • name, category   │  • product_id        │  • user_id, status        │
+│  • lowest_price     │  • seller_name       │  • business_name, stall   │
 │  • best_seller      │  • price, unit       │  • market_hub, channel    │
-│  • standard_unit    │  • channel, verified │  • phone, status          │
-│  • standardized_rate│  • standardized_rate │  • submitted_at           │
+│  • standard_unit    │  • channel, verified │  • phone, submitted_at    │
+│  • standardized_rate│  • category, in_stock│  • latitude, longitude    │
 ├─────────────────────┼──────────────────────┼───────────────────────────┤
-│      profiles       │    price_anomalies   │      app_audit_logs       │
+│      profiles       │ store_edit_requests  │      password_resets      │
 │  • id (auth.uid)    │  • id (UUID)         │  • id (UUID)              │
-│  • email, role      │  • observation_id    │  • action_type            │
-│  • business_name    │  • anomaly_reason    │  • actor_id, target_id    │
-│  • seller_channel   │  • is_resolved       │  • created_at             │
+│  • email, role      │  • seller_id         │  • email                  │
+│  • business_name    │  • proposed_business │  • token (6-digit OTP)    │
+│  • stall_location   │  • proposed_hub/stall│  • expires_at, used       │
+│  • latitude, long   │  • status, reviewer  │  • created_at             │
+├─────────────────────┼──────────────────────┼───────────────────────────┤
+│   price_anomalies   │    app_audit_logs    │   commodity_categories    │
+│  • id (UUID)         │  • id (UUID)         │  • id, name, icon         │
+│  • observation_id    │  • action_type       │  • is_active, display_rank│
+│  • anomaly_reason    │  • actor_id          │  • created_at             │
+│  • is_resolved       │  • created_at        │                           │
 └─────────────────────┴──────────────────────┴───────────────────────────┘
 ```
 
@@ -212,7 +300,15 @@ SmartMove is built with test-driven discipline. Every feature, service, and scre
 flutter test
 ```
 
-### Test Suite Coverage (150 Automated Tests):
+### Test Suite Coverage (202 Automated Tests across 26 Test Suites):
+- **[`seller_listing_management_ai_refine_and_images_test.dart`](test/seller_listing_management_ai_refine_and_images_test.dart)**: 1-tap stock switch, listing modifications, safe deletions, AI listing refinement, and visual commodity image rendering.
+- **[`realtime_language_switch_test.dart`](test/realtime_language_switch_test.dart)**: Instant reactive language switching across 16 languages without app restart, and first-launch preference onboarding.
+- **[`offline_session_and_legal_screens_test.dart`](test/offline_session_and_legal_screens_test.dart)**: Offline session persistence, SharedPreferences caching, and offline legal screen rendering.
+- **[`voice_mic_seller_reapply_settings_cleanup_test.dart`](test/voice_mic_seller_reapply_settings_cleanup_test.dart)**: Microphone audio capture, approved seller access without reapplication loops, and settings UI cleanup.
+- **[`database_role_sync_and_appliance_resolution_test.dart`](test/database_role_sync_and_appliance_resolution_test.dart)**: Appliance classification (Electric Cookers vs grain Rice), zero fake trader fallbacks, and database role synchronization.
+- **[`lathe_spare_parts_and_outlet_resolution_test.dart`](test/lathe_spare_parts_and_outlet_resolution_test.dart)**: Hardware and spare parts resolution without erroneous supermarket fallbacks.
+- **[`live_web_search_grounding_test.dart`](test/live_web_search_grounding_test.dart)**: Grounded live web search for fresh commodities and authentic platform deep-links.
+- **[`profile_and_settings_functional_test.dart`](test/profile_and_settings_functional_test.dart)**: Profile updates, seller applications, store profile modifications, and sign-out confirmation dialogs.
 - **[`decision_engine_test.dart`](test/decision_engine_test.dart)**: Deterministic multi-plan calculations, budget constraint enforcement, and cashflow delay logic.
 - **[`meta_ai_service_test.dart`](test/meta_ai_service_test.dart)**: Natural language prompt parsing, AI proposal generation, PII sanitization, and graceful error reporting.
 - **[`voice_transcribe_dialect_test.dart`](test/voice_transcribe_dialect_test.dart)**: Dialect detection across Pidgin, Yoruba, Igbo, and Hausa, translation, and push-to-talk recording flows.
@@ -224,6 +320,13 @@ flutter test
 - **[`auth_service_test.dart`](test/auth_service_test.dart)**: Session persistence, role upgrading, and authentication state transitions.
 - **[`trader_prioritization_and_outlets_test.dart`](test/trader_prioritization_and_outlets_test.dart)**: In-app trader chat negotiations, counter-offers, and stock inquiry workflows.
 - **[`live_catalog_empty_state_test.dart`](test/live_catalog_empty_state_test.dart)**: Clean UI empty states when products or observations are empty.
+- **[`commodity_catalog_schema_test.dart`](test/commodity_catalog_schema_test.dart)**: Database schema validation, category definitions, and pricing audit trail models.
+- **[`commodity_comparison_service_test.dart`](test/commodity_comparison_service_test.dart)**: Standardized price conversions across bulk and retail package formats.
+- **[`location_service_test.dart`](test/location_service_test.dart)**: High-accuracy GPS geocoding and market hub distance calculations.
+- **[`seller_application_test.dart`](test/seller_application_test.dart)**: Trader credential verification and approval status lifecycles.
+- **[`guide_service_test.dart`](test/guide_service_test.dart)**: Interactive user guide walkthroughs and contextual tooltips.
+- **[`splash_screen_test.dart`](test/splash_screen_test.dart)**: App cold-boot initialization, session restore, and first-launch routing.
+- **[`ai_proposal_review_sheet_test.dart`](test/ai_proposal_review_sheet_test.dart)**: AI proposal presentation and layout compliance across compact mobile viewports.
 
 ---
 
@@ -326,6 +429,10 @@ smartmove/
 │   │   │   ├── auth_service.dart             # RBAC auth and session management
 │   │   │   ├── location_service.dart         # Market geocoordinates & distance math
 │   │   │   └── supabase_data_service.dart    # Cloud Supabase REST / RLS interface
+│   │   ├── localization/
+│   │   │   └── app_language.dart             # 16-language reactive localization matrix
+│   │   ├── presentation/widgets/
+│   │   │   └── commodity_image_widget.dart   # Curated commodity photography & fallback badges
 │   │   ├── state/
 │   │   │   └── app_state.dart                # Riverpod state notifiers (Auth, Catalog, Lab)
 │   │   └── theme/
@@ -337,6 +444,7 @@ smartmove/
 │       ├── community/presentation/       # Crowdsourced observations & trader negotiation
 │       ├── decision_lab/presentation/    # Itinerary candidates & "What If?" sliders
 │       ├── itinerary/presentation/       # Live errand checklist & stop progress
+│       ├── seller/presentation/          # Seller portal, inventory stock & AI quote refiner
 │       ├── admin/presentation/           # SuperAdmin control panel & moderation tools
 │       └── profile/presentation/         # User roles, trader application & settings
 ├── supabase/
@@ -344,7 +452,7 @@ smartmove/
 │   │   └── meta-ai-proxy/                # Secure server edge proxy for Meta API
 │   ├── migrations/                       # PostgreSQL database migrations & RLS policies
 │   └── schema.sql                        # Core table definitions & constraints
-└── test/                                 # 150 automated unit and widget test suites
+└── test/                                 # 202 automated unit and widget test suites (26 files)
 ```
 
 ---

@@ -1324,6 +1324,7 @@ class MetaAiService {
     String prompt, {
     String? city,
     bool enableWebGrounding = true,
+    List<PriceObservation>? inAppObservations,
   }) async {
     final sanitizedPrompt = sanitizePrompt(prompt);
     if (sanitizedPrompt.trim().isEmpty) {
@@ -1459,6 +1460,7 @@ class MetaAiService {
       rawPrompt: sanitizedPrompt,
       baseProposal: initialProposal,
       city: city,
+      inAppObservations: inAppObservations,
     );
   }
 
@@ -1517,22 +1519,70 @@ class MetaAiService {
     required String rawPrompt,
     required AiPlanProposal baseProposal,
     String? city,
+    List<PriceObservation>? inAppObservations,
   }) async {
     final searchResultsByItem = <String, List<LiveWebVendorResult>>{};
     final allDiscoveredVendors = <LiveWebVendorResult>[];
 
-    // Layer 2: Search stores & e-commerce catalogs for each parsed item concurrently
+    // Layer 2: Search in-app sellers database first, then stores & e-commerce catalogs concurrently
     await Future.wait(
       baseProposal.shoppingItems.map((item) async {
         try {
+          final inAppVendorsForItem = <LiveWebVendorResult>[];
+          if (inAppObservations != null && inAppObservations.isNotEmpty) {
+            final itemLower = item.productName.toLowerCase();
+            final itemTokens = itemLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
+            final matchingObs = inAppObservations.where((obs) {
+              final pLower = obs.productName.toLowerCase();
+              if (pLower.contains(itemLower) || itemLower.contains(pLower)) return true;
+              final obsTokens = pLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
+              if (obsTokens.intersection(itemTokens).isNotEmpty) return true;
+              if ((itemLower.contains('oil') || itemLower.contains('ororo')) && pLower.contains('oil')) return true;
+              return false;
+            }).toList();
+
+            matchingObs.sort((a, b) {
+              if (a.isVerified && !b.isVerified) return -1;
+              if (!a.isVerified && b.isVerified) return 1;
+              return a.price.compareTo(b.price);
+            });
+
+            for (final obs in matchingObs) {
+              inAppVendorsForItem.add(
+                LiveWebVendorResult(
+                  vendorName: '${obs.sellerName} (In-App Verified)',
+                  title: '${obs.productName} • ${obs.formattedPrice}/${obs.unit}',
+                  snippet:
+                      '${obs.marketLocation} • ${obs.inStock ? "In Stock" : "Out of Stock"}${obs.brandOrGrade != null ? " • Brand: ${obs.brandOrGrade}" : ""} (Direct In-App Contact)',
+                  targetUrl:
+                      'smartmove://seller?name=${Uri.encodeComponent(obs.sellerName)}&product=${Uri.encodeComponent(obs.productName)}',
+                  detectedPrice: obs.price,
+                  priceDisplay: obs.formattedPrice,
+                  channel: obs.channel,
+                  badge: 'SmartMove Verified Seller',
+                  isPhysicalLocation: true,
+                  isDelivery: obs.channel.toLowerCase().contains('online') ||
+                      obs.channel.toLowerCase().contains('smb'),
+                ),
+              );
+            }
+          }
+
           final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
             item.productName,
             city: city,
             benchmarkPrice: item.estimatedUnitPrice,
           );
-          if (vendors.isNotEmpty) {
-            searchResultsByItem[item.productName] = vendors;
-            allDiscoveredVendors.addAll(vendors);
+
+          // IN-APP VERIFIED SELLERS ARE ALWAYS COMBED AND PLACED FIRST BEFORE ONLINE STORES
+          final combined = <LiveWebVendorResult>[
+            ...inAppVendorsForItem,
+            ...vendors,
+          ];
+
+          if (combined.isNotEmpty) {
+            searchResultsByItem[item.productName] = combined;
+            allDiscoveredVendors.addAll(combined);
           }
         } catch (_) {}
       }),
@@ -3502,21 +3552,66 @@ class MetaAiService {
     );
   }
 
-  /// Conducts live AI web research and multi-channel vendor price comparison
+  /// Conducts live AI web research and multi-channel vendor price comparison.
+  /// Combing through the in-app verified sellers database FIRST before querying online stores.
   Future<LiveAiMultiVendorComparison> conductLiveAiVendorComparison(
     String commodityName, {
     String? city,
+    List<PriceObservation>? inAppObservations,
   }) async {
     final clean = commodityName.trim();
+    final cleanLower = clean.toLowerCase();
+
+    // 1. FIRST COMB THROUGH IN-APP VERIFIED SELLERS DATABASE
+    final inAppVendors = <LiveWebVendorResult>[];
+    if (inAppObservations != null && inAppObservations.isNotEmpty) {
+      final cleanTokens = cleanLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
+      final matchingObs = inAppObservations.where((obs) {
+        final pLower = obs.productName.toLowerCase();
+        if (pLower.contains(cleanLower) || cleanLower.contains(pLower)) return true;
+        final obsTokens = pLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
+        if (obsTokens.intersection(cleanTokens).isNotEmpty) return true;
+        if ((cleanLower.contains('oil') || cleanLower.contains('ororo')) && pLower.contains('oil')) return true;
+        return false;
+      }).toList();
+
+      for (final obs in matchingObs) {
+        inAppVendors.add(
+          LiveWebVendorResult(
+            vendorName: '${obs.sellerName} (In-App Verified)',
+            title: '${obs.productName} • ${obs.formattedPrice}/${obs.unit}',
+            snippet:
+                '${obs.marketLocation} • ${obs.inStock ? "In Stock" : "Out of Stock"}${obs.brandOrGrade != null ? " • Brand: ${obs.brandOrGrade}" : ""} (Direct In-App Contact)',
+            targetUrl:
+                'smartmove://seller?name=${Uri.encodeComponent(obs.sellerName)}&product=${Uri.encodeComponent(obs.productName)}',
+            detectedPrice: obs.price,
+            priceDisplay: obs.formattedPrice,
+            channel: obs.channel,
+            badge: 'SmartMove Verified Seller',
+            isPhysicalLocation: true,
+            isDelivery: obs.channel.toLowerCase().contains('online') ||
+                obs.channel.toLowerCase().contains('smb'),
+          ),
+        );
+      }
+    }
+
     final basePlan = coordinatePriceResearch(clean);
-    final benchmarkPrice = (basePlan.estimatedBenchmarkMin + basePlan.estimatedBenchmarkMax) / 2;
-    final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
+    final benchmarkPrice =
+        (basePlan.estimatedBenchmarkMin + basePlan.estimatedBenchmarkMax) / 2;
+    final webVendors = await WebSearchGroundingService.fetchLiveWebVendors(
       clean,
       city: city,
       benchmarkPrice: benchmarkPrice,
     );
 
-    final pricesWithVal = vendors
+    // IN-APP VERIFIED SELLERS ARE PLACED FIRST BEFORE ONLINE E-COMMERCE STORES
+    final allVendors = <LiveWebVendorResult>[
+      ...inAppVendors,
+      ...webVendors,
+    ];
+
+    final pricesWithVal = allVendors
         .where((v) => v.detectedPrice != null && v.detectedPrice! > 0)
         .map((v) => v.detectedPrice!)
         .toList();
@@ -3528,12 +3623,12 @@ class MetaAiService {
       minPrice = pricesWithVal.reduce((a, b) => a < b ? a : b);
       maxPrice = pricesWithVal.reduce((a, b) => a > b ? a : b);
     } else {
-      final basePlan = coordinatePriceResearch(clean);
       minPrice = basePlan.estimatedBenchmarkMin;
       maxPrice = basePlan.estimatedBenchmarkMax;
     }
 
-    final spreadDisplay = '₦${minPrice.toStringAsFixed(0)} - ₦${maxPrice.toStringAsFixed(0)}';
+    final spreadDisplay =
+        '₦${minPrice.toStringAsFixed(0)} - ₦${maxPrice.toStringAsFixed(0)}';
 
     final lower = clean.toLowerCase();
     final isHardware = lower.contains('lathe') ||
@@ -3552,7 +3647,10 @@ class MetaAiService {
         lower.contains('microwave');
 
     String recommendation;
-    if (isElectronics) {
+    if (inAppVendors.isNotEmpty) {
+      recommendation =
+          'Meta AI Verified Local Inventory Priority: Found ${inAppVendors.length} active in-app seller quote(s) for "$clean" in local physical hubs (${inAppVendors.first.vendorName} at ${inAppVendors.first.priceDisplay}). Online stores (Jumia, Konga) are ranked below as secondary alternatives.';
+    } else if (isElectronics) {
       recommendation =
           'Meta AI Price Intelligence: For $clean, Konga and Jiji offer competitive merchant listings, while Jumia provides verified manufacturer warranty with door-to-door delivery. For immediate inspection, local electronics dealers in ${city ?? 'Ibadan'} allow in-person testing before payment.';
     } else if (isHardware) {
@@ -3565,13 +3663,14 @@ class MetaAiService {
 
     return LiveAiMultiVendorComparison(
       commodityName: clean,
-      summary:
-          'Meta AI discovered ${vendors.length} live vendor alternatives across online ecommerce and local physical hubs.',
+      summary: inAppVendors.isNotEmpty
+          ? 'Meta AI prioritized ${inAppVendors.length} verified in-app market seller(s) ahead of ${webVendors.length} web alternatives.'
+          : 'Meta AI discovered ${webVendors.length} live vendor alternatives across online ecommerce and local physical hubs.',
       lowestPrice: minPrice,
       highestPrice: maxPrice,
       priceSpreadDisplay: spreadDisplay,
       aiRecommendation: recommendation,
-      vendors: vendors,
+      vendors: allVendors,
     );
   }
 
@@ -3581,11 +3680,16 @@ class MetaAiService {
   Future<OnlinePriceResearchPlan?> queryAiPriceResearch(
     String commodityName, {
     String? city,
+    List<PriceObservation>? inAppObservations,
   }) async {
     final clean = commodityName.trim();
     if (clean.isEmpty) return null;
 
-    final comparison = await conductLiveAiVendorComparison(clean, city: city);
+    final comparison = await conductLiveAiVendorComparison(
+      clean,
+      city: city,
+      inAppObservations: inAppObservations,
+    );
     final basePlan = coordinatePriceResearch(clean);
 
     return OnlinePriceResearchPlan(
@@ -4293,5 +4397,192 @@ class MetaAiService {
       priceSpreadPercent: spread,
       explanation: explanation,
     );
+  }
+
+  /// AI Assistant method to help sellers automatically parse, refine, and format listing fields
+  Map<String, dynamic> refineSellerListing({
+    required String rawInput,
+    String? currentProductName,
+    double? currentPrice,
+    String? currentUnit,
+    String? currentCategory,
+    String? currentBrand,
+    String? currentNotes,
+  }) {
+    final combined = '$rawInput ${currentProductName ?? ''} ${currentNotes ?? ''}'.trim();
+    final lower = combined.toLowerCase();
+
+    // 1. Extract Price if present (e.g. ₦85,000, 85000, 85k, 32000 naira)
+    double? detectedPrice = currentPrice;
+    final priceMatches = RegExp(
+      r'(?:₦|ngn|\bN\b|\bnaira\b)?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\s*(?:k|thousand|naira))?\b',
+      caseSensitive: false,
+    ).allMatches(rawInput);
+    for (final match in priceMatches) {
+      final numStr = match.group(1)!.replaceAll(',', '');
+      double? val = double.tryParse(numStr);
+      if (val != null) {
+        if (match.group(0)!.toLowerCase().contains('k') && val < 1000) {
+          val *= 1000;
+        }
+        // Don't match numbers immediately followed by metric units like 1.5L or 500mg
+        final fullMatchEnd = match.end;
+        if (fullMatchEnd < rawInput.length) {
+          final nextChars = rawInput.substring(fullMatchEnd).trimLeft().toLowerCase();
+          if (RegExp(r'^(?:kg|g|mg|cl|ml|l)\b', caseSensitive: false).hasMatch(nextChars)) {
+            continue;
+          }
+        }
+        if (val >= 100) {
+          detectedPrice = val;
+          break;
+        }
+      }
+    }
+
+    // 2. Extract Unit
+    String detectedUnit = currentUnit ?? '1kg';
+    if (lower.contains('50kg') || lower.contains('50 kg')) {
+      detectedUnit = '50kg bag';
+    } else if (lower.contains('25kg') || lower.contains('25 kg')) {
+      detectedUnit = '25kg bag';
+    } else if (lower.contains('10kg') || lower.contains('10 kg')) {
+      detectedUnit = '10kg bag';
+    } else if (lower.contains('5kg') || lower.contains('5 kg')) {
+      detectedUnit = '5kg';
+    } else if (lower.contains('25l') ||
+        lower.contains('25 l') ||
+        lower.contains('jerrycan') ||
+        lower.contains('jerry can')) {
+      detectedUnit = '25L jerrycan';
+    } else if (lower.contains('4l') ||
+        lower.contains('paint rubber') ||
+        lower.contains('paint')) {
+      detectedUnit = 'paint rubber';
+    } else if (lower.contains('derica') || lower.contains('derika')) {
+      detectedUnit = '1 derica';
+    } else if (lower.contains('crate') || lower.contains('egg')) {
+      detectedUnit = 'crate';
+    } else if (lower.contains('carton')) {
+      detectedUnit = 'carton';
+    } else if (lower.contains('tuber') || lower.contains('yam')) {
+      detectedUnit = 'tuber';
+    } else if (lower.contains('75cl') || lower.contains('bottle')) {
+      detectedUnit = '75cl bottle';
+    } else if (lower.contains('basket')) {
+      detectedUnit = 'basket';
+    } else if (lower.contains('piece') ||
+        lower.contains('cooker') ||
+        lower.contains('blender') ||
+        lower.contains('fan')) {
+      detectedUnit = 'piece';
+    }
+
+    // 3. Extract Category
+    String detectedCategory = currentCategory ?? 'Groceries';
+    if (lower.contains('cooker') ||
+        lower.contains('blender') ||
+        lower.contains('fan') ||
+        lower.contains('tv') ||
+        lower.contains('microwave') ||
+        lower.contains('refrigerator') ||
+        lower.contains('kettle') ||
+        lower.contains('phone') ||
+        lower.contains('charger') ||
+        lower.contains('electronics') ||
+        lower.contains('appliance')) {
+      detectedCategory = 'Electronics';
+    } else if (lower.contains('paracetamol') ||
+        lower.contains('vitamin') ||
+        lower.contains('drug') ||
+        lower.contains('pharmacy') ||
+        lower.contains('supplement') ||
+        lower.contains('medicine') ||
+        lower.contains('panadol') ||
+        lower.contains('plaster')) {
+      detectedCategory = 'Pharmacy';
+    } else if (lower.contains('cement') ||
+        lower.contains('pipe') ||
+        lower.contains('nail') ||
+        lower.contains('iron rod') ||
+        lower.contains('bulb') ||
+        lower.contains('wire') ||
+        lower.contains('tile')) {
+      detectedCategory = 'Others';
+    } else {
+      detectedCategory = 'Groceries';
+    }
+
+    // 4. Extract Brand
+    String? detectedBrand = currentBrand;
+    final knownBrands = [
+      'Mama Gold',
+      'Golden Penny',
+      'Dangote',
+      'Royal Stallion',
+      'Big Bull',
+      'Optima',
+      'Kings',
+      'Grand',
+      'Power Oil',
+      'Devon Kings',
+      'Gino',
+      'Sonia',
+      'Tasty Tom',
+      'Indomie',
+      'Chivita',
+      'Peak',
+      'Dano',
+      'Milo',
+      'Titus',
+      'Thermocool',
+      'Scanfrost',
+      'Binatone',
+      'Century',
+      'Nexus',
+      'Haier',
+      'Samsung',
+      'LG',
+      'Panasonic',
+      'Elephant Cement',
+      'Dangote Cement',
+      'BUA',
+      'Emzor',
+      'May & Baker',
+      'Panadol',
+      'Pfizer',
+    ];
+    for (final b in knownBrands) {
+      if (lower.contains(b.toLowerCase())) {
+        detectedBrand = b;
+        break;
+      }
+    }
+
+    // 5. Refine Commodity Product Name
+    String refinedProductName = (currentProductName != null && currentProductName.isNotEmpty)
+        ? currentProductName
+        : rawInput;
+
+    var cleanedName = refinedProductName
+        .replaceAll(RegExp(r'\b\d+(?:kg|g|l|cl|ml|k|,\d+)?\b', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\b(?:₦|ngn|price|bag|carton|crate|tuber|paint rubber|derica)\b', caseSensitive: false), '')
+        .trim();
+    if (cleanedName.length >= 3) {
+      cleanedName = cleanedName
+          .split(' ')
+          .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+          .join(' ');
+      refinedProductName = cleanedName;
+    }
+
+    return {
+      'productName': refinedProductName.isNotEmpty ? refinedProductName : 'Commodity Item',
+      'price': detectedPrice,
+      'unit': detectedUnit,
+      'category': detectedCategory,
+      'brand': detectedBrand,
+      'notes': currentNotes ?? (detectedBrand != null ? 'Authentic, verified $detectedBrand stock' : 'Genuine market verified stock'),
+    };
   }
 }

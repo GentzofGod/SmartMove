@@ -5,6 +5,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/price_observation.dart';
 import '../../../core/models/seller_application.dart';
+import '../../../core/models/item_acquisition_source.dart';
+import '../../../core/presentation/widgets/commodity_image_widget.dart';
+import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/localization/app_language.dart';
 
@@ -17,8 +21,15 @@ class CommunityScreen extends ConsumerStatefulWidget {
 }
 
 class _CommunityScreenState extends ConsumerState<CommunityScreen> {
-  String _selectedChannelFilter = 'All';
-  String _selectedSourceFilter = 'All';
+  late int _selectedTab; // 0: Verified Seller Added Products, 1: Community Added Products
+  String _selectedCategory = 'All'; // 'All', 'Groceries', 'Electronics', 'Pharmacy', 'Others'
+  bool _userExplicitlySelectedTab = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTab = widget.initialTab.clamp(0, 1);
+  }
 
   static const List<String> _commodityPresets = [
     'Parboiled Rice',
@@ -82,6 +93,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     String channel = isSellerDirect && userSession.sellerChannel != null
         ? userSession.sellerChannel!
         : 'Local Market';
+    String category = 'Groceries';
     bool inStock = true;
 
     showModalBottomSheet(
@@ -334,6 +346,33 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     ),
                     const SizedBox(height: 12),
 
+                    // Category Selector
+                    const Text(
+                      'Category:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: ['Groceries', 'Electronics', 'Pharmacy', 'Others'].map((cat) {
+                        final isSel = category == cat;
+                        return ChoiceChip(
+                          label: Text(cat),
+                          selected: isSel,
+                          selectedColor: AppColors.primaryTint,
+                          labelStyle: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                            color: isSel ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                          onSelected: (val) {
+                            if (val) setModalState(() => category = cat);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+
                     TextField(
                       controller: notesController,
                       decoration: InputDecoration(
@@ -377,6 +416,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                                   submitterName: isSellerDirect ? 'You (Verified Seller)' : userSession.displayName,
                                   submitterRole: submitterRole,
                                   channel: channel,
+                                  category: category,
                                   brandOrGrade: brandController.text.trim().isNotEmpty
                                       ? brandController.text.trim()
                                       : null,
@@ -511,7 +551,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: _buildPriceFeedTab(observations),
+        child: _buildBody(observations),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddObservationDialog(context),
@@ -522,95 +562,188 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     );
   }
 
-  Widget _buildPriceFeedTab(List<PriceObservation> observations) {
-    var filtered = observations;
-    if (_selectedChannelFilter != 'All') {
-      filtered = filtered.where((o) => o.channel == _selectedChannelFilter).toList();
+  bool _isVerifiedSellerObs(PriceObservation o) {
+    return o.isVerified ||
+        o.sourceType == ObservationSource.traderProvided ||
+        o.sourceType == ObservationSource.traderConfirmed ||
+        o.sourceType == ObservationSource.independentlyVerified ||
+        o.submitterRole == 'Trader' ||
+        o.submitterRole == 'Seller';
+  }
+
+  Widget _buildBody(List<PriceObservation> observations) {
+    final verifiedSellerList = observations.where(_isVerifiedSellerObs).toList();
+    final communityList = observations.where((o) => !_isVerifiedSellerObs(o)).toList();
+
+    int effectiveTab = _selectedTab;
+    if (!_userExplicitlySelectedTab) {
+      if (effectiveTab == 0 && verifiedSellerList.isEmpty && communityList.isNotEmpty) {
+        effectiveTab = 1;
+      } else if (effectiveTab == 1 && communityList.isEmpty && verifiedSellerList.isNotEmpty) {
+        effectiveTab = 0;
+      }
     }
-    if (_selectedSourceFilter == 'Trader Confirmed') {
-      filtered = filtered
-          .where((o) => o.sourceType == ObservationSource.traderConfirmed)
-          .toList();
-    } else if (_selectedSourceFilter == 'Independently Verified') {
-      filtered = filtered
-          .where((o) => o.sourceType == ObservationSource.independentlyVerified)
-          .toList();
-    } else if (_selectedSourceFilter == 'Community') {
-      filtered = filtered
-          .where((o) => o.sourceType == ObservationSource.communityReported)
-          .toList();
-    } else if (_selectedSourceFilter == 'Online Verified') {
-      filtered = filtered
-          .where((o) => o.sourceType == ObservationSource.onlineGrounded)
+
+    var activeList = effectiveTab == 0 ? verifiedSellerList : communityList;
+
+    if (_selectedCategory != 'All') {
+      activeList = activeList
+          .where((o) => o.category.toLowerCase() == _selectedCategory.toLowerCase())
           .toList();
     }
 
     return Column(
       children: [
-        // Filter bar
+        // 1. Two-tab segmented switcher: Verified Seller Added Products vs Community Added Products
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildChannelFilterChip('All'),
-                    const SizedBox(width: 8),
-                    _buildChannelFilterChip('Local Market'),
-                    const SizedBox(width: 8),
-                    _buildChannelFilterChip('SMB Store'),
-                    const SizedBox(width: 8),
-                    _buildChannelFilterChip('Online Retailer'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    'All',
-                    'Trader Confirmed',
-                    'Independently Verified',
-                    'Community',
-                    'Online Verified',
-                  ].map((src) {
-                    final isSel = _selectedSourceFilter == src;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6.0),
-                      child: ChoiceChip(
-                        label: Text(src),
-                        selected: isSel,
-                        selectedColor: AppColors.primaryTint,
-                        labelStyle: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                          color: isSel ? AppColors.primary : AppColors.textSecondary,
-                        ),
-                        onSelected: (val) {
-                          if (val) setState(() => _selectedSourceFilter = src);
-                        },
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.all(4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    key: const ValueKey('tab_verified_sellers'),
+                    onTap: () => setState(() {
+                      _selectedTab = 0;
+                      _userExplicitlySelectedTab = true;
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: effectiveTab == 0 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                        boxShadow: effectiveTab == 0
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ]
+                            : null,
                       ),
-                    );
-                  }).toList(),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            size: 16,
+                            color: effectiveTab == 0 ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Verified Sellers (${verifiedSellerList.length})',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: effectiveTab == 0 ? FontWeight.w800 : FontWeight.w600,
+                                color: effectiveTab == 0 ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: GestureDetector(
+                    key: const ValueKey('tab_community_reports'),
+                    onTap: () => setState(() {
+                      _selectedTab = 1;
+                      _userExplicitlySelectedTab = true;
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: effectiveTab == 1 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                        boxShadow: effectiveTab == 1
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.people_alt_rounded,
+                            size: 16,
+                            color: effectiveTab == 1 ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Community Reports (${communityList.length})',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: effectiveTab == 1 ? FontWeight.w800 : FontWeight.w600,
+                                color: effectiveTab == 1 ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+
+        // 2. Single-line Category Filter Chips (replacing double line filter)
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildCategoryChip('All', Icons.grid_view_rounded),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Groceries', Icons.shopping_basket_outlined),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Electronics', Icons.devices_rounded),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Pharmacy', Icons.medical_services_outlined),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Others', Icons.category_outlined),
+              ],
+            ),
+          ),
+        ),
+        const Divider(height: 1, color: AppColors.cardBorder),
+
+        // 3. Observations List
         Expanded(
-          child: _buildObservationsList(filtered),
+          child: _buildObservationsList(activeList),
         ),
       ],
     );
   }
 
-  Widget _buildChannelFilterChip(String label) {
-    final isSelected = _selectedChannelFilter == label;
+  Widget _buildCategoryChip(String label, IconData icon) {
+    final isSelected = _selectedCategory == label;
     return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 14,
+        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+      ),
       label: Text(label),
       selected: isSelected,
       selectedColor: AppColors.primaryTint,
@@ -619,14 +752,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         color: isSelected ? AppColors.primary : AppColors.textSecondary,
       ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? AppColors.primary : AppColors.cardBorder,
+        ),
+      ),
       onSelected: (val) {
-        if (val) setState(() => _selectedChannelFilter = label);
+        if (val) setState(() => _selectedCategory = label);
       },
     );
   }
 
   Widget _buildObservationsList(List<PriceObservation> list) {
     if (list.isEmpty) {
+      final isOverallEmpty = ref.watch(communityProvider).isEmpty;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -639,19 +779,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                 color: AppColors.primary.withValues(alpha: 0.4),
               ),
               const SizedBox(height: 14),
-              const Text(
-                'No Community Price Quotes Yet',
-                style: TextStyle(
+              Text(
+                isOverallEmpty ? 'No Community Price Quotes Yet' : 'No Listings in this Section',
+                style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 16.5,
                   color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'No observations have been reported yet for this filter. Tap the + button to contribute verified market prices.',
+              Text(
+                isOverallEmpty
+                    ? 'No observations have been reported yet for this filter. Tap the + button to contribute verified market prices.'
+                    : 'Switch tabs or adjust category filters above, or tap the + button to contribute market prices.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                   height: 1.35,
@@ -678,61 +820,121 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             border: Border.all(
               color: obs.isFlaggedAnomaly ? const Color(0xFFFFCDD2) : AppColors.cardBorder,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Product details row with CommodityImageWidget
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  CommodityImageWidget(
+                    imageUrl: obs.imageUrl,
+                    commodityName: obs.productName,
+                    size: 52,
+                    borderRadius: 10,
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          obs.productName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        if (obs.brandOrGrade != null)
-                          Text(
-                            obs.brandOrGrade!,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                obs.productName,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  obs.formattedPrice,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                Text(
+                                  '/${obs.unit}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                obs.category,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            if (obs.brandOrGrade != null) ...[
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  obs.brandOrGrade!,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                            if (obs.standardizedUnitPrice != null) ...[
+                              const Spacer(),
+                              Text(
+                                '₦${obs.standardizedUnitPrice!.toStringAsFixed(0)} / ${obs.baseUnit}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        obs.formattedPrice,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Text(
-                        '/${obs.unit}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
+              // Seller and Location Info
               Row(
                 children: [
                   Icon(
@@ -747,29 +949,39 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      '${obs.sellerName}  •  ${obs.channel}',
+                      '${obs.sellerName}  •  ${obs.marketLocation}',
                       style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (obs.standardizedUnitPrice != null) ...[
-                    const SizedBox(width: 6),
-                    Text(
-                      '₦${obs.standardizedUnitPrice!.toStringAsFixed(0)} / ${obs.baseUnit}',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: obs.inStock
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                  ],
+                    child: Text(
+                      obs.inStock ? 'In Stock' : 'Out of Stock',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: obs.inStock
+                            ? const Color(0xFF2E7D32)
+                            : AppColors.errorText,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
 
-              // Badges
+              // Verification badge & time
               Row(
                 children: [
                   Container(
@@ -795,33 +1007,70 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       obs.timeAgo,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textTertiary),
+                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // In stock indicator
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: obs.inStock
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      obs.inStock ? 'In Stock' : 'Out of Stock',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: obs.inStock
-                            ? const Color(0xFF2E7D32)
-                            : AppColors.errorText,
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Action Buttons: Locate on Map & Chat & Buy
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.location_on_outlined, size: 14),
+                      label: const Text(
+                        'Locate on Map',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
                       ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        SellerLocationMapSheet.show(
+                          context,
+                          sellerName: obs.sellerName,
+                          marketLocation: obs.marketLocation,
+                          stallLocation: obs.notes,
+                          productName: obs.productName,
+                          price: obs.price,
+                          unit: obs.unit,
+                          brandOrGrade: obs.brandOrGrade,
+                          inStock: obs.inStock,
+                          observation: obs,
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
+                      label: const Text(
+                        'Chat & Buy',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        final source = ItemAcquisitionSource.fromObservation(obs);
+                        TraderNegotiationSheet.show(context, source: source);
+                      },
                     ),
                   ),
                 ],

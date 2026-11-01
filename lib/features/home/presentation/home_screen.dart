@@ -8,6 +8,7 @@ import '../../../core/localization/app_language.dart';
 import '../../discover/presentation/product_detail_sheet.dart';
 import 'widgets/location_picker_sheet.dart';
 import 'widgets/meta_ai_scenario_card.dart';
+import '../../../core/presentation/widgets/commodity_image_widget.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -433,18 +434,11 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.shopping_basket_outlined,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
+                            CommodityImageWidget(
+                              commodityName: p.name,
+                              imageUrl: p.imageUrl,
+                              size: 38,
+                              borderRadius: 10,
                             ),
                             const SizedBox(width: 12),
                             Expanded(

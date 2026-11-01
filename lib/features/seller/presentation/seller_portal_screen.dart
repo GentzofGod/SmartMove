@@ -8,6 +8,8 @@ import '../../../core/models/seller_application.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
+import '../../../core/services/meta_ai_service.dart';
+import '../../../core/presentation/widgets/commodity_image_widget.dart';
 
 class SellerPortalScreen extends ConsumerStatefulWidget {
   const SellerPortalScreen({super.key});
@@ -27,6 +29,8 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     final brandController = TextEditingController();
     final notesController = TextEditingController();
     String channel = userSession.sellerChannel ?? 'Local Market';
+    String selectedCategory = 'Groceries';
+    final categories = ['Groceries', 'Electronics', 'Pharmacy', 'Others'];
     bool inStock = true;
 
     showModalBottomSheet(
@@ -109,10 +113,96 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
-                        'Commodity / Product Name *',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Commodity / Product Name *',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                            ),
+                            icon: const Icon(Icons.auto_awesome,
+                                size: 14, color: Color(0xFF673AB7)),
+                            label: const Text(
+                              'AI Auto-Fill / Refine',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF673AB7),
+                              ),
+                            ),
+                            onPressed: () {
+                              final raw =
+                                  '${productController.text} ${notesController.text}'
+                                      .trim();
+                              final input = raw.isNotEmpty
+                                  ? raw
+                                  : 'Mama Gold Rice 50kg bag 85000 fresh stock';
+                              final res =
+                                  const MetaAiService().refineSellerListing(
+                                rawInput: input,
+                                currentProductName: productController
+                                        .text.trim().isNotEmpty
+                                    ? productController.text.trim()
+                                    : null,
+                                currentPrice: double.tryParse(
+                                    priceController.text.trim()),
+                                currentUnit: unitController.text.trim().isNotEmpty
+                                    ? unitController.text.trim()
+                                    : null,
+                                currentCategory: selectedCategory,
+                                currentBrand:
+                                    brandController.text.trim().isNotEmpty
+                                        ? brandController.text.trim()
+                                        : null,
+                                currentNotes:
+                                    notesController.text.trim().isNotEmpty
+                                        ? notesController.text.trim()
+                                        : null,
+                              );
+                              setModalState(() {
+                                if (res['productName'] != null) {
+                                  productController.text =
+                                      res['productName'] as String;
+                                }
+                                if (res['price'] != null) {
+                                  priceController.text =
+                                      (res['price'] as double)
+                                          .toStringAsFixed(0);
+                                }
+                                if (res['unit'] != null) {
+                                  unitController.text = res['unit'] as String;
+                                }
+                                if (res['category'] != null &&
+                                    categories.contains(res['category'])) {
+                                  selectedCategory = res['category'] as String;
+                                }
+                                if (res['brand'] != null) {
+                                  brandController.text =
+                                      res['brand'] as String;
+                                }
+                                if (res['notes'] != null) {
+                                  notesController.text =
+                                      res['notes'] as String;
+                                }
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'AI Assistant refined and standardized listing fields!'),
+                                  duration: Duration(seconds: 2),
+                                  backgroundColor: Color(0xFF673AB7),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       TextField(
@@ -124,6 +214,32 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Category *',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedCategory,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        items: categories
+                            .map((c) =>
+                                DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() => selectedCategory = val);
+                          }
+                        },
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -319,6 +435,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                       : (userSession.businessName ?? 'Verified Trader'),
                                   price: price,
                                   unit: unit,
+                                  category: selectedCategory,
                                   submitterName: 'You (Verified Seller)',
                                   submitterRole: 'Trader',
                                   channel: channel,
@@ -336,6 +453,460 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           },
                           child: const Text(
                             'Publish Price Quote',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteObservation(BuildContext context, PriceObservation obs) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Listing?',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+            'Are you sure you want to remove "${obs.productName}" from your active store listings?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.badgeErrorText,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              ref.read(communityProvider.notifier).deleteListing(obs.id);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content:
+                      Text('"${obs.productName}" removed from your listings.'),
+                  backgroundColor: AppColors.textPrimary,
+                ),
+              );
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditObservationDialog(BuildContext context, PriceObservation obs) {
+    final productController = TextEditingController(text: obs.productName);
+    final priceController =
+        TextEditingController(text: obs.price.toStringAsFixed(0));
+    final unitController = TextEditingController(text: obs.unit);
+    final brandController = TextEditingController(text: obs.brandOrGrade ?? '');
+    final notesController = TextEditingController(text: obs.notes ?? '');
+    final categories = ['Groceries', 'Electronics', 'Pharmacy', 'Others'];
+    String selectedCategory = categories.contains(obs.category)
+        ? obs.category
+        : 'Groceries';
+    bool inStock = obs.inStock;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final parsedPrice =
+                double.tryParse(priceController.text.trim()) ?? 0.0;
+            final mult = CommodityComparisonService.calculateUnitMultiplier(
+              unitController.text.trim(),
+              commodityName: productController.text.trim(),
+            );
+            final previewStandardized =
+                mult > 0 ? (parsedPrice / mult) : parsedPrice;
+            final baseUnit = CommodityComparisonService.resolveBaseUnit(
+              unitController.text.trim(),
+              commodityName: productController.text.trim(),
+            );
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Modify Price Listing',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(bottomCtx),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Commodity / Product Name *',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                            ),
+                            icon: const Icon(Icons.auto_awesome,
+                                size: 14, color: Color(0xFF673AB7)),
+                            label: const Text(
+                              'AI Refine',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF673AB7),
+                              ),
+                            ),
+                            onPressed: () {
+                              final raw =
+                                  '${productController.text} ${notesController.text}'
+                                      .trim();
+                              final input =
+                                  raw.isNotEmpty ? raw : obs.productName;
+                              final res =
+                                  const MetaAiService().refineSellerListing(
+                                rawInput: input,
+                                currentProductName: productController
+                                        .text.trim().isNotEmpty
+                                    ? productController.text.trim()
+                                    : null,
+                                currentPrice: double.tryParse(
+                                    priceController.text.trim()),
+                                currentUnit: unitController.text.trim().isNotEmpty
+                                    ? unitController.text.trim()
+                                    : null,
+                                currentCategory: selectedCategory,
+                                currentBrand:
+                                    brandController.text.trim().isNotEmpty
+                                        ? brandController.text.trim()
+                                        : null,
+                                currentNotes:
+                                    notesController.text.trim().isNotEmpty
+                                        ? notesController.text.trim()
+                                        : null,
+                              );
+                              setModalState(() {
+                                if (res['productName'] != null) {
+                                  productController.text =
+                                      res['productName'] as String;
+                                }
+                                if (res['price'] != null) {
+                                  priceController.text =
+                                      (res['price'] as double)
+                                          .toStringAsFixed(0);
+                                }
+                                if (res['unit'] != null) {
+                                  unitController.text = res['unit'] as String;
+                                }
+                                if (res['category'] != null &&
+                                    categories.contains(res['category'])) {
+                                  selectedCategory = res['category'] as String;
+                                }
+                                if (res['brand'] != null) {
+                                  brandController.text =
+                                      res['brand'] as String;
+                                }
+                                if (res['notes'] != null) {
+                                  notesController.text =
+                                      res['notes'] as String;
+                                }
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'AI Assistant refined listing fields!'),
+                                  duration: Duration(seconds: 2),
+                                  backgroundColor: Color(0xFF673AB7),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: productController,
+                        onChanged: (_) => setModalState(() {}),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Category *',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedCategory,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        items: categories
+                            .map((c) =>
+                                DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() => selectedCategory = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Price (₦) *',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: priceController,
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) => setModalState(() {}),
+                                  decoration: InputDecoration(
+                                    prefixText: '₦ ',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Unit *',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: unitController,
+                                  onChanged: (_) => setModalState(() {}),
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (parsedPrice > 0) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calculate_outlined,
+                                  size: 14, color: Color(0xFF2E7D32)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Normalized unit price: ₦${previewStandardized.toStringAsFixed(0)} / $baseUnit',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Brand (Optional)',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: brandController,
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('In Stock',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
+                              Switch(
+                                value: inStock,
+                                activeThumbColor: AppColors.primary,
+                                onChanged: (val) =>
+                                    setModalState(() => inStock = val),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Notes / Description',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: notesController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            final name = productController.text.trim();
+                            final pStr = priceController.text.trim();
+                            if (name.isEmpty || pStr.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Please provide product name and price.'),
+                                  backgroundColor: AppColors.badgeErrorText,
+                                ),
+                              );
+                              return;
+                            }
+                            final price = double.tryParse(pStr) ?? 0.0;
+                            if (price <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Please enter a valid price amount.'),
+                                  backgroundColor: AppColors.badgeErrorText,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final unit = unitController.text.trim().isNotEmpty
+                                ? unitController.text.trim()
+                                : '1kg';
+                            final finalBrand =
+                                brandController.text.trim().isNotEmpty
+                                    ? brandController.text.trim()
+                                    : null;
+                            final finalNotes =
+                                notesController.text.trim().isNotEmpty
+                                    ? notesController.text.trim()
+                                    : null;
+
+                            ref
+                                .read(communityProvider.notifier)
+                                .updateListingDetails(
+                                  id: obs.id,
+                                  productName: name,
+                                  price: price,
+                                  unit: unit,
+                                  category: selectedCategory,
+                                  brandOrGrade: finalBrand,
+                                  notes: finalNotes,
+                                  inStock: inStock,
+                                );
+                            Navigator.pop(bottomCtx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Listing "$name" updated successfully!'),
+                                backgroundColor: AppColors.primary,
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Save Changes',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
@@ -1391,66 +1962,177 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
         else
           ...myObservations.map((obs) {
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.cardBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryTint,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.shopping_bag_outlined,
-                        color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          obs.productName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${obs.formattedPrice} / ${obs.unit}  •  ${obs.inStock ? "In Stock" : "Out of Stock"}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: obs.inStock
-                                ? AppColors.textSecondary
-                                : AppColors.badgeErrorText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.badgeSuccessBg,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'Live Verified',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CommodityImageWidget(
+                        commodityName: obs.productName,
+                        imageUrl: obs.imageUrl,
+                        size: 48,
+                        borderRadius: 12,
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    obs.productName,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.badgeSuccessBg,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    obs.category,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${obs.formattedPrice} / ${obs.unit}',
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            if (obs.brandOrGrade != null &&
+                                obs.brandOrGrade!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Brand: ${obs.brandOrGrade}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: AppColors.cardBorder),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      // 1-Tap In Stock / Out of Stock switch/pill
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          ref
+                              .read(communityProvider.notifier)
+                              .toggleListingStock(obs.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${obs.productName} marked as ${!obs.inStock ? "In Stock" : "Out of Stock"}',
+                              ),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: obs.inStock
+                                ? const Color(0xFFE8F5E9)
+                                : const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: obs.inStock
+                                  ? const Color(0xFF81C784)
+                                  : const Color(0xFFE57373),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                obs.inStock
+                                    ? Icons.check_circle_rounded
+                                    : Icons.cancel_rounded,
+                                size: 14,
+                                color: obs.inStock
+                                    ? const Color(0xFF2E7D32)
+                                    : const Color(0xFFC62828),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                obs.inStock
+                                    ? 'In Stock'
+                                    : 'Out of Stock',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: obs.inStock
+                                      ? const Color(0xFF1B5E20)
+                                      : const Color(0xFFB71C1C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      // Edit button
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 18, color: AppColors.primary),
+                        tooltip: 'Modify Listing',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () =>
+                            _showEditObservationDialog(context, obs),
+                      ),
+                      // Delete button
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            size: 18, color: AppColors.badgeErrorText),
+                        tooltip: 'Delete Listing',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () =>
+                            _confirmDeleteObservation(context, obs),
+                      ),
+                    ],
                   ),
                 ],
               ),

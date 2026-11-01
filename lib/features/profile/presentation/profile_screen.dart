@@ -350,61 +350,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Guest Banner vs Seller Application Card for Customers
-          if (userSession.isGuest) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.person_add_outlined,
-                          color: AppColors.primary, size: 22),
-                      SizedBox(width: 8),
-                      Text(
-                        'Unlock Full SmartMove Access',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Sign in or create a free account to apply as a verified seller, save itineraries, and contribute verified commodity prices.',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        height: 1.35),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => context.push('/auth'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text('Sign In / Register',
-                          style: TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ] else if (userSession.isCustomer) ...[
+          // Seller Application Card for Customers
+          if (userSession.isCustomer) ...[
             if (userSession.canApplyForSeller) ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -1272,6 +1219,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _showEditBusinessProfile(BuildContext context, UserSession session) {
     final bizController = TextEditingController(text: session.businessName ?? '');
     final phoneController = TextEditingController(text: session.phone ?? '');
+    final stallController = TextEditingController(text: session.stallLocation ?? '');
     String selectedHub = session.marketHub ?? 'Bodija Market';
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
@@ -1409,6 +1357,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     const SizedBox(height: 14),
                     const Text(
+                      'Stall / Line Location',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: stallController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Line 4, Stall 14, Grains Section',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
                       'Phone / WhatsApp',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                     ),
@@ -1435,43 +1398,69 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                         onPressed: () {
+                          final newBizName = bizController.text.trim().isNotEmpty
+                              ? bizController.text.trim()
+                              : (session.businessName ?? '');
+                          final newPhone = phoneController.text.trim().isNotEmpty
+                              ? phoneController.text.trim()
+                              : (session.phone ?? '');
+                          final newStall = stallController.text.trim().isNotEmpty
+                              ? stallController.text.trim()
+                              : session.stallLocation;
+
                           if (session.isApprovedSeller) {
                             ref
                                 .read(storeEditRequestsProvider.notifier)
                                 .submitRequest(
                                   seller: session,
-                                  proposedBusinessName: bizController.text
-                                          .trim()
-                                          .isNotEmpty
-                                      ? bizController.text.trim()
-                                      : (session.businessName ?? ''),
+                                  proposedBusinessName: newBizName,
                                   proposedMarketHub: selectedHub,
-                                  proposedStallLocation: session.stallLocation,
-                                  proposedPhone: phoneController.text
-                                          .trim()
-                                          .isNotEmpty
-                                      ? phoneController.text.trim()
-                                      : (session.phone ?? ''),
+                                  proposedStallLocation: newStall,
+                                  proposedPhone: newPhone,
                                   proposedSellerChannel: selectedChannel,
+                                );
+                            ref.read(authProvider.notifier).updateSellerProfile(
+                                  businessName: newBizName,
+                                  marketHub: selectedHub,
+                                  stallLocation: newStall,
+                                  phone: newPhone,
+                                  sellerChannel: selectedChannel,
+                                  hasPendingStoreEdit: true,
+                                  pendingStoreEditSummary: '$newBizName ($selectedHub)',
+                                );
+                            ref.read(sellerApplicationsProvider.notifier).updateApplicationStoreDetails(
+                                  userId: session.id,
+                                  userEmail: session.email,
+                                  businessName: newBizName,
+                                  marketHub: selectedHub,
+                                  stallLocation: newStall,
+                                  phone: newPhone,
+                                  sellerChannel: selectedChannel,
                                 );
                             Navigator.pop(bottomSheetContext);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
-                                    'Store modifications submitted for admin review!'),
+                                    'Store details updated & queued for admin verification!'),
                                 backgroundColor: AppColors.primary,
                               ),
                             );
                           } else {
                             ref.read(authProvider.notifier).updateSellerProfile(
-                                  businessName: bizController.text.trim().isNotEmpty
-                                      ? bizController.text.trim()
-                                      : null,
+                                  businessName: newBizName,
                                   marketHub: selectedHub,
                                   sellerChannel: selectedChannel,
-                                  phone: phoneController.text.trim().isNotEmpty
-                                      ? phoneController.text.trim()
-                                      : null,
+                                  stallLocation: newStall,
+                                  phone: newPhone,
+                                );
+                            ref.read(sellerApplicationsProvider.notifier).updateApplicationStoreDetails(
+                                  userId: session.id,
+                                  userEmail: session.email,
+                                  businessName: newBizName,
+                                  marketHub: selectedHub,
+                                  stallLocation: newStall,
+                                  phone: newPhone,
+                                  sellerChannel: selectedChannel,
                                 );
                             Navigator.pop(bottomSheetContext);
                             ScaffoldMessenger.of(context).showSnackBar(

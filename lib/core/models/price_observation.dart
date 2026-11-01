@@ -64,6 +64,8 @@ class PriceObservation {
   final bool inStock;
   final double? standardizedUnitPrice;
   final String baseUnit;
+  final String category; // 'Groceries', 'Electronics', 'Pharmacy', 'Others'
+  final String? imageUrl;
   final bool isFlaggedAnomaly;
   final String? anomalyReason;
 
@@ -86,6 +88,8 @@ class PriceObservation {
     this.inStock = true,
     this.standardizedUnitPrice,
     this.baseUnit = 'kg',
+    this.category = 'Groceries',
+    this.imageUrl,
     this.isFlaggedAnomaly = false,
     this.anomalyReason,
   });
@@ -147,6 +151,8 @@ class PriceObservation {
     bool? inStock,
     double? standardizedUnitPrice,
     String? baseUnit,
+    String? category,
+    String? imageUrl,
     bool? isFlaggedAnomaly,
     String? anomalyReason,
   }) {
@@ -170,6 +176,8 @@ class PriceObservation {
       standardizedUnitPrice:
           standardizedUnitPrice ?? this.standardizedUnitPrice,
       baseUnit: baseUnit ?? this.baseUnit,
+      category: category ?? this.category,
+      imageUrl: imageUrl ?? this.imageUrl,
       isFlaggedAnomaly: isFlaggedAnomaly ?? this.isFlaggedAnomaly,
       anomalyReason: anomalyReason ?? this.anomalyReason,
     );

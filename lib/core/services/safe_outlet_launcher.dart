@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
+import '../models/item_acquisition_source.dart';
+import '../presentation/widgets/seller_location_map_sheet.dart';
+import '../../features/decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 import 'meta_ai_service.dart';
 
 class SafeOutletLauncher {
@@ -321,29 +324,86 @@ class SafeOutletLauncher {
                                     ),
                                   ],
                                 ),
-                                ElevatedButton.icon(
-                                  icon: Icon(
-                                    isMaps ? Icons.map_outlined : Icons.open_in_new,
-                                    size: 13,
+                                if (vendor.badge == 'SmartMove Verified Seller' || vendor.targetUrl.startsWith('smartmove://'))
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.location_on_outlined, size: 13),
+                                        label: const Text('Locate', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.primary,
+                                          side: const BorderSide(color: AppColors.primary),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        onPressed: () {
+                                          SellerLocationMapSheet.show(
+                                            context,
+                                            sellerName: vendor.vendorName.replaceAll(' (In-App Verified)', ''),
+                                            marketLocation: vendor.snippet.split('•').first.trim(),
+                                            productName: comparison.commodityName,
+                                            price: vendor.detectedPrice,
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 6),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.chat_bubble_outline, size: 13),
+                                        label: const Text('Chat & Buy', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          foregroundColor: Colors.white,
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        onPressed: () {
+                                          final src = ItemAcquisitionSource(
+                                            id: 'vendor-${vendor.vendorName.hashCode}',
+                                            itemId: 'item-${comparison.commodityName.hashCode}',
+                                            commodityName: comparison.commodityName,
+                                            quantity: 1.0,
+                                            unit: '1kg',
+                                            unitPrice: vendor.detectedPrice ?? 0.0,
+                                            totalCost: vendor.detectedPrice ?? 0.0,
+                                            outletName: vendor.vendorName.replaceAll(' (In-App Verified)', ''),
+                                            channel: AcquisitionChannel.registeredTrader,
+                                            marketHubOrLocation: vendor.snippet.split('•').first.trim(),
+                                            dynamicDistanceKm: 1.5,
+                                            isPlatformRegisteredTrader: true,
+                                            inStock: true,
+                                          );
+                                          TraderNegotiationSheet.show(context, source: src);
+                                        },
+                                      ),
+                                    ],
+                                  )
+                                else
+                                  ElevatedButton.icon(
+                                    icon: Icon(
+                                      isMaps ? Icons.map_outlined : Icons.open_in_new,
+                                      size: 13,
+                                    ),
+                                    label: Text(
+                                      isMaps ? 'Locate on Maps' : 'Open Listing',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isMaps ? const Color(0xFF2E7D32) : AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () => openExternalWebUrl(
+                                      context,
+                                      url: vendor.targetUrl,
+                                      outletName: vendor.vendorName,
+                                      searchQuery: comparison.commodityName,
+                                    ),
                                   ),
-                                  label: Text(
-                                    isMaps ? 'Locate on Maps' : 'Open Listing',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isMaps ? const Color(0xFF2E7D32) : AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                  onPressed: () => openExternalWebUrl(
-                                    context,
-                                    url: vendor.targetUrl,
-                                    outletName: vendor.vendorName,
-                                    searchQuery: comparison.commodityName,
-                                  ),
-                                ),
                               ],
                             ),
                           ],

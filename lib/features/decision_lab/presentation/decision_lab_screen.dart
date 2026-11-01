@@ -1539,6 +1539,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                             final comparison = await aiService.conductLiveAiVendorComparison(
                               source.commodityName,
                               city: userCity,
+                              inAppObservations: ref.read(communityProvider),
                             );
                             if (context.mounted) {
                               messenger.hideCurrentSnackBar();

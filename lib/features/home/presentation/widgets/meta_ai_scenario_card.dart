@@ -33,7 +33,11 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
 
     try {
       const aiService = MetaAiService();
-      final proposal = await aiService.parseToProposal(prompt);
+      final inAppObs = ref.read(communityProvider);
+      final proposal = await aiService.parseToProposal(
+        prompt,
+        inAppObservations: inAppObs,
+      );
 
       if (!mounted) return;
       setState(() => _isProcessing = false);
@@ -83,6 +87,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
         backgroundColor: Colors.transparent,
         builder: (ctx) => AiProposalReviewSheet(
           proposal: proposal,
+          inAppObservations: inAppObs,
           onConfirm: (confirmedBudget, confirmedItems, confirmedErrand) {
             _applyConfirmedProposal(confirmedBudget, confirmedItems, confirmedErrand);
           },
@@ -150,108 +155,6 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
           _processAiPlan(text);
         },
       ),
-    );
-  }
-
-  void _showCustomPromptDialog() {
-    final controller = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryTint,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.auto_awesome,
-                            color: AppColors.primary, size: 18),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'SmartMove AI Options',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Enter commodities to compare, quantities, target location, and budget:',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'e.g. 5kg rice, 2L cooking oil, 1 crate of eggs in Bodija...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppColors.cardBorder),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    final text = controller.text.trim();
-                    Navigator.pop(ctx);
-                    if (text.isNotEmpty) {
-                      _processAiPlan(text);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.auto_awesome, size: 18),
-                  label: const Text(
-                    'Generate Proposal & Review',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -363,12 +266,9 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 Expanded(
                   child: TextField(
                     controller: _inlinePromptController,
-                    onSubmitted: (value) {
-                      final text = value.trim();
-                      if (text.isNotEmpty) {
-                        _processAiPlan(text);
-                      }
-                    },
+                    minLines: 1,
+                    maxLines: 5,
+                    keyboardType: TextInputType.multiline,
                     decoration: const InputDecoration(
                       hintText: 'Ask AI Assistant (e.g. 5kg rice, 2L oil in Bodija)...',
                       hintStyle: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
@@ -456,38 +356,6 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         'Scan Note',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryDark,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Custom Text Prompt Button
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('btn_custom_prompt'),
-                    onPressed: _isProcessing ? null : _showCustomPromptDialog,
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                    ),
-                    icon: const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 16),
-                    label: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Custom Prompt',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,

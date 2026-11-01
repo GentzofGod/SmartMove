@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/ai_proposal.dart';
 import '../../../../core/models/errand.dart';
+import '../../../../core/models/price_observation.dart';
 import '../../../../core/services/safe_outlet_launcher.dart';
 import '../../../../core/services/web_search_grounding_service.dart';
 import '../../../../core/services/meta_ai_service.dart';
+import '../../../../core/presentation/widgets/seller_location_map_sheet.dart';
 
 /// Modal bottom sheet for reviewing, adjusting, and confirming an AI Plan Proposal
 ///
@@ -17,12 +19,14 @@ class AiProposalReviewSheet extends StatefulWidget {
   final AiPlanProposal proposal;
   final Function(double confirmedBudget, List<ShoppingItem> confirmedItems, Errand? confirmedErrand) onConfirm;
   final VoidCallback? onManualFallback;
+  final List<PriceObservation>? inAppObservations;
 
   const AiProposalReviewSheet({
     super.key,
     required this.proposal,
     required this.onConfirm,
     this.onManualFallback,
+    this.inAppObservations,
   });
 
   @override
@@ -51,15 +55,55 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
     bool hasUpdates = false;
     for (int i = 0; i < _items.length; i++) {
       if (_items[i].availableSourceQuotes.isEmpty) {
+        final inAppVendors = <LiveWebVendorResult>[];
+        if (widget.inAppObservations != null && widget.inAppObservations!.isNotEmpty) {
+          final itemLower = _items[i].productName.toLowerCase();
+          final matchingObs = widget.inAppObservations!.where((obs) {
+            final pLower = obs.productName.toLowerCase();
+            return pLower.contains(itemLower) ||
+                itemLower.contains(pLower) ||
+                pLower.split(' ').any((w) => w.length > 3 && itemLower.contains(w));
+          }).toList();
+
+          matchingObs.sort((a, b) {
+            if (a.isVerified && !b.isVerified) return -1;
+            if (!a.isVerified && b.isVerified) return 1;
+            return a.price.compareTo(b.price);
+          });
+
+          for (final obs in matchingObs) {
+            inAppVendors.add(
+              LiveWebVendorResult(
+                vendorName: '${obs.sellerName} (In-App Verified)',
+                title: '${obs.productName} • ${obs.formattedPrice}/${obs.unit}',
+                snippet:
+                    '${obs.marketLocation} • ${obs.inStock ? "In Stock" : "Out of Stock"}${obs.brandOrGrade != null ? " • Brand: ${obs.brandOrGrade}" : ""} (Direct In-App Contact)',
+                targetUrl:
+                    'smartmove://seller?name=${Uri.encodeComponent(obs.sellerName)}&product=${Uri.encodeComponent(obs.productName)}',
+                detectedPrice: obs.price,
+                priceDisplay: obs.formattedPrice,
+                channel: obs.channel,
+                badge: 'SmartMove Verified Seller',
+                isPhysicalLocation: true,
+                isDelivery: obs.channel.toLowerCase().contains('online') ||
+                    obs.channel.toLowerCase().contains('smb'),
+              ),
+            );
+          }
+        }
+
         final quotes = await WebSearchGroundingService.fetchLiveWebVendors(
           _items[i].productName,
           benchmarkPrice: _items[i].estimatedUnitPrice,
         );
-        if (quotes.isNotEmpty && mounted) {
+
+        final combined = [...inAppVendors, ...quotes];
+
+        if (combined.isNotEmpty && mounted) {
           _items[i] = _items[i].copyWith(
-            availableSourceQuotes: quotes,
-            matchedVendorName: _items[i].matchedVendorName ?? quotes.first.vendorName,
-            webReferenceUrl: _items[i].webReferenceUrl ?? quotes.first.targetUrl,
+            availableSourceQuotes: combined,
+            matchedVendorName: _items[i].matchedVendorName ?? combined.first.vendorName,
+            webReferenceUrl: _items[i].webReferenceUrl ?? combined.first.targetUrl,
           );
           hasUpdates = true;
         }
@@ -795,7 +839,18 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                     onPressed: () {
                       final url = item.webReferenceUrl ??
                           (quotes.isNotEmpty ? quotes.first.targetUrl : null);
-                      if (url != null) {
+                      final isSmartMoveSeller = (item.matchedVendorName?.contains('In-App Verified') ?? false) ||
+                          (url?.startsWith('smartmove://') ?? false);
+                      if (isSmartMoveSeller) {
+                        SellerLocationMapSheet.show(
+                          context,
+                          sellerName: (item.matchedVendorName ?? 'Verified Trader').replaceAll(' (In-App Verified)', ''),
+                          marketLocation: 'Bodija Market',
+                          productName: item.productName,
+                          price: item.estimatedUnitPrice,
+                          unit: item.unit,
+                        );
+                      } else if (url != null) {
                         SafeOutletLauncher.openExternalWebUrl(
                           context,
                           url: url,
@@ -804,9 +859,18 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                         );
                       }
                     },
-                    icon: const Icon(Icons.open_in_new, size: 12),
+                    icon: Icon(
+                      ((item.matchedVendorName?.contains('In-App Verified') ?? false) ||
+                              (item.webReferenceUrl?.startsWith('smartmove://') ?? false))
+                          ? Icons.location_on_outlined
+                          : Icons.open_in_new,
+                      size: 12,
+                    ),
                     label: Text(
-                      'View ${item.matchedVendorName ?? 'Store'}',
+                      ((item.matchedVendorName?.contains('In-App Verified') ?? false) ||
+                              (item.webReferenceUrl?.startsWith('smartmove://') ?? false))
+                          ? 'Locate Stall'
+                          : 'View ${item.matchedVendorName ?? 'Store'}',
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
                     ),
@@ -826,6 +890,7 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
                       final comparison = await const MetaAiService().conductLiveAiVendorComparison(
                         item.productName,
                         city: 'Local',
+                        inAppObservations: widget.inAppObservations,
                       );
                       if (mounted) {
                         SafeOutletLauncher.showMultiVendorComparisonSheet(

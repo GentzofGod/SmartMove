@@ -1,3 +1,5 @@
+import 'price_observation.dart';
+
 enum AcquisitionChannel {
   registeredTrader,
   physicalMarketHub,
@@ -62,6 +64,36 @@ class ItemAcquisitionSource {
     this.inStock = true,
     this.brandOrGrade,
   });
+
+  factory ItemAcquisitionSource.fromObservation(
+    PriceObservation obs, {
+    double dynamicDistanceKm = 1.5,
+    double quantity = 1.0,
+  }) {
+    final chLower = obs.channel.toLowerCase();
+    final ch = chLower.contains('online')
+        ? AcquisitionChannel.ecommercePlatform
+        : (chLower.contains('smb')
+            ? AcquisitionChannel.retailStore
+            : AcquisitionChannel.physicalMarketHub);
+
+    return ItemAcquisitionSource(
+      id: obs.id,
+      itemId: obs.productId,
+      commodityName: obs.productName,
+      quantity: quantity,
+      unit: obs.unit,
+      unitPrice: obs.price,
+      totalCost: obs.price * quantity,
+      outletName: obs.sellerName,
+      channel: ch,
+      marketHubOrLocation: obs.marketLocation,
+      dynamicDistanceKm: dynamicDistanceKm,
+      isPlatformRegisteredTrader: obs.isVerified,
+      inStock: obs.inStock,
+      brandOrGrade: obs.brandOrGrade,
+    );
+  }
 
   String get formattedUnitPrice => '₦${unitPrice.toStringAsFixed(0).replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),

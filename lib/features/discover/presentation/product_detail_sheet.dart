@@ -8,6 +8,10 @@ import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/state/app_state.dart';
+import '../../../core/presentation/widgets/commodity_image_widget.dart';
+import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../../core/models/item_acquisition_source.dart';
+import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 
 class ProductDetailSheet extends ConsumerStatefulWidget {
   final Product product;
@@ -352,18 +356,11 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
             // Product Hero Header
             Row(
               children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryTint,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.inventory_2_outlined,
-                    color: AppColors.primary,
-                    size: 28,
-                  ),
+                CommodityImageWidget(
+                  commodityName: widget.product.name,
+                  imageUrl: widget.product.imageUrl,
+                  size: 58,
+                  borderRadius: 16,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -916,6 +913,82 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                visualDensity: VisualDensity.compact,
+                                side: const BorderSide(color: AppColors.primary),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: const Icon(Icons.explore_outlined, size: 15),
+                              label: const Text(
+                                'Locate Stall',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
+                              onPressed: () {
+                                SellerLocationMapSheet.show(
+                                  context,
+                                  sellerName: obs.sellerName,
+                                  marketLocation: obs.marketLocation,
+                                  stallLocation: obs.notes,
+                                  productName: obs.productName,
+                                  price: obs.price,
+                                  unit: obs.unit,
+                                  brandOrGrade: obs.brandOrGrade,
+                                  inStock: obs.inStock,
+                                  observation: obs,
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                visualDensity: VisualDensity.compact,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                              label: const Text(
+                                'Chat & Buy',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
+                              onPressed: () {
+                                final source = ItemAcquisitionSource(
+                                  id: 'src-${obs.sellerName.toLowerCase().replaceAll(' ', '-')}',
+                                  itemId: 'item-${widget.product.id}',
+                                  commodityName: obs.productName,
+                                  quantity: _quantity,
+                                  unit: obs.unit,
+                                  unitPrice: obs.price,
+                                  totalCost: obs.price * _quantity,
+                                  outletName: obs.sellerName,
+                                  channel: obs.sellerChannel == SellerChannel.onlineRetailer
+                                      ? AcquisitionChannel.ecommercePlatform
+                                      : AcquisitionChannel.registeredTrader,
+                                  marketHubOrLocation: obs.marketLocation,
+                                  dynamicDistanceKm: sq.dynamicDistanceKm,
+                                  isPlatformRegisteredTrader: obs.isVerified,
+                                  inStock: obs.inStock,
+                                  brandOrGrade: obs.brandOrGrade,
+                                );
+                                TraderNegotiationSheet.show(context, source: source);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1918,6 +1991,82 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               fontSize: 10.5,
               color: AppColors.textSecondary,
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    visualDensity: VisualDensity.compact,
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.explore_outlined, size: 14),
+                  label: const Text(
+                    'Locate Stall',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: () {
+                    SellerLocationMapSheet.show(
+                      context,
+                      sellerName: opt.observation.sellerName,
+                      marketLocation: opt.observation.marketLocation,
+                      stallLocation: opt.observation.notes,
+                      productName: opt.observation.productName,
+                      price: opt.observation.price,
+                      unit: opt.observation.unit,
+                      brandOrGrade: opt.observation.brandOrGrade,
+                      inStock: opt.observation.inStock,
+                      observation: opt.observation,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                  label: const Text(
+                    'Chat & Buy',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: () {
+                    final source = ItemAcquisitionSource(
+                      id: 'src-${opt.observation.sellerName.toLowerCase().replaceAll(' ', '-')}',
+                      itemId: 'item-${widget.product.id}',
+                      commodityName: opt.observation.productName,
+                      quantity: _quantity,
+                      unit: opt.observation.unit,
+                      unitPrice: opt.observation.price,
+                      totalCost: opt.observation.price * _quantity,
+                      outletName: opt.observation.sellerName,
+                      channel: opt.channel == SellerChannel.onlineRetailer
+                          ? AcquisitionChannel.ecommercePlatform
+                          : AcquisitionChannel.registeredTrader,
+                      marketHubOrLocation: opt.observation.marketLocation,
+                      dynamicDistanceKm: opt.distanceKm,
+                      isPlatformRegisteredTrader: opt.observation.isVerified,
+                      inStock: opt.observation.inStock,
+                      brandOrGrade: opt.observation.brandOrGrade,
+                    );
+                    TraderNegotiationSheet.show(context, source: source);
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
