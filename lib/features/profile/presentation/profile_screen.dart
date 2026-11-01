@@ -8,6 +8,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
 import '../../../core/localization/app_language.dart';
+import '../../../core/presentation/widgets/language_selection_sheet.dart';
 import '../../home/presentation/widgets/location_picker_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -51,11 +52,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await prefs.setBool(key, value);
   }
 
-  Future<void> _updateLanguageSetting(String language) async {
-    ref.read(appLanguageProvider.notifier).setLanguage(language);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('smartmove_app_language', language);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1618,119 +1614,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _showLanguageSelectorSheet(BuildContext context) {
-    final currentLanguage = ref.read(appLanguageProvider);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (bottomSheetContext) {
-        return SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.75,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Select Dialect / Language',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () => Navigator.pop(bottomSheetContext),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Choose from 15 common Nigerian languages and dialects across all geopolitical zones for localized navigation and price comparison.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: AppStrings.supportedLanguages.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1, indent: 12, color: AppColors.divider),
-                    itemBuilder: (context, index) {
-                      final lang = AppStrings.supportedLanguages[index];
-                      final isSelected = currentLanguage == lang.name;
-                      return ListTile(
-                        key: ValueKey('lang_option_${lang.name}'),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        selected: isSelected,
-                        selectedTileColor: AppColors.primaryTint.withValues(alpha: 0.5),
-                        title: Row(
-                          children: [
-                            Text(
-                              lang.name,
-                              style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                lang.code.toUpperCase(),
-                                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
-                              ),
-                            ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(lang.nativeName, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500)),
-                            Text(lang.region, style: const TextStyle(fontSize: 10, color: AppColors.textTertiary)),
-                          ],
-                        ),
-                        trailing: isSelected
-                            ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
-                            : null,
-                        onTap: () {
-                          _updateLanguageSetting(lang.name);
-                          Navigator.pop(bottomSheetContext);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Language set to ${lang.name}!'),
-                              backgroundColor: AppColors.primary,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    LanguageSelectionSheet.show(context);
   }
 
   void _showDataAndPrivacySheet(BuildContext context) {

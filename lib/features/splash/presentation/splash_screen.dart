@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/guide_service.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/localization/app_language.dart';
+import '../../../core/presentation/widgets/language_selection_sheet.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,11 +15,24 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _isChecking = true;
+  String _currentLanguage = 'English';
 
   @override
   void initState() {
     super.initState();
+    _loadLanguage();
     _checkInitialRoute();
+  }
+
+  Future<void> _loadLanguage() async {
+    try {
+      final lang = await AppLanguageNotifier.getPersistedLanguage();
+      if (mounted) {
+        setState(() {
+          _currentLanguage = lang;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkInitialRoute() async {
@@ -49,7 +64,15 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _proceedToOnboarding() async {
+    final hasChosenLanguage = await AppLanguageNotifier.hasChosenInitialLanguage();
+    if (!hasChosenLanguage && mounted) {
+      final chosen = await LanguageSelectionSheet.show(context, isFirstLaunch: true);
+      if (chosen != null && mounted) {
+        setState(() => _currentLanguage = chosen);
+      }
+    }
     await GuideService.markGuideSeen();
+    await AppLanguageNotifier.markInitialLanguageChosen();
     if (mounted) {
       context.go('/onboarding');
     }
@@ -57,6 +80,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _skipToHome() async {
     await GuideService.markGuideSeen();
+    await AppLanguageNotifier.markInitialLanguageChosen();
     if (mounted) {
       context.go('/home');
     }
@@ -64,8 +88,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _proceedToAuth() async {
     await GuideService.markGuideSeen();
+    await AppLanguageNotifier.markInitialLanguageChosen();
     if (mounted) {
       context.push('/auth');
+    }
+  }
+
+  Future<void> _pickLanguage() async {
+    final chosen = await LanguageSelectionSheet.show(context, isFirstLaunch: true);
+    if (chosen != null && mounted) {
+      setState(() => _currentLanguage = chosen);
     }
   }
 
@@ -104,6 +136,10 @@ class _SplashScreenState extends State<SplashScreen> {
                                 _buildLogoAndHeader(),
                                 const SizedBox(height: 12),
 
+                                // Preferred Language Prompt Card for First Launch
+                                _buildFirstLaunchLanguageCard(),
+                                const SizedBox(height: 12),
+
                                 // Core Capabilities Cards
                                 _buildCapabilitiesCard(),
                                 const SizedBox(height: 12),
@@ -132,49 +168,34 @@ class _SplashScreenState extends State<SplashScreen> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
+                  color: Colors.black.withValues(alpha: 0.25),
                   blurRadius: 16,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Image.asset(
+                'assets/icons/app_icon.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_bag_outlined,
                     color: Colors.white,
-                    size: 28,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 36),
                   ),
                 ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.location_on,
-                      color: AppColors.primary,
-                      size: 14,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -208,52 +229,37 @@ class _SplashScreenState extends State<SplashScreen> {
           width: 76,
           height: 76,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 50,
-                height: 50,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.asset(
+              'assets/icons/app_icon.png',
+              width: 76,
+              height: 76,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 76,
+                height: 76,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Icon(
-                  Icons.shopping_bag_outlined,
                   color: Colors.white,
-                  size: 28,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Center(
+                  child: Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 34),
                 ),
               ),
-              Positioned(
-                right: 10,
-                bottom: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: AppColors.primary,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         const Text(
           'SmartMove',
           style: TextStyle(
@@ -263,18 +269,83 @@ class _SplashScreenState extends State<SplashScreen> {
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         const Text(
           'Know the Prices. Plan the Trip.\nMake the Better Decision.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Color(0xFFC0D5CB),
-            fontSize: 14,
+            fontSize: 13.5,
             fontWeight: FontWeight.w500,
             height: 1.3,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFirstLaunchLanguageCard() {
+    return Container(
+      key: const ValueKey('splash_language_selection_banner'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFF57D9A3).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.translate_rounded, color: Color(0xFF57D9A3), size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Preferred Language: $_currentLanguage',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                const Text(
+                  '16 common Nigerian languages & dialects supported',
+                  style: TextStyle(
+                    color: Color(0xFFB3CFC3),
+                    fontSize: 10.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            key: const ValueKey('btn_select_language_splash'),
+            onPressed: _pickLanguage,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF57D9A3),
+              foregroundColor: const Color(0xFF042419),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Change',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

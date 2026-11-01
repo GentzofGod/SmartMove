@@ -16,8 +16,18 @@ class NigerianLanguage {
 }
 
 class AppLanguageNotifier extends Notifier<String> {
+  static const String languageKey = 'smartmove_app_language';
+  static const String initialLanguageChosenKey = 'smartmove_first_language_chosen_v1';
+
+  final String? _initialLanguage;
+  AppLanguageNotifier([this._initialLanguage]);
+
   @override
   String build() {
+    final initial = _initialLanguage;
+    if (initial != null && initial.isNotEmpty) {
+      return initial;
+    }
     _loadSavedLanguage();
     return 'English';
   }
@@ -25,8 +35,8 @@ class AppLanguageNotifier extends Notifier<String> {
   Future<void> _loadSavedLanguage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('smartmove_app_language');
-      if (saved != null && saved.isNotEmpty) {
+      final saved = prefs.getString(languageKey);
+      if (saved != null && saved.isNotEmpty && saved != state) {
         state = saved;
       }
     } catch (_) {}
@@ -36,7 +46,33 @@ class AppLanguageNotifier extends Notifier<String> {
     state = languageName;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('smartmove_app_language', languageName);
+      await prefs.setString(languageKey, languageName);
+      await prefs.setBool(initialLanguageChosenKey, true);
+    } catch (_) {}
+  }
+
+  static Future<String> getPersistedLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(languageKey) ?? 'English';
+    } catch (_) {
+      return 'English';
+    }
+  }
+
+  static Future<bool> hasChosenInitialLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(initialLanguageChosenKey) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> markInitialLanguageChosen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(initialLanguageChosenKey, true);
     } catch (_) {}
   }
 }
@@ -162,6 +198,21 @@ class AppStrings {
       'acquisitionProcess': 'Acquisition Process',
       'activeBasket': 'Shopping Basket',
       'noActiveOptions': 'No active shopping options yet',
+      'welcomeTitle': 'Welcome to SmartMove',
+      'selectLanguageTitle': 'Choose Your Preferred Language',
+      'selectLanguageSubtitle': 'Select from 15 common Nigerian languages & dialects',
+      'continueBtn': 'Continue',
+      'profileAndSettings': 'Profile & Settings',
+      'marketHubAndLocation': 'Market Hub & Location',
+      'notifications': 'Notifications',
+      'logOut': 'Log Out',
+      'topPriceSpreads': 'Top Commodity Price Spreads',
+      'recentObservations': 'Recent Market Observations',
+      'sellerPortal': 'Seller Portal',
+      'verifiedSeller': 'Verified Seller',
+      'edit': 'Edit',
+      'applySeller': 'Apply as Seller',
+      'languageUpdated': 'Language updated successfully!',
     },
     'Nigerian Pidgin': {
       'navHome': 'House',
@@ -185,6 +236,21 @@ class AppStrings {
       'acquisitionProcess': 'Acquisition Process',
       'activeBasket': 'Market Basket',
       'noActiveOptions': 'No active shopping options yet',
+      'welcomeTitle': 'Welcome to SmartMove',
+      'selectLanguageTitle': 'Pick Di Language Wey You Wan Use',
+      'selectLanguageSubtitle': 'Select from 15 Nigerian languages and dialects',
+      'continueBtn': 'Continue',
+      'profileAndSettings': 'Profile & Settings',
+      'marketHubAndLocation': 'Market Hub & Location',
+      'notifications': 'Notifications',
+      'logOut': 'Comot Account',
+      'topPriceSpreads': 'Top Market Price Differences',
+      'recentObservations': 'Recent Market Updates',
+      'sellerPortal': 'Seller Portal',
+      'verifiedSeller': 'Verified Trader',
+      'edit': 'Change Am',
+      'applySeller': 'Apply to Sell',
+      'languageUpdated': 'Language don change successfully!',
     },
     'Yorùbá': {
       'navHome': 'Ilé',
@@ -208,6 +274,21 @@ class AppStrings {
       'acquisitionProcess': 'Ìlànà Ìgbà Rírà',
       'activeBasket': 'Agbọ̀n Ọjà',
       'noActiveOptions': 'Kò sí àwọn àṣàyàn rírà tí ó wà',
+      'welcomeTitle': 'Ẹ kú àbọ̀ sí SmartMove',
+      'selectLanguageTitle': 'Yan Èdè Tí O Fẹ́',
+      'selectLanguageSubtitle': 'Yan lára àwọn èdè Nàìjíríà 15 fún rírà ọjà tó dára',
+      'continueBtn': 'Tẹ̀síwájú',
+      'profileAndSettings': 'Àkọọ́lẹ̀ & Ètò',
+      'marketHubAndLocation': 'Ibùdó Ọjà & Ibùgbé',
+      'notifications': 'Àwọn Ìfitíletí',
+      'logOut': 'Jáde Kúrò',
+      'topPriceSpreads': 'Ìyàtọ̀ Iye Owó Ọjà Tó Ga Jù',
+      'recentObservations': 'Àwọn Àkíyèsí Ọjà Tuntun',
+      'sellerPortal': 'Ojú-Ọ̀nà Olùtajà',
+      'verifiedSeller': 'Olùtajà Tí A Fọwọ́sí',
+      'edit': 'Ṣàtúnṣe',
+      'applySeller': 'Béèrè Láti Di Olùtajà',
+      'languageUpdated': 'Èdè ti yípadà ní àṣeyọrí!',
     },
     'Hausa': {
       'navHome': 'Gida',
@@ -231,6 +312,21 @@ class AppStrings {
       'acquisitionProcess': 'Hanyar Sayayya',
       'activeBasket': 'Kwandan Sayayya',
       'noActiveOptions': 'Babu zaɓin sayayya mai aiki tukuna',
+      'welcomeTitle': 'Barka da zuwa SmartMove',
+      'selectLanguageTitle': 'Zaɓi Harshen Da Kake So',
+      'selectLanguageSubtitle': 'Zaɓi daga harsunan Najeriya guda 15 don sayayya mafi sauƙi',
+      'continueBtn': 'Ci gaba',
+      'profileAndSettings': 'Bayanin Asusu & Saituna',
+      'marketHubAndLocation': 'Cibiyar Kasuwa & Wuri',
+      'notifications': 'Sanarwa',
+      'logOut': 'Fita Daga Asusu',
+      'topPriceSpreads': 'Bambancin Farashin Kaya Mafi Girma',
+      'recentObservations': 'Sabbin Rahotannin Kasuwa',
+      'sellerPortal': 'Dandalin Yan Kasuwa',
+      'verifiedSeller': 'Tabbataccen Mai Sayarwa',
+      'edit': 'Gyara',
+      'applySeller': 'Nemi Zama Mai Sayarwa',
+      'languageUpdated': 'An sabunta harshe cikin nasara!',
     },
     'Asụsụ Igbo': {
       'navHome': 'Ụlọ',
@@ -254,6 +350,21 @@ class AppStrings {
       'acquisitionProcess': 'Usoro Ịzụ Ahịa',
       'activeBasket': 'Nkata Ahịa',
       'noActiveOptions': 'Enweghị nhọrọ ịzụ ahịa na-arụ ọrụ ma',
+      'welcomeTitle': 'Nnọọ na SmartMove',
+      'selectLanguageTitle': 'Họrọ Asụsụ Ị Chọrọ',
+      'selectLanguageSubtitle': 'Họrọ n\'ime asụsụ Naijiria 15 maka ịzụ ahịa dị mfe',
+      'continueBtn': 'Gaa n\'ihu',
+      'profileAndSettings': 'Profaịlụ & Ntọala',
+      'marketHubAndLocation': 'Ebe Ahịa & Ọnọdụ',
+      'notifications': 'Ọkwa',
+      'logOut': 'Pụọ n\'Akaụntụ',
+      'topPriceSpreads': 'Ọdịiche Ọnụahịa Ngwa Ahịa Kasị Elu',
+      'recentObservations': 'Nchọpụta Ahịa Ọhụrụ',
+      'sellerPortal': 'Ọnụ Ụzọ Ndị Na-ere Ahịa',
+      'verifiedSeller': 'Onye Na-ere Ahịa E Kwadoro',
+      'edit': 'Dezie',
+      'applySeller': 'Tinyere Akwụkwọ Ịbụ Onye Na-ere Ahịa',
+      'languageUpdated': 'Emelitere asụsụ nke ọma!',
     },
     'Fulfulde': {
       'navHome': 'Wuro',
@@ -277,6 +388,21 @@ class AppStrings {
       'acquisitionProcess': 'Laawol Soodeede',
       'activeBasket': 'Silbere Soodeede',
       'noActiveOptions': 'Walaa suɓooji soodeede jooni',
+      'welcomeTitle': 'Barka da zuwa SmartMove',
+      'selectLanguageTitle': 'Suɓo Ɗemngal Maada',
+      'selectLanguageSubtitle': 'Suɓo nder ɗemɗe Naajeeriya 15 gam soodeede',
+      'continueBtn': 'Yaha yeeso',
+      'profileAndSettings': 'Profaayil & Teeltol',
+      'marketHubAndLocation': 'Suudu Lummo & Babal',
+      'notifications': 'Kabaaruuji',
+      'logOut': 'Wurtu',
+      'topPriceSpreads': 'Burdal Cogguuji Kaye',
+      'recentObservations': 'Kabaaru Lummo Kesol',
+      'sellerPortal': 'Babal Jom Lummo',
+      'verifiedSeller': 'Jom Lummo Goongɗinaaɗo',
+      'edit': 'Waylu',
+      'applySeller': 'Waddu Namnal Soorowo',
+      'languageUpdated': 'Ɗemngal wattitaama no haani!',
     },
     'Kanuri': {
       'navHome': 'Fato',
@@ -300,6 +426,21 @@ class AppStrings {
       'acquisitionProcess': 'Yewata Kwaye',
       'activeBasket': 'Kundu Soodeede',
       'noActiveOptions': 'Karataro soodeede ba',
+      'welcomeTitle': 'Barka da zuwa SmartMove',
+      'selectLanguageTitle': 'Talam Kwaye Gowata',
+      'selectLanguageSubtitle': 'Talamwa Nigeria 15 laduwuro karata',
+      'continueBtn': 'Leta',
+      'profileAndSettings': 'Hali & Saituwu',
+      'marketHubAndLocation': 'Kasuwa & Nduwu',
+      'notifications': 'Wara Kwaye',
+      'logOut': 'Tuluwu',
+      'topPriceSpreads': 'Bargi Gadawo Kaye',
+      'recentObservations': 'Bargi Kasuwa Badiye',
+      'sellerPortal': 'Dala Lumowama',
+      'verifiedSeller': 'Lumowama Tabbatana',
+      'edit': 'Kalakto',
+      'applySeller': 'Lumowamaro Yewata',
+      'languageUpdated': 'Talam kwaye tabbatana!',
     },
     'Ibibio': {
       'navHome': 'Ufọk',
@@ -323,6 +464,21 @@ class AppStrings {
       'acquisitionProcess': 'Usoro Udep',
       'activeBasket': 'Ekpat Urue',
       'noActiveOptions': 'Idaha udep ibaha kanga',
+      'welcomeTitle': 'Emedi ke SmartMove',
+      'selectLanguageTitle': 'Mek Usem Mfo',
+      'selectLanguageSubtitle': 'Mek ke otu usem Nigeria 15 emi man edep nsubo',
+      'continueBtn': 'Kaha iso',
+      'profileAndSettings': 'Idaha & Mbet',
+      'marketHubAndLocation': 'Ufọk Urue & Ebiet',
+      'notifications': 'Ntọt',
+      'logOut': 'Wọrọ ke Akawunt',
+      'topPriceSpreads': 'Ukpụhọde Urue Nsubo',
+      'recentObservations': 'Ntiise Urue Mfịn',
+      'sellerPortal': 'Inua-okop Anyam Urue',
+      'verifiedSeller': 'Anyam Urue Enyịmede',
+      'edit': 'Kpụhọ',
+      'applySeller': 'Benyeme Nyam Urue',
+      'languageUpdated': 'Ekpụhọ usem ọfọn!',
     },
     'Tiv': {
       'navHome': 'Ya',
@@ -346,6 +502,21 @@ class AppStrings {
       'acquisitionProcess': 'Gbenda Uyam',
       'activeBasket': 'Kpa Uyam',
       'noActiveOptions': 'Meyan shol uyam ngu hegen ga',
+      'welcomeTitle': 'Msugh u va ken SmartMove',
+      'selectLanguageTitle': 'Torough Zwa Wou',
+      'selectLanguageSubtitle': 'Torough ken ijô i Nigeria 15 sha ci u uyam kwaghyan',
+      'continueBtn': 'Za hemen',
+      'profileAndSettings': 'Mbamtom man Ijiir',
+      'marketHubAndLocation': 'Kasuwa man Ijiir',
+      'notifications': 'Upasen',
+      'logOut': 'Dua ken Akawunti',
+      'topPriceSpreads': 'Mkposo u Ayautu Kwagh',
+      'recentObservations': 'Upasen Kasuwa u Hegen',
+      'sellerPortal': 'Gbenda u Or u Yam kwagh',
+      'verifiedSeller': 'Or u Yam kwagh u mimi',
+      'edit': 'Sôôr',
+      'applySeller': 'Ker ijiir i yam kwagh',
+      'languageUpdated': 'I gema zwa dedoo!',
     },
     'Èdò (Bini)': {
       'navHome': 'Owa',
@@ -369,6 +540,21 @@ class AppStrings {
       'acquisitionProcess': 'Ẹdẹmwẹ Edẹ',
       'activeBasket': 'Ekpeti Ẹki',
       'noActiveOptions': 'Iro ẹki iro ra re',
+      'welcomeTitle': 'Kọyo gha re SmartMove',
+      'selectLanguageTitle': 'Zẹ Ẹvbe Nọ Gha Yẹ Ruẹ',
+      'selectLanguageSubtitle': 'Zẹ vbe Ẹvbe Naijiria 15 nẹ',
+      'continueBtn': 'Koko gha khian',
+      'profileAndSettings': 'Itohan Egbere',
+      'marketHubAndLocation': 'Ẹki & Ẹvbo',
+      'notifications': 'Iyẹn',
+      'logOut': 'Ladian vbe Akawunti',
+      'topPriceSpreads': 'Ekhọrọ Igho Emwi',
+      'recentObservations': 'Iyẹn Ẹki Ọgbọn',
+      'sellerPortal': 'Ẹkpo Ọtẹki',
+      'verifiedSeller': 'Ọtẹki Nọ Gbọkpa',
+      'edit': 'Doloyi',
+      'applySeller': 'Gbẹ Ebe Ọtẹki',
+      'languageUpdated': 'A doloyi ẹvbe nẹ!',
     },
     'Urhobo': {
       'navHome': 'Uvwie',
@@ -392,6 +578,21 @@ class AppStrings {
       'acquisitionProcess': 'Idjerhe Ẹdẹ',
       'activeBasket': 'Ekete Ẹki',
       'noActiveOptions': 'Iroro ẹki erha kọfa',
+      'welcomeTitle': 'Miguwo kpo SmartMove',
+      'selectLanguageTitle': 'Sẹrẹ Ẹvwrẹ Wọ Guọlọ',
+      'selectLanguageSubtitle': 'Sẹrẹ vwe evun rẹ ẹvwrẹ Nigeria 15',
+      'continueBtn': 'Kpo obaro',
+      'profileAndSettings': 'Iruo & Akpọ',
+      'marketHubAndLocation': 'Ẹki & Orho',
+      'notifications': 'Ighwoghwovwo',
+      'logOut': 'Vwo kparobọ',
+      'topPriceSpreads': 'Ẹdẹwẹ Igho Emu',
+      'recentObservations': 'Obo re phia vwe ẹki',
+      'sellerPortal': 'Idjerhe rẹ Ọtẹki',
+      'verifiedSeller': 'Ọtẹki Esiri',
+      'edit': 'Wian phiyo',
+      'applySeller': 'Guọlọ Efe Ọtẹki',
+      'languageUpdated': 'Ẹvwrẹ rhẹriẹ re!',
     },
     'Nupe': {
       'navHome': 'Emi',
@@ -415,6 +616,21 @@ class AppStrings {
       'acquisitionProcess': 'Gba Enya',
       'activeBasket': 'Kpete Enya',
       'noActiveOptions': 'Yegborolo ba tso a',
+      'welcomeTitle': 'Kubani ga SmartMove',
+      'selectLanguageTitle': 'Gba Egba Nayi Wondó',
+      'selectLanguageSubtitle': 'Gba dan egan Nigeria 15 bo',
+      'continueBtn': 'Yaha yeeso',
+      'profileAndSettings': 'Egbanyi & Akawunti',
+      'marketHubAndLocation': 'Eka Dazan & Emi',
+      'notifications': 'Eba',
+      'logOut': 'Takun Akawunti',
+      'topPriceSpreads': 'Egan Li Iye Enya',
+      'recentObservations': 'Labari Dazan Voron',
+      'sellerPortal': 'Gbanye Dazan',
+      'verifiedSeller': 'Maza Dazan Gbanyi',
+      'edit': 'Cikpe',
+      'applySeller': 'Bazan Dazan',
+      'languageUpdated': 'Egba tswitswi gba!',
     },
     'Ijaw': {
       'navHome': 'Wari',
@@ -438,6 +654,21 @@ class AppStrings {
       'acquisitionProcess': 'Tiri Ye',
       'activeBasket': 'Kere Fiyai',
       'noActiveOptions': 'Kari tiri ye fa',
+      'welcomeTitle': 'Bari ya SmartMove',
+      'selectLanguageTitle': 'Kari Bibiri Yo',
+      'selectLanguageSubtitle': 'Kari Nigeria bibiri 15 bo',
+      'continueBtn': 'Mu yeeso',
+      'profileAndSettings': 'Bari & Wene',
+      'marketHubAndLocation': 'Tiri & Ama',
+      'notifications': 'Kari Akpọ',
+      'logOut': 'Mu Tari',
+      'topPriceSpreads': 'Tiri Fiyai Ye Gba',
+      'recentObservations': 'Tiri Ye Kesol',
+      'sellerPortal': 'Tiri Wene Yo',
+      'verifiedSeller': 'Tiri Wene Eme',
+      'edit': 'Finye',
+      'applySeller': 'Du Tiri Ye',
+      'languageUpdated': 'Bibiri fa ma kpe!',
     },
     'Ebira': {
       'navHome': 'Ihima',
@@ -461,6 +692,21 @@ class AppStrings {
       'acquisitionProcess': 'Onyi Ize',
       'activeBasket': 'Ate Ẹki',
       'noActiveOptions': 'Eme ize da a',
+      'welcomeTitle': 'Maro ga SmartMove',
+      'selectLanguageTitle': 'Ve Ira No Wore',
+      'selectLanguageSubtitle': 'Ve ira Nigeria 15 oyi',
+      'continueBtn': 'Ve gba',
+      'profileAndSettings': 'Etu & Ebe',
+      'marketHubAndLocation': 'Ahia & Ohi',
+      'notifications': 'Oza',
+      'logOut': 'Vo vana',
+      'topPriceSpreads': 'Iye Enya Ahia',
+      'recentObservations': 'Ahia Enya Hegen',
+      'sellerPortal': 'Oza Ozi Enya',
+      'verifiedSeller': 'Oza Ozi Enya Koko',
+      'edit': 'Rono',
+      'applySeller': 'Banyi Oza Ozi',
+      'languageUpdated': 'Ira kpa vo nẹ!',
     },
     'Igala': {
       'navHome': 'Ene',
@@ -484,6 +730,21 @@ class AppStrings {
       'acquisitionProcess': 'Ọna Ẹlẹ',
       'activeBasket': 'Ọkpa Ẹlẹ',
       'noActiveOptions': 'Eli ẹlẹ dọmọ n',
+      'welcomeTitle': 'Aba wa SmartMove',
+      'selectLanguageTitle': 'Eli Ichi Kide Wẹ',
+      'selectLanguageSubtitle': 'Eli kwobí ichi Nigeria 15',
+      'continueBtn': 'Le gba',
+      'profileAndSettings': 'Uchola & Ọma',
+      'marketHubAndLocation': 'Ugbẹlẹ & Ane',
+      'notifications': 'Ito',
+      'logOut': 'Kwo efu Akawunti',
+      'topPriceSpreads': 'Kọ Iye Ẹlẹ Muro',
+      'recentObservations': 'Ugbẹlẹ Ẹlẹ Agbalaka',
+      'sellerPortal': 'Ẹkpata Onẹ Ẹlẹ',
+      'verifiedSeller': 'Onẹ Ẹlẹ Kọ Kpayi',
+      'edit': 'Tẹnyẹ',
+      'applySeller': 'Gba Onẹ Ẹlẹ',
+      'languageUpdated': 'Ichi kwayi che nyọnyọ!',
     },
   };
 
