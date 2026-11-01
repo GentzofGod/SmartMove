@@ -344,4 +344,41 @@ class SupabaseDataService {
       return false;
     }
   }
+
+  /// Promote a user's profile to Seller/Trader upon application approval
+  static Future<bool> promoteProfileToSeller({
+    required String userId,
+    required String businessName,
+    required String marketHub,
+    required String sellerChannel,
+    String? stallLocation,
+    double? latitude,
+    double? longitude,
+    String? phone,
+  }) async {
+    final client = _client;
+    if (client == null || userId.isEmpty) return false;
+
+    try {
+      final updateData = <String, dynamic>{
+        'role': 'Trader',
+        'seller_application_status': 'approved',
+        'business_name': businessName,
+        'market_hub': marketHub,
+        'seller_channel': sellerChannel,
+        'stall_location': ?stallLocation,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'phone': ?phone,
+      };
+
+      await client
+          .from('profiles')
+          .update(updateData)
+          .eq('id', userId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

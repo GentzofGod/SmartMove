@@ -360,7 +360,52 @@ class AuthService {
   static Future<void> persistSession(UserSession session) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_sessionStorageKey, jsonEncode(session.toJson()));
+      final jsonStr = jsonEncode(session.toJson());
+      await prefs.setString(_sessionStorageKey, jsonStr);
+      if (!session.isGuest && session.email.isNotEmpty) {
+        await prefs.setString(
+            'smartmove_profile_${session.email.trim().toLowerCase()}', jsonStr);
+        await prefs.setString('smartmove_profile_${session.id}', jsonStr);
+      }
+    } catch (_) {}
+  }
+
+  /// Save approved trader profile locally to persistent storage for account switches
+  static Future<void> saveApprovedTraderProfile({
+    required String email,
+    required String userId,
+    required String displayName,
+    required String businessName,
+    required String marketHub,
+    required String sellerChannel,
+    String? stallLocation,
+    double? latitude,
+    double? longitude,
+    String? phone,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final approvedSession = UserSession(
+        id: userId.isNotEmpty ? userId : 'usr-${email.hashCode.abs()}',
+        email: email.trim(),
+        displayName: displayName.isNotEmpty ? displayName : email.split('@').first,
+        role: 'Trader',
+        businessName: businessName,
+        marketHub: marketHub,
+        sellerChannel: sellerChannel,
+        stallLocation: stallLocation,
+        latitude: latitude,
+        longitude: longitude,
+        phone: phone,
+        sellerApplicationStatus: SellerApplicationStatus.approved,
+        isGuest: false,
+      );
+      final jsonStr = jsonEncode(approvedSession.toJson());
+      await prefs.setString(
+          'smartmove_profile_${email.trim().toLowerCase()}', jsonStr);
+      if (userId.isNotEmpty) {
+        await prefs.setString('smartmove_profile_$userId', jsonStr);
+      }
     } catch (_) {}
   }
 
@@ -429,30 +474,74 @@ class AuthService {
       }
     }
 
+    // Check if an existing profile or approved application exists for this email
+    final prefs = await SharedPreferences.getInstance();
+    final profileKey = 'smartmove_profile_${email.trim().toLowerCase()}';
+    final savedProfile = prefs.getString(profileKey);
+    if (savedProfile != null && savedProfile.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(savedProfile) as Map<String, dynamic>;
+        final cached = UserSession.fromJson(decoded);
+        await persistSession(cached);
+        return cached;
+      } catch (_) {}
+    }
+
+    // Check cached seller applications to ensure approved/pending status is preserved
+    final appsRaw = prefs.getString('smartmove_cached_seller_applications');
+    SellerApplication? matchedApp;
+    if (appsRaw != null && appsRaw.isNotEmpty) {
+      try {
+        final List<dynamic> list = jsonDecode(appsRaw) as List<dynamic>;
+        for (final item in list) {
+          final app = SellerApplication.fromJson(item as Map<String, dynamic>);
+          if (app.applicantEmail.trim().toLowerCase() ==
+              email.trim().toLowerCase()) {
+            matchedApp = app;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
     // Offline / Demo fallback authentication
     final lower = email.toLowerCase();
     final role = lower.contains('superadmin')
         ? 'SuperAdmin'
         : lower.contains('admin')
             ? 'Admin'
-            : (lower.contains('trader') || lower.contains('seller'))
+            : (lower.contains('trader') ||
+                    lower.contains('seller') ||
+                    matchedApp?.status == SellerApplicationStatus.approved)
                 ? 'Trader'
                 : 'Customer';
     final isTrader = role == 'Trader';
     final session = UserSession(
-      id: 'usr-${email.hashCode.abs()}',
+      id: matchedApp?.userId.isNotEmpty == true
+          ? matchedApp!.userId
+          : 'usr-${email.hashCode.abs()}',
       email: email.trim(),
-      displayName: email.split('@').first,
+      displayName: matchedApp?.applicantName.isNotEmpty == true
+          ? matchedApp!.applicantName
+          : email.split('@').first,
       role: role,
-      businessName: isTrader ? '${email.split('@').first} Enterprise' : null,
-      marketHub: isTrader ? 'Bodija Market' : null,
-      sellerChannel: isTrader ? 'Local Market' : null,
-      stallLocation: isTrader ? 'Stall 14, Grain Section, Bodija Market, Ibadan' : null,
-      latitude: isTrader ? 7.4343 : null,
-      longitude: isTrader ? 3.9056 : null,
-      sellerApplicationStatus: isTrader
-          ? SellerApplicationStatus.approved
-          : SellerApplicationStatus.none,
+      businessName: matchedApp?.businessName ??
+          (isTrader ? '${email.split('@').first} Enterprise' : null),
+      marketHub: matchedApp?.marketHub ?? (isTrader ? 'Bodija Market' : null),
+      sellerChannel:
+          matchedApp?.sellerChannel ?? (isTrader ? 'Local Market' : null),
+      stallLocation: matchedApp?.stallLocation ??
+          (isTrader
+              ? 'Stall 14, Grain Section, Bodija Market, Ibadan'
+              : null),
+      latitude: matchedApp?.latitude ?? (isTrader ? 7.4343 : null),
+      longitude: matchedApp?.longitude ?? (isTrader ? 3.9056 : null),
+      phone: matchedApp?.phone,
+      sellerApplicationStatus: matchedApp != null
+          ? matchedApp.status
+          : (isTrader
+              ? SellerApplicationStatus.approved
+              : SellerApplicationStatus.none),
       isGuest: false,
     );
     await persistSession(session);

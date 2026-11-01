@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/models/seller_application.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
 import '../../../core/localization/app_language.dart';
 import '../../../core/presentation/widgets/language_selection_sheet.dart';
@@ -55,8 +56,50 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userSession = ref.watch(authProvider);
+    final rawUserSession = ref.watch(authProvider);
+    final applications = ref.watch(sellerApplicationsProvider);
     final currentLocation = ref.watch(locationProvider);
+
+    final matchingApp = applications.cast<SellerApplication?>().firstWhere(
+          (a) =>
+              a != null &&
+              (a.userId == rawUserSession.id ||
+                  (!rawUserSession.isGuest &&
+                      rawUserSession.email.isNotEmpty &&
+                      a.applicantEmail.trim().toLowerCase() ==
+                          rawUserSession.email.trim().toLowerCase())),
+          orElse: () => null,
+        );
+
+    final userSession = (matchingApp != null &&
+            matchingApp.status == SellerApplicationStatus.approved &&
+            !rawUserSession.isApprovedSeller)
+        ? rawUserSession.copyWith(
+            role: 'Trader',
+            sellerApplicationStatus: SellerApplicationStatus.approved,
+            businessName:
+                rawUserSession.businessName ?? matchingApp.businessName,
+            marketHub: rawUserSession.marketHub ?? matchingApp.marketHub,
+            sellerChannel:
+                rawUserSession.sellerChannel ?? matchingApp.sellerChannel,
+            phone: rawUserSession.phone ?? matchingApp.phone,
+            stallLocation:
+                rawUserSession.stallLocation ?? matchingApp.stallLocation,
+            latitude: rawUserSession.latitude ?? matchingApp.latitude,
+            longitude: rawUserSession.longitude ?? matchingApp.longitude,
+          )
+        : (matchingApp != null &&
+                matchingApp.status == SellerApplicationStatus.pending &&
+                !rawUserSession.isApprovedSeller &&
+                !rawUserSession.isPendingSeller)
+            ? rawUserSession.copyWith(
+                sellerApplicationStatus: SellerApplicationStatus.pending,
+                businessName:
+                    rawUserSession.businessName ?? matchingApp.businessName,
+                marketHub: rawUserSession.marketHub ?? matchingApp.marketHub,
+                phone: rawUserSession.phone ?? matchingApp.phone,
+              )
+            : rawUserSession;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -764,7 +807,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   key: const ValueKey('menu_legal_terms'),
                   icon: Icons.gavel_outlined,
                   title: AppStrings.tr(ref, 'legalAndTerms'),
-                  trailingText: 'NDPA / FCCPC',
                   onTap: () => context.push('/legal'),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
@@ -772,16 +814,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   key: const ValueKey('menu_help_support'),
                   icon: Icons.help_outline_rounded,
                   title: AppStrings.tr(ref, 'helpAndSupport'),
-                  trailingText: 'FAQs & Desk',
                   onTap: () => _showHelpAndSupportSheet(context),
-                ),
-                const Divider(height: 1, indent: 56, color: AppColors.divider),
-                _buildMenuItem(
-                  key: const ValueKey('menu_app_guide'),
-                  icon: Icons.school_outlined,
-                  title: AppStrings.tr(ref, 'appGuide'),
-                  trailingText: 'Replay',
-                  onTap: () => context.push('/onboarding'),
                 ),
                 const Divider(height: 1, indent: 56, color: AppColors.divider),
                 _buildMenuItem(

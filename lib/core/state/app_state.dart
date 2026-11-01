@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
@@ -874,9 +875,67 @@ class AuthNotifier extends Notifier<UserSession> {
     return UserSession.guest;
   }
 
+  void syncWithSellerApplications(List<SellerApplication> applications) {
+    if (state.isGuest) return;
+    for (final app in applications) {
+      final matches = app.userId == state.id ||
+          (state.email.isNotEmpty &&
+              app.applicantEmail.trim().toLowerCase() ==
+                  state.email.trim().toLowerCase());
+      if (matches) {
+        if (app.status == SellerApplicationStatus.approved) {
+          if (!state.isApprovedSeller || state.role != 'Trader') {
+            state = state.copyWith(
+              role: 'Trader',
+              sellerApplicationStatus: SellerApplicationStatus.approved,
+              businessName: app.businessName,
+              marketHub: app.marketHub,
+              sellerChannel: app.sellerChannel,
+              phone: app.phone,
+              stallLocation: app.stallLocation,
+              latitude: app.latitude,
+              longitude: app.longitude,
+            );
+            AuthService.persistSession(state);
+          }
+        } else if (app.status == SellerApplicationStatus.pending) {
+          if (state.sellerApplicationStatus !=
+                  SellerApplicationStatus.pending &&
+              state.sellerApplicationStatus !=
+                  SellerApplicationStatus.approved) {
+            state = state.copyWith(
+              sellerApplicationStatus: SellerApplicationStatus.pending,
+              businessName: app.businessName,
+              marketHub: app.marketHub,
+              sellerChannel: app.sellerChannel,
+              phone: app.phone,
+              stallLocation: app.stallLocation,
+              latitude: app.latitude,
+              longitude: app.longitude,
+            );
+            AuthService.persistSession(state);
+          }
+        } else if (app.status == SellerApplicationStatus.rejected) {
+          if (state.sellerApplicationStatus !=
+                  SellerApplicationStatus.rejected &&
+              state.sellerApplicationStatus !=
+                  SellerApplicationStatus.approved) {
+            state = state.copyWith(
+              sellerApplicationStatus: SellerApplicationStatus.rejected,
+            );
+            AuthService.persistSession(state);
+          }
+        }
+        break;
+      }
+    }
+  }
+
   Future<void> _restoreSession() async {
     final session = await AuthService.restorePersistedSession();
-    state = session;
+    if (ref.mounted) {
+      state = session;
+    }
   }
 
   /// Live refresh of user role and attributes from Supabase profiles table
@@ -1006,16 +1065,49 @@ final authProvider = NotifierProvider<AuthNotifier, UserSession>(
 
 // --- Seller Applications State ---
 class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
+  static const _storageKey = 'smartmove_cached_seller_applications';
+
   @override
   List<SellerApplication> build() {
+    _loadPersisted();
     _fetchLive();
     return _getInitialApplications();
   }
 
+  Future<void> _loadPersisted() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
+        final apps = list
+            .map((item) =>
+                SellerApplication.fromJson(item as Map<String, dynamic>))
+            .toList();
+        if (apps.isNotEmpty && ref.mounted) {
+          state = apps;
+          ref.read(authProvider.notifier).syncWithSellerApplications(state);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(List<SellerApplication> apps) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = apps.map((a) => a.toJson()).toList();
+      await prefs.setString(_storageKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
   Future<void> _fetchLive() async {
     final live = await SupabaseDataService.fetchSellerApplications();
-    if (live != null && live.isNotEmpty) {
-      state = live;
+    if (live != null && live.isNotEmpty && ref.mounted) {
+      final existingIds = live.map((a) => a.id).toSet();
+      final localOnly = state.where((a) => !existingIds.contains(a.id));
+      state = [...live, ...localOnly];
+      _persist(state);
+      ref.read(authProvider.notifier).syncWithSellerApplications(state);
     }
   }
 
@@ -1065,6 +1157,7 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
     );
 
     state = [newApp, ...state];
+    _persist(state);
 
     // Asynchronously sync to Cloud Supabase
     SupabaseDataService.insertSellerApplication(newApp);
@@ -1082,16 +1175,22 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
   }
 
   void approveApplication(String applicationId) {
+    SellerApplication? approvedApp;
     state = [
       for (final app in state)
-        if (app.id == applicationId)
-          app.copyWith(
-            status: SellerApplicationStatus.approved,
-            reviewedAt: DateTime.now(),
-          )
-        else
+        if (app.id == applicationId) ...[
+          (() {
+            final updated = app.copyWith(
+              status: SellerApplicationStatus.approved,
+              reviewedAt: DateTime.now(),
+            );
+            approvedApp = updated;
+            return updated;
+          })(),
+        ] else
           app,
     ];
+    _persist(state);
 
     // Asynchronously sync approval to Cloud Supabase
     SupabaseDataService.updateSellerApplicationStatus(
@@ -1099,35 +1198,70 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       status: SellerApplicationStatus.approved,
     );
 
-    // If the approved application belongs to current user, upgrade them to Trader
-    final currentUser = ref.read(authProvider);
-    final appMatches = state.where((a) => a.id == applicationId);
-    if (appMatches.isNotEmpty && appMatches.first.userId == currentUser.id) {
-      final app = appMatches.first;
-      ref.read(authProvider.notifier).approveSellerStatus(
-        businessName: app.businessName,
-        marketHub: app.marketHub,
-        sellerChannel: app.sellerChannel,
-        phone: app.phone,
-        stallLocation: app.stallLocation,
-        latitude: app.latitude,
-        longitude: app.longitude,
+    if (approvedApp != null) {
+      // Sync promotion to Supabase public.profiles table
+      SupabaseDataService.promoteProfileToSeller(
+        userId: approvedApp!.userId,
+        businessName: approvedApp!.businessName,
+        marketHub: approvedApp!.marketHub,
+        sellerChannel: approvedApp!.sellerChannel,
+        stallLocation: approvedApp!.stallLocation,
+        latitude: approvedApp!.latitude,
+        longitude: approvedApp!.longitude,
+        phone: approvedApp!.phone,
       );
+
+      // Save approved trader profile to local persistent storage for this applicant
+      AuthService.saveApprovedTraderProfile(
+        email: approvedApp!.applicantEmail,
+        userId: approvedApp!.userId,
+        displayName: approvedApp!.applicantName,
+        businessName: approvedApp!.businessName,
+        marketHub: approvedApp!.marketHub,
+        sellerChannel: approvedApp!.sellerChannel,
+        stallLocation: approvedApp!.stallLocation,
+        latitude: approvedApp!.latitude,
+        longitude: approvedApp!.longitude,
+        phone: approvedApp!.phone,
+      );
+
+      // If the approved application belongs to current user, upgrade them to Trader
+      final currentUser = ref.read(authProvider);
+      if (currentUser.id == approvedApp!.userId ||
+          (currentUser.email.isNotEmpty &&
+              currentUser.email.trim().toLowerCase() ==
+                  approvedApp!.applicantEmail.trim().toLowerCase())) {
+        ref.read(authProvider.notifier).approveSellerStatus(
+              businessName: approvedApp!.businessName,
+              marketHub: approvedApp!.marketHub,
+              sellerChannel: approvedApp!.sellerChannel,
+              phone: approvedApp!.phone,
+              stallLocation: approvedApp!.stallLocation,
+              latitude: approvedApp!.latitude,
+              longitude: approvedApp!.longitude,
+            );
+      }
     }
   }
 
   void rejectApplication(String applicationId, {required String reason}) {
+    SellerApplication? rejectedApp;
     state = [
       for (final app in state)
-        if (app.id == applicationId)
-          app.copyWith(
-            status: SellerApplicationStatus.rejected,
-            reviewedAt: DateTime.now(),
-            rejectionReason: reason,
-          )
-        else
+        if (app.id == applicationId) ...[
+          (() {
+            final updated = app.copyWith(
+              status: SellerApplicationStatus.rejected,
+              reviewedAt: DateTime.now(),
+              rejectionReason: reason,
+            );
+            rejectedApp = updated;
+            return updated;
+          })(),
+        ] else
           app,
     ];
+    _persist(state);
 
     // Asynchronously sync rejection to Cloud Supabase
     SupabaseDataService.updateSellerApplicationStatus(
@@ -1137,10 +1271,14 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
     );
 
     // If the rejected application belongs to current user, mark rejected
-    final currentUser = ref.read(authProvider);
-    final appMatches = state.where((a) => a.id == applicationId);
-    if (appMatches.isNotEmpty && appMatches.first.userId == currentUser.id) {
-      ref.read(authProvider.notifier).rejectSellerStatus(reason: reason);
+    if (rejectedApp != null) {
+      final currentUser = ref.read(authProvider);
+      if (currentUser.id == rejectedApp!.userId ||
+          (currentUser.email.isNotEmpty &&
+              currentUser.email.trim().toLowerCase() ==
+                  rejectedApp!.applicantEmail.trim().toLowerCase())) {
+        ref.read(authProvider.notifier).rejectSellerStatus(reason: reason);
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
 
@@ -38,6 +39,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   Timer? _recordingTimer;
   int _secondsRecorded = 0;
 
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  bool _speechInitialized = false;
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +50,36 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
+    _initSpeechRecognizer();
+  }
+
+  Future<void> _initSpeechRecognizer() async {
+    try {
+      final available = await _speechToText.initialize(
+        onError: (err) {
+          if (mounted) {
+            setState(() {
+              _isRecording = false;
+              _isTranscribing = false;
+            });
+          }
+        },
+        onStatus: (status) {
+          if ((status == 'done' || status == 'notListening') &&
+              mounted &&
+              _isRecording) {
+            _stopRecording();
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _speechInitialized = available;
+        });
+      }
+    } catch (_) {
+      _speechInitialized = false;
+    }
   }
 
   @override
@@ -53,10 +87,15 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     _recordingTimer?.cancel();
     _pulseController.dispose();
     _transcriptController.dispose();
+    if (_speechToText.isListening) {
+      try {
+        _speechToText.stop();
+      } catch (_) {}
+    }
     super.dispose();
   }
 
-  void _startRecording() {
+  Future<void> _startRecording() async {
     _pulseController.repeat(reverse: true);
     setState(() {
       _isRecording = true;
@@ -72,18 +111,87 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         });
       }
     });
+
+    if (!_speechInitialized) {
+      try {
+        _speechInitialized = await _speechToText.initialize();
+      } catch (_) {
+        _speechInitialized = false;
+      }
+    }
+
+    if (_speechInitialized) {
+      try {
+        String? localeId;
+        if (_selectedDialect == VoiceDialect.nigerianEnglish ||
+            _selectedDialect == VoiceDialect.nigerianPidgin) {
+          localeId = 'en_NG';
+        }
+        await _speechToText.listen(
+          onResult: (result) {
+            if (mounted) {
+              setState(() {
+                _transcriptController.text = result.recognizedWords;
+                if (result.recognizedWords.isNotEmpty) {
+                  _isFallback = false;
+                  _transcriptionResult = VoiceTranscriptionResult(
+                    text: result.recognizedWords,
+                    confidence:
+                        result.confidence > 0 ? result.confidence : 0.95,
+                    modelName: 'Phone Microphone Voice Transcribe',
+                    isFallback: false,
+                    detectedDialect: _selectedDialect,
+                    note: 'Spoken request captured live from microphone',
+                  );
+                  _transcriptionStatus =
+                      'SmartMove AI: Voice Input (${result.recognizedWords.split(' ').length} words)';
+                }
+              });
+            }
+          },
+          listenOptions: stt.SpeechListenOptions(
+            listenFor: const Duration(seconds: 30),
+            pauseFor: const Duration(seconds: 3),
+            partialResults: true,
+            localeId: localeId,
+            cancelOnError: true,
+          ),
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _stopRecording() async {
     _recordingTimer?.cancel();
     _pulseController.stop();
     _pulseController.reset();
+
+    if (_speechToText.isListening) {
+      try {
+        await _speechToText.stop();
+      } catch (_) {}
+    }
+
     setState(() {
       _isRecording = false;
       _isTranscribing = true;
       _transcriptController.text =
           'Transcribing with AI Voice Assistant (${_selectedDialect.languageCode})...';
     });
+
+    final capturedText = _transcriptionResult?.text.trim() ?? '';
+    if (capturedText.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _isTranscribing = false;
+          _transcriptController.text = capturedText;
+          _isFallback = false;
+          _transcriptionStatus =
+              'SmartMove AI: Voice Input (${_selectedDialect.label})';
+        });
+      }
+      return;
+    }
 
     const aiService = MetaAiService();
     // Simulate low-latency chunked recognition from AI Voice Assistant
@@ -94,7 +202,8 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     );
 
     if (mounted) {
-      final isUnavailable = result.isFallback || result.hasError || result.text.isEmpty;
+      final isUnavailable =
+          result.isFallback || result.hasError || result.text.isEmpty;
       setState(() {
         _isTranscribing = false;
         _transcriptionResult = result;
@@ -630,6 +739,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
             // Input field
             TextField(
+              key: const ValueKey('txt_voice_transcript'),
               controller: _transcriptController,
               maxLines: 3,
               decoration: InputDecoration(
