@@ -6,6 +6,10 @@
 	<string>SmartMove needs your location to calculate transit fares and show nearby markets.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>SmartMove needs your location to guide you through your market errands.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SmartMove needs access to your microphone to transcribe voice commodity requests and bargaining notes.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SmartMove uses speech recognition to accurately convert your spoken market errands and Nigerian dialects into shopping proposals.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

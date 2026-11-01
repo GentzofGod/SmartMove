@@ -39,6 +39,14 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(traderChatProvider.notifier).loadMessages(widget.source.outletName);
+    });
+  }
+
+  @override
   void dispose() {
     _msgController.dispose();
     _scrollController.dispose();

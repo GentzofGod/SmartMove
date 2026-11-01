@@ -19,6 +19,18 @@ class SellerPortalScreen extends ConsumerStatefulWidget {
 }
 
 class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final session = ref.read(authProvider);
+      final sellerName = session.businessName ?? session.displayName;
+      if (sellerName.isNotEmpty) {
+        ref.read(traderChatProvider.notifier).syncSellerInquiries(sellerName);
+      }
+    });
+  }
+
   void _showAddObservationDialog(BuildContext context, UserSession userSession) {
     final productController = TextEditingController();
     final sellerController = TextEditingController(
@@ -2633,6 +2645,46 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (userSession.isRejectedSeller) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFEF9A9A)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    color: Color(0xFFC62828), size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Seller Application Not Approved',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFC62828),
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Your previous verification request was not approved. You can review your stall location, market hub, and contact details, and reapply below.',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF424242), height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -2683,9 +2735,11 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                   ),
                   icon: const Icon(Icons.assignment_turned_in_rounded,
                       size: 18),
-                  label: const Text(
-                    'Apply to Become a Verified Seller',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                  label: Text(
+                    userSession.isRejectedSeller
+                        ? 'Update Details & Reapply'
+                        : 'Apply to Become a Verified Seller',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),

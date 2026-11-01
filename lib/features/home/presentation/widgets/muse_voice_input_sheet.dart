@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
 import '../../../../core/services/audio_feedback_service.dart';
@@ -49,8 +50,11 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   double _soundLevel = 0.0;
   int _consecutiveQuietTicks = 0;
   String? _recordedFilePath;
+  String _capturedSpeechFromMic = '';
 
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  bool _speechInitialized = false;
 
   @override
   void initState() {
@@ -60,6 +64,29 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
+    _initSpeechRecognizer();
+  }
+
+  Future<void> _initSpeechRecognizer() async {
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    if (isTest) return;
+    try {
+      final available = await _speechToText.initialize(
+        onError: (err) {
+          // Keep silent, recording will continue via audioRecorder
+        },
+        onStatus: (status) {
+          // Status updates
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _speechInitialized = available;
+        });
+      }
+    } catch (_) {
+      _speechInitialized = false;
+    }
   }
 
   @override
@@ -69,6 +96,11 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     _pulseController.dispose();
     _transcriptController.dispose();
     AudioFeedbackService.stop();
+    if (_speechToText.isListening) {
+      try {
+        _speechToText.stop();
+      } catch (_) {}
+    }
     try {
       _audioRecorder.dispose();
     } catch (_) {}
@@ -78,6 +110,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   Future<void> _startRecording() async {
     AudioFeedbackService.playFeedbackSound();
     _pulseController.repeat(reverse: true);
+    _capturedSpeechFromMic = '';
 
     setState(() {
       _isRecording = true;
@@ -156,6 +189,63 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
             }
           }
         });
+
+        // 5. Start on-device speech recognizer in parallel to capture user's spoken words
+        if (_speechInitialized) {
+          String? resolvedLocaleId;
+          try {
+            final systemLocales = await _speechToText.locales();
+            var targetPrefix = 'en';
+            if (_selectedDialect == VoiceDialect.yoruba) {
+              targetPrefix = 'yo';
+            } else if (_selectedDialect == VoiceDialect.hausa) {
+              targetPrefix = 'ha';
+            } else if (_selectedDialect == VoiceDialect.igbo) {
+              targetPrefix = 'ig';
+            } else if (_selectedDialect == VoiceDialect.nigerianPidgin) {
+              targetPrefix = 'pcm';
+            }
+
+            for (final loc in systemLocales) {
+              final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
+              if (locClean.startsWith(targetPrefix)) {
+                resolvedLocaleId = loc.localeId;
+                break;
+              }
+            }
+            if (resolvedLocaleId == null) {
+              for (final loc in systemLocales) {
+                final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
+                if (locClean.startsWith('en_ng')) {
+                  resolvedLocaleId = loc.localeId;
+                  break;
+                }
+              }
+            }
+          } catch (_) {}
+
+          await _speechToText.listen(
+            onResult: (result) {
+              if (mounted && _isRecording) {
+                final words = result.recognizedWords.trim();
+                if (words.isNotEmpty) {
+                  _capturedSpeechFromMic = words;
+                  setState(() {
+                    _transcriptController.text = words;
+                  });
+                }
+              }
+            },
+            listenOptions: stt.SpeechListenOptions(
+              localeId: resolvedLocaleId,
+              listenFor: const Duration(seconds: 45),
+              pauseFor: const Duration(seconds: 4),
+              partialResults: true,
+              cancelOnError: false,
+              listenMode: stt.ListenMode.dictation,
+            ),
+          );
+        }
       } catch (_) {}
     }
   }
@@ -170,6 +260,11 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     final isTest = Platform.environment.containsKey('FLUTTER_TEST');
     String? audioPath;
     if (!isTest) {
+      if (_speechToText.isListening) {
+        try {
+          await _speechToText.stop();
+        } catch (_) {}
+      }
       try {
         audioPath = await _audioRecorder.stop();
       } catch (_) {}
@@ -181,7 +276,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       _transcriptController.text =
           'Transcribing with AI Voice Assistant (${_selectedDialect.languageCode})...';
       _transcriptionStatus =
-          'Uploading 24 kHz WAV recording to Meta transcription endpoint...';
+          'Processing recording and transcribing speech...';
     });
 
     List<int>? audioBytes;
@@ -203,6 +298,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     final result = await aiService.transcribeAudio(
       audioBytes: audioBytes,
       audioFilePath: filePath,
+      spokenTextFromMic: _capturedSpeechFromMic.trim().isNotEmpty
+          ? _capturedSpeechFromMic.trim()
+          : null,
       dialect: _selectedDialect,
       audioFormat: 'audio/wav',
       sampleRate: 24000,
@@ -220,7 +318,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         _isFallback = isUnavailable;
         _transcriptionStatus = isUnavailable
             ? 'Voice input unavailable. Please type your request directly below.'
-            : 'Meta Voice Transcribe: Success (${result.detectedDialect.label})';
+            : 'AI Voice Assistant: Success (${result.detectedDialect.label})';
       });
     }
   }

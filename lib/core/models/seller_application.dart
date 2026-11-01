@@ -145,6 +145,8 @@ class SellerApplication {
     DateTime? submittedAt,
     DateTime? reviewedAt,
     String? rejectionReason,
+    bool clearRejectionReason = false,
+    bool clearReviewedAt = false,
   }) {
     return SellerApplication(
       id: id ?? this.id,
@@ -160,8 +162,8 @@ class SellerApplication {
       phone: phone ?? this.phone,
       status: status ?? this.status,
       submittedAt: submittedAt ?? this.submittedAt,
-      reviewedAt: reviewedAt ?? this.reviewedAt,
-      rejectionReason: rejectionReason ?? this.rejectionReason,
+      reviewedAt: clearReviewedAt ? null : (reviewedAt ?? this.reviewedAt),
+      rejectionReason: clearRejectionReason ? null : (rejectionReason ?? this.rejectionReason),
     );
   }
 }

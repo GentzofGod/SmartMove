@@ -8,7 +8,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?logo=dart)](https://dart.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Database-3ECF8E?logo=supabase)](https://supabase.com)
 [![Meta AI](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%20%26%20Voice%20%26%20Vision-0668E1?logo=meta)](https://about.meta.com)
-[![Tests](https://img.shields.io/badge/Tests-222%20Passing-success?logo=checkmarx)](test/)
+[![Tests](https://img.shields.io/badge/Tests-230%20Passing-success?logo=checkmarx)](test/)
 [![Analyzer](https://img.shields.io/badge/Analyzer-0%20Issues-success)](lib/)
 
 ---
@@ -122,14 +122,17 @@ SmartMove has undergone continuous iterative development and real-world hardenin
 - **Enforced Merchant Integrity**: Verified and approved traders are restricted from publishing inventory through general community channels to ensure all merchant listings maintain verified stall geolocations, official business metadata, and live stock tracking.
 - **Automatic Portal Redirect**: When an approved seller taps the add button in the Community tab, a dedicated "Verified Seller Portal Notice" dialog guides them to manage and publish their inventory directly within their official **Seller Portal** (`/seller-portal`).
 
-### 18. 🎙️ End-to-End High-Fidelity Audio Recording & Meta Voice Transcription Pipeline
-- **Modern Audio Capture (`record: ^7.1.2`)**: Replaced fragile on-device STT with cross-platform native audio recording using `AudioRecorder`.
-- **Automated Microphone Permissions**: Verifies and requests Android runtime microphone permission (`android.permission.RECORD_AUDIO`) on-demand when the mic button is tapped.
-- **Strict Audio Specification**: Formats recorded audio to **WAV, mono, 24 kHz, 16-bit PCM** (`RecordConfig(encoder: AudioEncoder.wav, sampleRate: 24000, numChannels: 1)`) matching Meta's ASR transcription models.
+### 18. 🎙️ Hybrid Native On-Device & Meta Voice Transcription Pipeline
+- **Hybrid Speech-to-Text Architecture**: Combines cross-platform native audio recording (`record: ^7.1.2`) with on-device speech recognition (`speech_to_text: ^7.5.0`), ensuring spoken speech is reliably transcribed even when cloud Meta API keys or edge proxies are unconfigured.
+- **Automated Microphone Permissions**: Verifies and requests runtime microphone permission (`android.permission.RECORD_AUDIO`, `NSMicrophoneUsageDescription`) on-demand when the mic button is tapped.
+- **Strict Audio Specification**: Simultaneously captures high-fidelity audio formatted to **WAV, mono, 24 kHz, 16-bit PCM** (`RecordConfig(encoder: AudioEncoder.wav, sampleRate: 24000, numChannels: 1)`) matching Meta's ASR transcription models.
 - **Live Recording Indicator & Elapsed Time**: Displays real-time dynamic amplitude waveforms and ticking elapsed timer (`00:01`, `00:02`...) tracking active session duration.
 - **Adaptive Silence & Pause Detection**: Monitors audio amplitude stream (`onAmplitudeChanged`) and auto-stops recording after 2.5s of quiet once speech starts, or immediately when the user taps "Finish".
-- **Meta Transcription Endpoint Integration**: Uploads the WAV payload with audio metadata headers to the backend proxy directing to Meta's `muse-voice-transcribe-1.0` ASR endpoint.
+- **Real-Time On-Device Speech Streaming**: Captures real spoken words via native Google Speech / Apple Speech services directly into the input buffer.
+- **Phonetic Normalization for Nigerian Commodities**: Utilizes `MetaAiService.cleanAndNormalizeMicrophoneSpeech` to correct speech-to-text mistranscriptions of Nigerian commodities and vernacular (e.g. *carry* -> *garri*, *bins* -> *beans*, *apple proper* -> *epo pupa*, *a bag* -> *abeg*).
+- **Multi-Dialect Translation**: Automatically identifies spoken dialect (Nigerian Pidgin, Yoruba, Hausa, Igbo) and generates English translations with 1-tap "Use Translation".
 - **Editable Chat Input Field Insertion**: Injects the returned transcript directly into the chat input field on the home screen, keeping the input focused and allowing the user to review, edit, or adjust the prompt before sending.
+- **Transparent Zero-Fallback Error Reporting**: Eliminates wiping of user-spoken words. Real microphone speech is preserved and never replaced with canned demo text. If the user was silent or no speech was detected, a clear prompt guides the user without breaking input state.
 
 ### 19. 🎯 Zero Fake Data & True-to-Life Geolocation Scanning
 - **Eliminated False Bodija Coordinates**: Purged hardcoded defaults across the codebase that mistakenly assumed all Nigerian users or sellers were in Ibadan at Bodija Market (`7.4243, 3.9168`), which previously led to jarring synthetic ~66km distance estimates for Abeokuta residents.
@@ -150,6 +153,15 @@ SmartMove has undergone continuous iterative development and real-world hardenin
 ### 22. 🛡️ User-Friendly, Respectful Error Handling & Anomaly Reporting
 - **Polite Human-Centered Messaging**: Eliminated raw technical exceptions (`$e`), stack trace dumps, and cryptic toasts across the app.
 - **Clear Actionable Guidance**: Polished user feedback across GPS scanning, camera/gallery receipt OCR failures, external navigation launchers, and empty search results.
+
+### 23. 🔐 End-to-End Seller Account Approval, Revocation & Multi-State Moderation Lifecycle
+- **Dynamic PostgreSQL Trigger (`handle_seller_application_review`)**: Automatically upgrades or demotes applicant roles (`Trader` vs. `Customer`), syncing stall locations, contact phone, verified GPS coordinates (`latitude`, `longitude`), and approval status across `public.profiles` using resilient multi-key matching (`id = user_id OR email = applicant_email`).
+- **SuperAdmin Moderation Controls**:
+  - **Approve Seller**: 1-tap promotion granting price publication rights, verified badge, and live inventory tools.
+  - **Revoke Approval**: Demotes compromised or fraudulent accounts back to `Customer` with custom administrator feedback notes.
+  - **Re-open Review**: Resets rejected or reviewed applications back to `Pending` for re-evaluation.
+- **Application Queue Deduplication**: Reapplying with updated stall documentation replaces previous applications cleanly rather than cluttering administrative queues with duplicates.
+- **Transparent Rejection & Reapply Guidance**: Rejected sellers see a dedicated feedback card in `SellerPortalScreen` explaining the decision and enabling 1-tap re-application with corrected information.
 
 ---
 

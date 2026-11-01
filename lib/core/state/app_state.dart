@@ -740,6 +740,66 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
       commodityName: commodityName ?? 'Commodity',
     );
   }
+
+  /// Synchronize chat history from Cloud Supabase database for a given trader/outlet
+  Future<void> loadMessages(String traderName) async {
+    final remoteMessages = await SupabaseDataService.fetchChatMessages(traderName);
+    if (remoteMessages != null && remoteMessages.isNotEmpty) {
+      final current = List<TraderChatMessage>.from(state[traderName] ?? []);
+      final currentIds = current.map((m) => m.id).toSet();
+      bool changed = false;
+
+      for (final rMsg in remoteMessages) {
+        if (!currentIds.contains(rMsg.id)) {
+          current.add(rMsg);
+          currentIds.add(rMsg.id);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        current.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        final updatedState = {
+          ...state,
+          traderName: current,
+        };
+        state = updatedState;
+        _persist(updatedState);
+      }
+    }
+  }
+
+  /// Synchronize all incoming customer inquiries from Cloud Supabase database for a verified seller
+  Future<void> syncSellerInquiries(String sellerStoreName) async {
+    final remoteMap = await SupabaseDataService.fetchAllSellerInquiries(sellerStoreName);
+    if (remoteMap != null && remoteMap.isNotEmpty) {
+      final updatedState = Map<String, List<TraderChatMessage>>.from(state);
+      bool changed = false;
+
+      remoteMap.forEach((convKey, remoteList) {
+        final current = List<TraderChatMessage>.from(updatedState[convKey] ?? []);
+        final currentIds = current.map((m) => m.id).toSet();
+
+        for (final rMsg in remoteList) {
+          if (!currentIds.contains(rMsg.id)) {
+            current.add(rMsg);
+            currentIds.add(rMsg.id);
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          current.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          updatedState[convKey] = current;
+        }
+      });
+
+      if (changed) {
+        state = updatedState;
+        _persist(updatedState);
+      }
+    }
+  }
 }
 
 final traderChatProvider =
@@ -1066,15 +1126,11 @@ class AuthNotifier extends Notifier<UserSession> {
             AuthService.persistSession(state);
           }
         } else if (app.status == SellerApplicationStatus.rejected) {
-          if (state.sellerApplicationStatus !=
-                  SellerApplicationStatus.rejected &&
-              state.sellerApplicationStatus !=
-                  SellerApplicationStatus.approved) {
-            state = state.copyWith(
-              sellerApplicationStatus: SellerApplicationStatus.rejected,
-            );
-            AuthService.persistSession(state);
-          }
+          state = state.copyWith(
+            role: state.role == 'Trader' ? 'Customer' : state.role,
+            sellerApplicationStatus: SellerApplicationStatus.rejected,
+          );
+          AuthService.persistSession(state);
         }
         break;
       }
@@ -1298,8 +1354,23 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
   Future<void> _fetchLive() async {
     final live = await SupabaseDataService.fetchSellerApplications();
     if (live != null && live.isNotEmpty && ref.mounted) {
-      final existingIds = live.map((a) => a.id).toSet();
-      final localOnly = state.where((a) => !existingIds.contains(a.id));
+      final liveEmails = live
+          .map((a) => a.applicantEmail.trim().toLowerCase())
+          .where((e) => e.isNotEmpty)
+          .toSet();
+      final liveUserIds = live.map((a) => a.userId).where((u) => u.isNotEmpty).toSet();
+      final liveIds = live.map((a) => a.id).toSet();
+
+      final localOnly = state.where((a) {
+        if (liveIds.contains(a.id)) return false;
+        if (a.userId.isNotEmpty && liveUserIds.contains(a.userId)) return false;
+        if (a.applicantEmail.isNotEmpty &&
+            liveEmails.contains(a.applicantEmail.trim().toLowerCase())) {
+          return false;
+        }
+        return true;
+      });
+
       state = [...live, ...localOnly];
       _persist(state);
       ref.read(authProvider.notifier).syncWithSellerApplications(state);
@@ -1336,7 +1407,17 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       submittedAt: DateTime.now(),
     );
 
-    state = [newApp, ...state];
+    // Cleanly replace any previous application by the same user or email
+    final filtered = state.where((a) {
+      if (a.userId == user.id) return false;
+      if (user.email.isNotEmpty &&
+          a.applicantEmail.trim().toLowerCase() == user.email.trim().toLowerCase()) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    state = [newApp, ...filtered];
     _persist(state);
 
     // Asynchronously sync to Cloud Supabase
@@ -1372,16 +1453,18 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
     ];
     _persist(state);
 
-    // Asynchronously sync approval to Cloud Supabase
-    SupabaseDataService.updateSellerApplicationStatus(
-      applicationId: applicationId,
-      status: SellerApplicationStatus.approved,
-    );
-
     if (approvedApp != null) {
+      // Asynchronously sync approval to Cloud Supabase
+      SupabaseDataService.updateSellerApplicationStatus(
+        applicationId: applicationId,
+        status: SellerApplicationStatus.approved,
+        applicantEmail: approvedApp!.applicantEmail,
+      );
+
       // Sync promotion to Supabase public.profiles table
       SupabaseDataService.promoteProfileToSeller(
         userId: approvedApp!.userId,
+        email: approvedApp!.applicantEmail,
         businessName: approvedApp!.businessName,
         marketHub: approvedApp!.marketHub,
         sellerChannel: approvedApp!.sellerChannel,
@@ -1443,21 +1526,76 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
     ];
     _persist(state);
 
-    // Asynchronously sync rejection to Cloud Supabase
-    SupabaseDataService.updateSellerApplicationStatus(
-      applicationId: applicationId,
-      status: SellerApplicationStatus.rejected,
-      reason: reason,
-    );
-
-    // If the rejected application belongs to current user, mark rejected
     if (rejectedApp != null) {
+      // Asynchronously sync rejection to Cloud Supabase
+      SupabaseDataService.updateSellerApplicationStatus(
+        applicationId: applicationId,
+        status: SellerApplicationStatus.rejected,
+        reason: reason,
+        applicantEmail: rejectedApp!.applicantEmail,
+      );
+
+      // Demote profile in Supabase
+      SupabaseDataService.demoteProfileToCustomer(
+        userId: rejectedApp!.userId,
+        email: rejectedApp!.applicantEmail,
+      );
+
+      // If the rejected application belongs to current user, mark rejected
       final currentUser = ref.read(authProvider);
       if (currentUser.id == rejectedApp!.userId ||
           (currentUser.email.isNotEmpty &&
               currentUser.email.trim().toLowerCase() ==
                   rejectedApp!.applicantEmail.trim().toLowerCase())) {
         ref.read(authProvider.notifier).rejectSellerStatus(reason: reason);
+      }
+    }
+  }
+
+  void revokeApproval(String applicationId, {required String reason}) {
+    rejectApplication(applicationId, reason: reason);
+  }
+
+  void reopenApplication(String applicationId) {
+    SellerApplication? reopenedApp;
+    state = [
+      for (final app in state)
+        if (app.id == applicationId) ...[
+          (() {
+            final updated = app.copyWith(
+              status: SellerApplicationStatus.pending,
+              clearReviewedAt: true,
+              clearRejectionReason: true,
+            );
+            reopenedApp = updated;
+            return updated;
+          })(),
+        ] else
+          app,
+    ];
+    _persist(state);
+
+    if (reopenedApp != null) {
+      SupabaseDataService.updateSellerApplicationStatus(
+        applicationId: applicationId,
+        status: SellerApplicationStatus.pending,
+        applicantEmail: reopenedApp!.applicantEmail,
+      );
+
+      final currentUser = ref.read(authProvider);
+      if (currentUser.id == reopenedApp!.userId ||
+          (currentUser.email.isNotEmpty &&
+              currentUser.email.trim().toLowerCase() ==
+                  reopenedApp!.applicantEmail.trim().toLowerCase())) {
+        ref.read(authProvider.notifier).submitSellerApplication(
+              businessName: reopenedApp!.businessName,
+              marketHub: reopenedApp!.marketHub,
+              sellerChannel: reopenedApp!.sellerChannel,
+              phone: reopenedApp!.phone,
+              stallLocation: reopenedApp!.stallLocation,
+              latitude: reopenedApp!.latitude,
+              longitude: reopenedApp!.longitude,
+            );
       }
     }
   }

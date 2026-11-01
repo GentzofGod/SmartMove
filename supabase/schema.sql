@@ -366,15 +366,26 @@ BEGIN
         market_hub = NEW.market_hub,
         seller_channel = NEW.seller_channel,
         stall_location = NEW.stall_location,
+        latitude = COALESCE(NEW.latitude, public.profiles.latitude),
+        longitude = COALESCE(NEW.longitude, public.profiles.longitude),
         phone = COALESCE(NEW.phone, public.profiles.phone),
         seller_application_status = 'approved',
         updated_at = timezone('utc'::text, now())
-    WHERE id = NEW.user_id;
+    WHERE (NEW.user_id IS NOT NULL AND id = NEW.user_id)
+       OR (NEW.applicant_email IS NOT NULL AND LOWER(email) = LOWER(NEW.applicant_email));
   ELSIF NEW.status = 'rejected' AND (OLD IS NULL OR OLD.status != 'rejected') THEN
     UPDATE public.profiles
-    SET seller_application_status = 'rejected',
+    SET role = 'Customer',
+        seller_application_status = 'rejected',
         updated_at = timezone('utc'::text, now())
-    WHERE id = NEW.user_id;
+    WHERE (NEW.user_id IS NOT NULL AND id = NEW.user_id)
+       OR (NEW.applicant_email IS NOT NULL AND LOWER(email) = LOWER(NEW.applicant_email));
+  ELSIF NEW.status = 'pending' THEN
+    UPDATE public.profiles
+    SET seller_application_status = 'pending',
+        updated_at = timezone('utc'::text, now())
+    WHERE (NEW.user_id IS NOT NULL AND id = NEW.user_id)
+       OR (NEW.applicant_email IS NOT NULL AND LOWER(email) = LOWER(NEW.applicant_email));
   END IF;
   RETURN NEW;
 END;
@@ -384,6 +395,27 @@ CREATE TRIGGER on_seller_application_status_changed
   AFTER INSERT OR UPDATE OF status ON public.seller_applications
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_seller_application_review();
+
+-- ------------------------------------------------------------------------------
+-- 13b. NEGOTIATION MESSAGES TABLE (Buyer-Seller Direct Messaging Database)
+-- ------------------------------------------------------------------------------
+CREATE TABLE public.negotiation_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_key TEXT NOT NULL,
+  sender_id TEXT NOT NULL,
+  sender_name TEXT NOT NULL,
+  recipient_id TEXT,
+  is_trader BOOLEAN NOT NULL DEFAULT false,
+  message_text TEXT NOT NULL,
+  proposed_price NUMERIC(12, 2),
+  commodity_name TEXT,
+  is_read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX idx_negotiation_messages_conv ON public.negotiation_messages(conversation_key);
+CREATE INDEX idx_negotiation_messages_created ON public.negotiation_messages(created_at ASC);
+CREATE INDEX idx_negotiation_messages_sender ON public.negotiation_messages(sender_id);
 
 -- ------------------------------------------------------------------------------
 -- 14. ROW LEVEL SECURITY (RLS) POLICIES
@@ -396,6 +428,7 @@ ALTER TABLE public.commodity_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.price_observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.seller_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.negotiation_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.errands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shopping_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_plans ENABLE ROW LEVEL SECURITY;
@@ -556,6 +589,20 @@ CREATE POLICY "Admins can update seller applications"
       SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
     )
   );
+
+-- Negotiation Messages: Readable and insertable by shoppers and merchants
+CREATE POLICY "Allow public read access to negotiation_messages"
+  ON public.negotiation_messages FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow public insert access to negotiation_messages"
+  ON public.negotiation_messages FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Allow update read status for participants"
+  ON public.negotiation_messages FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
 
 -- ------------------------------------------------------------------------------
 -- 15. INITIAL SEED DATA (Commodity Categories, Markets & Baseline Products)

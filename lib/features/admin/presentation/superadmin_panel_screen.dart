@@ -997,26 +997,93 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    icon: const Icon(Icons.refresh_rounded, size: 14),
-                    label: const Text('Re-evaluate',
-                        style: TextStyle(
-                            fontSize: 11.5, fontWeight: FontWeight.w700)),
-                    onPressed: () {
-                      // Allow re-opening application into pending state for re-review
-                      ref
-                          .read(sellerApplicationsProvider.notifier)
-                          .approveApplication(app.id);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                              'Re-evaluated application for ${app.businessName}.'),
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                  ),
+                  if (app.status == SellerApplicationStatus.approved) ...[
+                    OutlinedButton.icon(
+                      key: ValueKey('btn_revoke_app_${app.id}'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFC62828),
+                        side: const BorderSide(color: Color(0xFFEF9A9A)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.block_rounded, size: 13, color: Color(0xFFC62828)),
+                      label: const Text('Revoke',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFC62828))),
+                      onPressed: () => _showRevokeDialog(context, app),
+                    ),
+                    const SizedBox(width: 6),
+                    TextButton.icon(
+                      key: ValueKey('btn_reopen_app_${app.id}'),
+                      icon: const Icon(Icons.refresh_rounded, size: 14),
+                      label: const Text('Re-open',
+                          style: TextStyle(
+                              fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      onPressed: () {
+                        ref
+                            .read(sellerApplicationsProvider.notifier)
+                            .reopenApplication(app.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Re-opened application for ${app.businessName} to Pending review.'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ] else ...[
+                    ElevatedButton.icon(
+                      key: ValueKey('btn_approve_app_${app.id}'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.check_rounded, size: 13, color: Colors.white),
+                      label: const Text('Approve',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                      onPressed: () {
+                        ref
+                            .read(sellerApplicationsProvider.notifier)
+                            .approveApplication(app.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Approved ${app.businessName}! Seller upgraded to Trader.'),
+                            backgroundColor: const Color(0xFF2E7D32),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    TextButton.icon(
+                      key: ValueKey('btn_reopen_app_${app.id}'),
+                      icon: const Icon(Icons.refresh_rounded, size: 14),
+                      label: const Text('Re-open',
+                          style: TextStyle(
+                              fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      onPressed: () {
+                        ref
+                            .read(sellerApplicationsProvider.notifier)
+                            .reopenApplication(app.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Re-opened application for ${app.businessName} to Pending review.'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -2110,6 +2177,61 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
               );
             },
             child: const Text('Reject Application',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRevokeDialog(BuildContext context, SellerApplication app) {
+    final reasonController = TextEditingController(
+        text: 'Seller accreditation revoked by marketplace administrator');
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Revoke Seller Accreditation',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Seller: ${app.businessName} (${app.applicantName})',
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason for Revocation',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFC62828)),
+            onPressed: () {
+              ref.read(sellerApplicationsProvider.notifier).revokeApproval(
+                    app.id,
+                    reason: reasonController.text.trim(),
+                  );
+              Navigator.pop(dialogCtx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      'Revoked seller status for ${app.businessName}. Reverted to Customer.'),
+                  backgroundColor: const Color(0xFFC62828),
+                ),
+              );
+            },
+            child: const Text('Revoke Seller',
                 style: TextStyle(color: Colors.white)),
           ),
         ],

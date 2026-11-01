@@ -117,6 +117,62 @@ void main() {
         findsOneWidget,
       );
     });
+
+    test('3. transcribeAudio normalizes and preserves real microphone speech without cloud API key', () async {
+      const aiService = MetaAiService();
+
+      // User spoke in Pidgin with phonetic mistranscriptions (e.g. "carry" for garri, "bins" for beans)
+      final result = await aiService.transcribeAudio(
+        spokenTextFromMic: 'I wan buy two paint rubber of carry and bins for Bodija market',
+        dialect: VoiceDialect.nigerianPidgin,
+        audioBytes: [1, 2, 3, 4], // WAV recording was also made
+      );
+
+      // Verify that user's spoken words are phonetically cleaned, not wiped, and not an error
+      expect(result.hasError, isFalse);
+      expect(result.isFallback, isFalse);
+      expect(result.modelName, 'Phone Microphone Voice Transcribe');
+      expect(result.text, contains('garri'));
+      expect(result.text, contains('beans'));
+      expect(result.detectedDialect, VoiceDialect.nigerianPidgin);
+      expect(result.isDialectTranslated, isTrue);
+      expect(result.englishTranslation, isNotNull);
+    });
+
+    test('4. transcribeAudio auto-detects dialect and translates vernacular microphone speech', () async {
+      const aiService = MetaAiService();
+
+      // User spoke in Yoruba into device microphone
+      final result = await aiService.transcribeAudio(
+        spokenTextFromMic: 'Mo fe ra apo iresi kan ati epo pupa ni oja Bodija',
+        dialect: VoiceDialect.autoDetect,
+        audioBytes: [1, 2, 3, 4],
+      );
+
+      expect(result.hasError, isFalse);
+      expect(result.isFallback, isFalse);
+      expect(result.modelName, 'Phone Microphone Voice Transcribe');
+      expect(result.detectedDialect, VoiceDialect.yoruba);
+      expect(result.isDialectTranslated, isTrue);
+      expect(result.englishTranslation, isNotNull);
+      expect(result.englishTranslation!.toLowerCase(), contains('rice'));
+      expect(result.englishTranslation!.toLowerCase(), contains('palm oil'));
+    });
+
+    test('5. transcribeAudio returns unavailable error when cloud fails and no speech was detected', () async {
+      const aiService = MetaAiService();
+
+      // User held button in silence (empty speech captured, audio bytes recorded, cloud unconfigured)
+      final result = await aiService.transcribeAudio(
+        spokenTextFromMic: '',
+        audioBytes: [1, 2, 3, 4],
+        dialect: VoiceDialect.autoDetect,
+      );
+
+      expect(result.hasError, isTrue);
+      expect(result.text, isEmpty);
+      expect(result.note, contains('currently unavailable'));
+    });
   });
 }
 

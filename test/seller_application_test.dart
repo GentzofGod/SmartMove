@@ -344,6 +344,126 @@ void main() {
       // Verified distance from Dugbe (7.3876, 3.8767) to Bodija (7.4343, 3.9056) is ~6.1 km
       expect(sellerStop.distanceKm, closeTo(6.1, 1.5));
     });
+
+    test('11. Revoking approved seller demotes user back to Customer and updates application status', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      const user = UserSession(
+        id: 'usr-revoke-test',
+        email: 'tunde@kuto.ng',
+        displayName: 'Tunde Trader',
+        role: 'Trader',
+        sellerApplicationStatus: SellerApplicationStatus.approved,
+        businessName: 'Tunde Grains',
+      );
+      container.read(authProvider.notifier).setSession(user);
+
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+            user: user,
+            businessName: 'Tunde Grains',
+            marketHub: 'Kuto Market, Abeokuta',
+            sellerChannel: 'Local Market',
+            phone: '+234 803 123 4567',
+          );
+
+      final app = container.read(sellerApplicationsProvider).first;
+      container.read(sellerApplicationsProvider.notifier).approveApplication(app.id);
+
+      var currentUser = container.read(authProvider);
+      expect(currentUser.isApprovedSeller, isTrue);
+
+      // SuperAdmin revokes the approval
+      container.read(sellerApplicationsProvider.notifier).revokeApproval(
+            app.id,
+            reason: 'Inaccurate market pricing reported',
+          );
+
+      final updatedApp = container.read(sellerApplicationsProvider).first;
+      expect(updatedApp.status, SellerApplicationStatus.rejected);
+      expect(updatedApp.rejectionReason, contains('Inaccurate market pricing'));
+
+      currentUser = container.read(authProvider);
+      expect(currentUser.isApprovedSeller, isFalse);
+      expect(currentUser.role, equals('Customer'));
+      expect(currentUser.sellerApplicationStatus, SellerApplicationStatus.rejected);
+    });
+
+    test('12. Re-opening application restores status to pending review for admin re-evaluation', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      const user = UserSession(
+        id: 'usr-reopen-test',
+        email: 'reopen@market.ng',
+        displayName: 'Amina',
+        role: 'Customer',
+        sellerApplicationStatus: SellerApplicationStatus.rejected,
+      );
+      container.read(authProvider.notifier).setSession(user);
+
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+            user: user,
+            businessName: 'Amina Provisions',
+            marketHub: 'Oja Oba Market, Akure',
+            sellerChannel: 'Local Market',
+            phone: '+234 809 988 7766',
+          );
+
+      final app = container.read(sellerApplicationsProvider).first;
+      container.read(sellerApplicationsProvider.notifier).rejectApplication(app.id, reason: 'Invalid phone');
+
+      var currentApp = container.read(sellerApplicationsProvider).first;
+      expect(currentApp.status, SellerApplicationStatus.rejected);
+
+      // SuperAdmin re-opens the application
+      container.read(sellerApplicationsProvider.notifier).reopenApplication(app.id);
+
+      currentApp = container.read(sellerApplicationsProvider).first;
+      expect(currentApp.status, SellerApplicationStatus.pending);
+      expect(currentApp.rejectionReason, isNull);
+    });
+
+    test('13. Submitting re-application cleanly replaces previous application without duplicates', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      const user = UserSession(
+        id: 'usr-dedup-test',
+        email: 'dedup@ogun.ng',
+        displayName: 'Femi',
+        role: 'Customer',
+      );
+      container.read(authProvider.notifier).setSession(user);
+
+      // First submission
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+            user: user,
+            businessName: 'Femi First Draft',
+            marketHub: 'Omida Market, Abeokuta',
+            sellerChannel: 'Local Market',
+            phone: '+234 801 111 2222',
+          );
+
+      expect(container.read(sellerApplicationsProvider).length, 1);
+      expect(container.read(sellerApplicationsProvider).first.businessName, 'Femi First Draft');
+
+      // Re-apply with corrected business name and stall
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+            user: user,
+            businessName: 'Femi Verified Superstore',
+            marketHub: 'Kuto Market, Abeokuta',
+            sellerChannel: 'Local Market',
+            phone: '+234 801 111 2222',
+            stallLocation: 'Stall B2, Produce Row',
+          );
+
+      // Must be 1 application (replaced cleanly), not 2 duplicates
+      final apps = container.read(sellerApplicationsProvider);
+      expect(apps.length, 1);
+      expect(apps.first.businessName, 'Femi Verified Superstore');
+      expect(apps.first.stallLocation, 'Stall B2, Produce Row');
+    });
   });
 }
 

@@ -401,6 +401,7 @@ class VoiceTranscriptionResult {
       isFallback: false,
       hasError: true,
       errorMessage: message,
+      note: message,
       detectedDialect: detectedDialect,
     );
   }
@@ -673,6 +674,7 @@ class MetaAiService {
     List<int>? audioBytes,
     String? audioFilePath,
     String? simulatedVoiceSample,
+    String? spokenTextFromMic,
     VoiceDialect dialect = VoiceDialect.autoDetect,
     String audioFormat = 'audio/wav',
     int sampleRate = 24000,
@@ -785,6 +787,34 @@ class MetaAiService {
         detectedDialect: resolvedDialect,
         englishTranslation: translation,
         isDialectTranslated: translation != null && translation.isNotEmpty,
+      );
+    }
+
+    // If microphone captured spoken speech on-device:
+    // Normalize vernacular/phonetics and translate to English without relying on cloud Meta API
+    if (spokenTextFromMic != null && spokenTextFromMic.trim().isNotEmpty) {
+      final processed = cleanAndNormalizeMicrophoneSpeech(
+        spokenTextFromMic.trim(),
+        targetDialect: dialect,
+      );
+      final cleanedText =
+          (processed['cleanedText'] as String?)?.trim() ?? spokenTextFromMic.trim();
+      final resolvedDialect = (dialect == VoiceDialect.autoDetect)
+          ? ((processed['detectedDialect'] as VoiceDialect?) ?? detectDialect(cleanedText))
+          : dialect;
+      final englishTranslation = processed['englishTranslation'] as String?;
+      final isTranslated = (processed['isTranslated'] as bool?) ??
+          (englishTranslation != null && englishTranslation.isNotEmpty);
+
+      return VoiceTranscriptionResult(
+        text: cleanedText,
+        confidence: 0.95,
+        modelName: 'Phone Microphone Voice Transcribe',
+        isFallback: false,
+        note: 'Transcribed from microphone via on-device speech engine (${resolvedDialect.label})',
+        detectedDialect: resolvedDialect,
+        englishTranslation: isTranslated ? englishTranslation : null,
+        isDialectTranslated: isTranslated,
       );
     }
 
@@ -1067,7 +1097,11 @@ class MetaAiService {
         RegExp(r'\b(?:carry|curry|gary)\b', caseSensitive: false), 'garri');
     // "bins" / "bin" in food contexts -> "beans"
     text = text.replaceAll(
-        RegExp(r'\b(?:bins|bin)\b(?=\s*(?:and|rice|garri|\.|\,|$))',
+        RegExp(r'\b(?:bins|bin)\b(?=\s*(?:and|rice|garri|oil|yam|plantain|for|at|in|from|to|\.|\,|;|$))',
+            caseSensitive: false),
+        'beans');
+    text = text.replaceAll(
+        RegExp(r'(?<=\b(?:and|buy|get|want|paint|rubber|bag|kongo|derica|cup|white|brown|honey)\s+)\b(?:bins|bin)\b',
             caseSensitive: false),
         'beans');
     // "a bag" when used as pidgin "abeg"

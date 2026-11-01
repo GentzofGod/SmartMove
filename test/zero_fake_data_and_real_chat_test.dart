@@ -248,4 +248,46 @@ void main() {
       expect(find.text('Chat & Buy'), findsOneWidget);
     });
   });
+
+  group('Chat Database Schema & Supabase Deserialization Tests', () {
+    test('9. TraderChatMessage deserializes snake_case Supabase SQL columns accurately', () {
+      final dbRow = {
+        'id': 'db-uuid-1234',
+        'conversation_key': 'Kuto Grain Merchants',
+        'sender_id': 'user-auth-uuid-5678',
+        'sender_name': 'Ibrahim Musa',
+        'is_trader': false,
+        'message_text': 'Do you offer discount on 5 bags of Mama Gold?',
+        'proposed_price': 180000.0,
+        'commodity_name': 'Mama Gold Rice (50kg)',
+        'created_at': '2026-11-01T14:30:00.000Z',
+        'is_read': false,
+      };
+
+      final msg = TraderChatMessage.fromJson(dbRow);
+      expect(msg.id, 'db-uuid-1234');
+      expect(msg.conversationKey, 'Kuto Grain Merchants');
+      expect(msg.senderName, 'Ibrahim Musa');
+      expect(msg.isTrader, isFalse);
+      expect(msg.text, 'Do you offer discount on 5 bags of Mama Gold?');
+      expect(msg.proposedPrice, 180000.0);
+      expect(msg.commodityName, 'Mama Gold Rice (50kg)');
+      expect(msg.timestamp.year, 2026);
+      expect(msg.timestamp.month, 11);
+    });
+
+    test('10. TraderChatNotifier loadMessages and syncSellerInquiries integrate gracefully', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(traderChatProvider.notifier);
+
+      // Verify methods execute safely (offline / without throwing unhandled exceptions)
+      await notifier.loadMessages('Kuto Grain Merchants');
+      await notifier.syncSellerInquiries('Kuto Grain Merchants');
+
+      final chats = container.read(traderChatProvider);
+      expect(chats, isA<Map<String, List<TraderChatMessage>>>());
+    });
+  });
 }

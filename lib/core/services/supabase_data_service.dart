@@ -319,6 +319,34 @@ class SupabaseDataService {
     }
   }
 
+  /// Fetch all customer inquiries directed to a specific seller from Supabase
+  static Future<Map<String, List<TraderChatMessage>>?> fetchAllSellerInquiries(String sellerStoreName) async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final sName = sellerStoreName.trim();
+      final response = await client
+          .from('negotiation_messages')
+          .select()
+          .ilike('conversation_key', '%$sName%')
+          .order('created_at', ascending: true);
+
+      final List<dynamic> data = response as List<dynamic>;
+      if (data.isEmpty) return const {};
+
+      final result = <String, List<TraderChatMessage>>{};
+      for (final item in data) {
+        final msg = TraderChatMessage.fromJson(item as Map<String, dynamic>);
+        final key = msg.conversationKey ?? sName;
+        result.putIfAbsent(key, () => []).add(msg);
+      }
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Insert a chat message between buyer and seller into Supabase
   static Future<bool> sendChatMessage(
     TraderChatMessage message, {
@@ -434,6 +462,7 @@ class SupabaseDataService {
     required String applicationId,
     required SellerApplicationStatus status,
     String? reason,
+    String? applicantEmail,
   }) async {
     final client = _client;
     if (client == null) return false;
@@ -443,16 +472,27 @@ class SupabaseDataService {
       final updateData = <String, dynamic>{
         'status': status.name,
         'reviewed_at': DateTime.now().toIso8601String(),
-        'reviewed_by': reviewer?.id,
+        if (reviewer?.id != null) 'reviewed_by': reviewer!.id,
       };
       if (reason != null && reason.isNotEmpty) {
         updateData['rejection_reason'] = reason;
       }
 
-      await client
-          .from('seller_applications')
-          .update(updateData)
-          .eq('id', applicationId);
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(applicationId);
+
+      if (isUuid) {
+        await client
+            .from('seller_applications')
+            .update(updateData)
+            .eq('id', applicationId);
+      } else if (applicantEmail != null && applicantEmail.isNotEmpty) {
+        await client
+            .from('seller_applications')
+            .update(updateData)
+            .eq('applicant_email', applicantEmail.trim().toLowerCase());
+      }
       return true;
     } catch (_) {
       return false;
@@ -462,6 +502,7 @@ class SupabaseDataService {
   /// Promote a user's profile to Seller/Trader upon application approval
   static Future<bool> promoteProfileToSeller({
     required String userId,
+    String? email,
     required String businessName,
     required String marketHub,
     required String sellerChannel,
@@ -471,7 +512,7 @@ class SupabaseDataService {
     String? phone,
   }) async {
     final client = _client;
-    if (client == null || userId.isEmpty) return false;
+    if (client == null) return false;
 
     try {
       final updateData = <String, dynamic>{
@@ -486,10 +527,44 @@ class SupabaseDataService {
         'phone': ?phone,
       };
 
-      await client
-          .from('profiles')
-          .update(updateData)
-          .eq('id', userId);
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(userId);
+
+      if (isUuid) {
+        await client.from('profiles').update(updateData).eq('id', userId);
+      } else if (email != null && email.isNotEmpty) {
+        await client.from('profiles').update(updateData).eq('email', email.trim().toLowerCase());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Demote a user's profile back to Customer upon application rejection or revocation
+  static Future<bool> demoteProfileToCustomer({
+    required String userId,
+    String? email,
+  }) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final updateData = <String, dynamic>{
+        'role': 'Customer',
+        'seller_application_status': 'rejected',
+      };
+
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(userId);
+
+      if (isUuid) {
+        await client.from('profiles').update(updateData).eq('id', userId);
+      } else if (email != null && email.isNotEmpty) {
+        await client.from('profiles').update(updateData).eq('email', email.trim().toLowerCase());
+      }
       return true;
     } catch (_) {
       return false;
