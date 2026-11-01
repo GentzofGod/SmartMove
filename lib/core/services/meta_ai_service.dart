@@ -801,9 +801,12 @@ class MetaAiService {
         lower.contains('mewaa') ||
         lower.contains('fẹ́ ra') ||
         lower.contains('fe ra') ||
+        lower.contains('mo fẹ') ||
+        lower.contains('mo fe') ||
         lower.contains('ìrẹsì') ||
         lower.contains('iresi') ||
         lower.contains('àpò') ||
+        lower.contains('apo') ||
         lower.contains('ẹyin') ||
         lower.contains('eyin') ||
         lower.contains('epo pupa') ||
@@ -811,6 +814,9 @@ class MetaAiService {
         lower.contains('oja') ||
         lower.contains('ẹwà') ||
         lower.contains('ewa') ||
+        lower.contains('elubo') ||
+        lower.contains('amala') ||
+        lower.contains('ewedu') ||
         lower.contains('ororo') ||
         lower.contains('aago méjì') ||
         lower.contains('aago meji') ||
@@ -833,6 +839,7 @@ class MetaAiService {
         lower.contains('sha biyar') ||
         lower.contains('karfe biyu') ||
         lower.contains('wake') ||
+        lower.contains('dawa') ||
         lower.contains('manja') ||
         lower.contains('albasa')) {
       return VoiceDialect.hausa;
@@ -842,6 +849,8 @@ class MetaAiService {
     if (lower.contains('enwere m') ||
         lower.contains('achọrọ m') ||
         lower.contains('achoro m') ||
+        lower.contains('achom') ||
+        lower.contains('choro') ||
         lower.contains('ịzụ') ||
         lower.contains('izu') ||
         lower.contains('akpa osikapa') ||
@@ -858,12 +867,15 @@ class MetaAiService {
         lower.contains('ehihie') ||
         lower.contains('azụ') ||
         lower.contains('anụ') ||
+        lower.contains('ogbono') ||
+        lower.contains('abacha') ||
         lower.contains('tupu')) {
       return VoiceDialect.igbo;
     }
 
     // 4. Nigerian Pidgin markers
     if (lower.contains('wan buy') ||
+        lower.contains('i wan') ||
         lower.contains('i get') ||
         lower.contains('make e no pass') ||
         lower.contains('paint rubber') ||
@@ -875,7 +887,8 @@ class MetaAiService {
         lower.contains('dey ') ||
         lower.contains('no pass') ||
         lower.contains('abeg') ||
-        lower.contains('how much be')) {
+        lower.contains('how much be') ||
+        lower.contains('kpekere')) {
       return VoiceDialect.nigerianPidgin;
     }
 
@@ -992,6 +1005,114 @@ class MetaAiService {
     }
 
     return prompt;
+  }
+
+  /// Phonetically cleans, normalizes, detects dialect, and translates raw speech-to-text
+  /// output from mobile microphones (especially where English STT engines transcribe
+  /// Nigerian vernacular or local commodities as phonetic English approximations).
+  Map<String, dynamic> cleanAndNormalizeMicrophoneSpeech(
+    String rawSpeech, {
+    VoiceDialect? targetDialect,
+  }) {
+    if (rawSpeech.trim().isEmpty) {
+      return {
+        'cleanedText': '',
+        'detectedDialect': targetDialect ?? VoiceDialect.autoDetect,
+        'englishTranslation': '',
+        'isTranslated': false,
+      };
+    }
+
+    var text = rawSpeech;
+
+    // 1. Phonetic Normalization for Nigerian commodities & vernacular mistranscriptions
+    // "carry" / "curry" -> "garri"
+    text = text.replaceAll(
+        RegExp(r'\b(?:carry|curry|gary)\b', caseSensitive: false), 'garri');
+    // "bins" / "bin" in food contexts -> "beans"
+    text = text.replaceAll(
+        RegExp(r'\b(?:bins|bin)\b(?=\s*(?:and|rice|garri|\.|\,|$))',
+            caseSensitive: false),
+        'beans');
+    // "a bag" when used as pidgin "abeg"
+    text = text.replaceAll(
+        RegExp(r'\ba bag\b(?=\s*(?:i|make|you|dey|abeg))',
+            caseSensitive: false),
+        'abeg');
+    // "more fair" / "my fair" -> "mo fe"
+    text = text.replaceAll(
+        RegExp(r'\b(?:more fair|my fair|more fer)\s+ra\b',
+            caseSensitive: false),
+        'mo fe ra');
+    text = text.replaceAll(
+        RegExp(r'\b(?:more fair|my fair)\b', caseSensitive: false), 'mo fe');
+    // "apple proper" / "apple pooper" -> "epo pupa"
+    text = text.replaceAll(
+        RegExp(
+            r'\b(?:apple proper|apple pooper|apple poopa|apple paper|apple purple)\b',
+            caseSensitive: false),
+        'epo pupa');
+    // "she car far" -> "shinkafa"
+    text = text.replaceAll(
+        RegExp(r'\b(?:she car far|she car fa|shekafa)\b',
+            caseSensitive: false),
+        'shinkafa');
+    // "bound yam" / "pound yam" -> "pounded yam"
+    text = text.replaceAll(
+        RegExp(r'\b(?:bound yam|pound yam|pounded young)\b',
+            caseSensitive: false),
+        'pounded yam');
+    // "pan la" -> "panla"
+    text = text.replaceAll(
+        RegExp(r'\bpan\s+la\b', caseSensitive: false), 'panla');
+    // "titan fish" -> "titus fish"
+    text = text.replaceAll(
+        RegExp(r'\b(?:titan|tighten)\s+fish\b', caseSensitive: false),
+        'titus fish');
+    // "into me" -> "indomie"
+    text = text.replaceAll(
+        RegExp(r'\b(?:into me|in do me)\b', caseSensitive: false), 'indomie');
+    // "pick milk" -> "peak milk"
+    text = text.replaceAll(
+        RegExp(r'\bpick\s+milk\b', caseSensitive: false), 'peak milk');
+    // "some more vita" / "semo vita" -> "semovita"
+    text = text.replaceAll(
+        RegExp(r'\b(?:some more vita|semo vita)\b', caseSensitive: false),
+        'semovita');
+    // "doe doe" -> "dodo"
+    text = text.replaceAll(
+        RegExp(r'\bdoe\s+doe\b', caseSensitive: false), 'dodo');
+    // "egg boy" / "ag boy" -> "agbado"
+    text = text.replaceAll(
+        RegExp(r'\b(?:egg boy|ag boy)\b', caseSensitive: false), 'agbado');
+    // "ground not oil" -> "groundnut oil"
+    text = text.replaceAll(
+        RegExp(r'\bground\s+not\s+oil\b', caseSensitive: false),
+        'groundnut oil');
+
+    // 2. Auto-detect dialect if not explicitly forced to a non-auto dialect
+    VoiceDialect activeDialect;
+    if (targetDialect == null || targetDialect == VoiceDialect.autoDetect) {
+      activeDialect = detectDialect(text);
+    } else {
+      activeDialect = targetDialect;
+    }
+
+    // 3. Translation to English if vernacular
+    String translation = '';
+    bool isTranslated = false;
+    if (activeDialect != VoiceDialect.nigerianEnglish &&
+        activeDialect != VoiceDialect.autoDetect) {
+      translation = translateDialectToEnglish(text, dialect: activeDialect);
+      isTranslated = translation != text;
+    }
+
+    return {
+      'cleanedText': text,
+      'detectedDialect': activeDialect,
+      'englishTranslation': translation,
+      'isTranslated': isTranslated,
+    };
   }
 
   // --- 2. Muse Spark Vision (Handwritten Paper Note & Shopping List Parsing) ---

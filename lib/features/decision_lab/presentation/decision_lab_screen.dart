@@ -129,37 +129,40 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           _buildCartTab(decisionState),
         ],
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.cardBorder)),
-        ),
-        child: SizedBox(
-          height: 50,
-          child: ElevatedButton(
-            onPressed: candidates.isNotEmpty && selectedPlan.id != 'plan-default'
-                ? () {
-                    // Lock in the selected option to the active itinerary / acquisition process
-                    ref.read(itineraryProvider.notifier).updateWithPlan(selectedPlan);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: AppColors.primary,
-                        content: Text('Proceeding with ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}! Loading acquisition process...'),
-                      ),
-                    );
-                    context.push('/itinerary');
-                  }
-                : null,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                candidates.isNotEmpty && selectedPlan.id != 'plan-default'
-                    ? '${AppStrings.tr(ref, 'proceedWith')} ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}'
-                    : 'Add Items to Cart to Proceed',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: AppColors.cardBorder)),
+          ),
+          child: SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: candidates.isNotEmpty && selectedPlan.id != 'plan-default'
+                  ? () {
+                      // Lock in the selected option to the active itinerary / acquisition process
+                      ref.read(itineraryProvider.notifier).updateWithPlan(selectedPlan);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: AppColors.primary,
+                          content: Text('Proceeding with ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}! Loading acquisition process...'),
+                        ),
+                      );
+                      context.push('/itinerary');
+                    }
+                  : null,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  candidates.isNotEmpty && selectedPlan.id != 'plan-default'
+                      ? '${AppStrings.tr(ref, 'proceedWith')} ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}'
+                      : 'Add Items to Cart to Proceed',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -950,22 +953,6 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'Records-Grounded',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
                     ),
                   ),
                 ],

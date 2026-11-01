@@ -218,13 +218,13 @@ class _LegalScreenState extends ConsumerState<LegalScreen>
           number: '4',
           title: 'Voice Input & Audio Processing Safeguards',
           content:
-              'Voice search inputs (in English, Nigerian Pidgin, Yorùbá, Hausa, Igbo, etc.) are processed ephemerally in RAM exclusively to transcribe commodity search phrases. Raw audio recordings are never stored on persistent disks, never shared with third-party ad brokers, and discarded immediately after transcription.',
+              'Voice search inputs (in English, Nigerian Pidgin, Yorùbá, Hausa, Igbo, etc.) are processed securely in real time exclusively to transcribe commodity search queries. Raw voice recordings are never retained, never shared with third parties, and discarded immediately after transcription.',
         ),
         _buildSection(
           number: '5',
-          title: 'Local On-Device Encryption & Offline Cache Resilience',
+          title: 'Local On-Device Storage & Offline Availability',
           content:
-              'Your shopping basket, commodity price cache, preferred dialects, and customized decision matrices reside encrypted on your local mobile device in SharedPreferences. This guarantees you can navigate prices and itineraries offline with zero cloud dependency.',
+              'Your shopping basket, commodity price cache, and language preferences remain stored securely on your local device. This ensures you can access prices and saved itineraries offline without requiring an active internet connection.',
         ),
         _buildSection(
           number: '6',

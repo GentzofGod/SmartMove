@@ -505,6 +505,21 @@ class SafeOutletLauncher {
         email: email.isNotEmpty ? email : 'support@smartmove.ng',
       );
     }
+
+    final isSupportOrWhatsApp = url.contains('wa.me') ||
+        outletName.toLowerCase().contains('whatsapp') ||
+        outletName.toLowerCase().contains('support');
+
+    if (isSupportOrWhatsApp) {
+      final uri = Uri.tryParse(url);
+      if (uri != null) {
+        try {
+          final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (launched) return;
+        } catch (_) {}
+      }
+    }
+    if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(

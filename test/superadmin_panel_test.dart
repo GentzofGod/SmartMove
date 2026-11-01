@@ -10,6 +10,7 @@ import 'package:smartmove/features/admin/presentation/superadmin_panel_screen.da
 import 'package:smartmove/features/community/presentation/community_screen.dart';
 import 'package:smartmove/features/home/presentation/home_screen.dart';
 import 'package:smartmove/features/profile/presentation/profile_screen.dart';
+import 'package:smartmove/features/seller/presentation/seller_portal_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -86,7 +87,7 @@ void main() {
   });
 
   group('CommunityScreen Role-Separated Moderation Widget Tests', () {
-    testWidgets('4. Customer sees only 2 tabs and NO superadmin chip', (tester) async {
+    testWidgets('4. Customer sees price feed and NO superadmin chip', (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 932));
 
       final container = ProviderContainer();
@@ -112,9 +113,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Only 2 consumer tabs
-      expect(find.text('Price Feed'), findsOneWidget);
-      expect(find.text('Seller Portal'), findsOneWidget);
+      // Community price feed renders directly; seller portal moved to dedicated screen
+      expect(find.widgetWithText(AppBar, 'Community'), findsOneWidget);
+      expect(find.text('Seller Portal'), findsNothing);
       expect(find.text('Moderation Queue'), findsNothing);
 
       // SuperAdmin button does NOT appear for consumer
@@ -207,6 +208,20 @@ void main() {
             ),
           );
 
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+        user: const UserSession(
+          id: 'applicant-1',
+          email: 'trader1@smartmove.ng',
+          displayName: 'Trader Ngozi',
+          role: 'Customer',
+        ),
+        businessName: 'Ngozi Enterprise',
+        marketHub: 'Mile 12 Market',
+        sellerChannel: 'Open Stall',
+        phone: '+2348011223344',
+        stallLocation: 'Shed 12, Fruit Section',
+      );
+
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -217,7 +232,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // By default, initial mock application app-001 (Kudirat Grains) is pending
       final pendingApps = container
           .read(sellerApplicationsProvider)
           .where((a) => a.status == SellerApplicationStatus.pending)
@@ -431,7 +445,7 @@ void main() {
       expect(find.text('Open SuperAdmin Moderation Panel'), findsOneWidget);
     });
 
-    testWidgets('13. In CommunityScreen, Customer sees seller application workflow and no simulation artifacts', (tester) async {
+    testWidgets('13. In SellerPortalScreen, Customer sees seller application workflow and no simulation artifacts', (tester) async {
       await tester.binding.setSurfaceSize(const Size(500, 1000));
 
       final container = ProviderContainer();
@@ -450,14 +464,10 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: const MaterialApp(
-            home: CommunityScreen(),
+            home: SellerPortalScreen(),
           ),
         ),
       );
-      await tester.pumpAndSettle();
-
-      // Tap Seller Portal tab
-      await tester.tap(find.text('Seller Portal'));
       await tester.pumpAndSettle();
 
       // Customer sees onboarding CTA, no simulation toggle exists
@@ -511,7 +521,7 @@ void main() {
       expect(find.textContaining('SuperAdmin'), findsWidgets);
     });
 
-    testWidgets('15. Approved seller accesses Seller Portal in CommunityScreen without block', (tester) async {
+    testWidgets('15. Approved seller accesses Seller Portal in SellerPortalScreen without block', (tester) async {
       await tester.binding.setSurfaceSize(const Size(500, 1000));
 
       final container = ProviderContainer();
@@ -537,7 +547,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: const MaterialApp(
-            home: CommunityScreen(initialTab: 1), // Direct access to Seller Portal
+            home: SellerPortalScreen(),
           ),
         ),
       );
@@ -545,7 +555,7 @@ void main() {
 
       // Verify that Seller Portal is displayed and user is NOT blocked by onboarding CTA
       expect(find.text('Iya Moria Foodstuffs'), findsOneWidget);
-      expect(find.text('Add New Commodity Price'), findsOneWidget);
+      expect(find.text('Publish Price'), findsOneWidget);
       expect(find.text('SmartMove Seller Hub'), findsNothing);
       expect(find.text('Application Pending Review'), findsNothing);
     });

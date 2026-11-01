@@ -7,7 +7,7 @@ import 'package:smartmove/core/services/auth_service.dart';
 import 'package:smartmove/core/state/app_state.dart';
 import 'package:smartmove/features/home/presentation/widgets/muse_voice_input_sheet.dart';
 import 'package:smartmove/features/profile/presentation/profile_screen.dart';
-import 'package:smartmove/features/community/presentation/community_screen.dart';
+import 'package:smartmove/features/seller/presentation/seller_portal_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -144,38 +144,38 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
 
       const applicantEmail = 'kudirat.grains@gmail.com';
-      // Alhaja Kudirat has seed application app-seed-001 in Bodija Market
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      // Approve Kudirat's application
-      container.read(sellerApplicationsProvider.notifier).approveApplication('app-seed-001');
-
-      // Now view profile as Kudirat
-      final kudiratSession = UserSession(
+      final applicantSession = UserSession(
         id: 'usr-kudirat',
         email: applicantEmail,
         displayName: 'Alhaja Kudirat',
-        role: 'Customer', // initially Customer before checking application
+        role: 'Customer',
         sellerApplicationStatus: SellerApplicationStatus.none,
         isGuest: false,
       );
+      container.read(authProvider.notifier).setSession(applicantSession);
+
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+        user: applicantSession,
+        businessName: 'Kudirat Grains & Staples',
+        marketHub: 'Bodija Market',
+        sellerChannel: 'Open Stall',
+        phone: '+2348031234567',
+        stallLocation: 'Line 2, Bodija Market',
+      );
+      final appId = container.read(sellerApplicationsProvider).first.id;
+      container.read(sellerApplicationsProvider.notifier).approveApplication(appId);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: MaterialApp(
-            home: Builder(
-              builder: (ctx) {
-                // Set session
-                return const Scaffold(body: ProfileScreen());
-              },
-            ),
+          child: const MaterialApp(
+            home: Scaffold(body: ProfileScreen()),
           ),
         ),
       );
-
-      container.read(authProvider.notifier).setSession(kudiratSession);
       await tester.pumpAndSettle();
 
       // Must show Registered Seller Profile and NOT "Apply to Become a Verified Seller"
@@ -185,7 +185,7 @@ void main() {
       expect(find.text('Reapply as Verified Seller'), findsNothing);
     });
 
-    testWidgets('CommunityScreen renders Seller Portal without prompt to reapply when approved', (tester) async {
+    testWidgets('SellerPortalScreen renders without prompt to reapply when approved', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -194,10 +194,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      // Approve Kudirat's application
-      container.read(sellerApplicationsProvider.notifier).approveApplication('app-seed-001');
-
-      final kudiratSession = UserSession(
+      final applicantSession = UserSession(
         id: 'usr-kudirat',
         email: applicantEmail,
         displayName: 'Alhaja Kudirat',
@@ -205,23 +202,31 @@ void main() {
         sellerApplicationStatus: SellerApplicationStatus.none,
         isGuest: false,
       );
-      container.read(authProvider.notifier).setSession(kudiratSession);
+      container.read(authProvider.notifier).setSession(applicantSession);
+
+      container.read(sellerApplicationsProvider.notifier).submitApplication(
+        user: applicantSession,
+        businessName: 'Kudirat Grains & Staples',
+        marketHub: 'Bodija Market',
+        sellerChannel: 'Open Stall',
+        phone: '+2348031234567',
+        stallLocation: 'Line 2, Bodija Market',
+      );
+      final appId = container.read(sellerApplicationsProvider).first.id;
+      container.read(sellerApplicationsProvider.notifier).approveApplication(appId);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
           child: const MaterialApp(
-            home: Scaffold(body: CommunityScreen()),
+            home: Scaffold(body: SellerPortalScreen()),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      // Switch to Seller Portal tab
-      await tester.tap(find.text('Seller Portal'));
-      await tester.pumpAndSettle();
-
       // Must not show prompt to apply
+      expect(find.text('Kudirat Grains & Staples'), findsOneWidget);
       expect(find.text('Apply to Become a Verified Seller'), findsNothing);
       expect(find.text('Reapply as Verified Seller'), findsNothing);
     });

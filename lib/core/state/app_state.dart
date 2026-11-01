@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
 import '../models/seller_application.dart';
+import '../models/store_edit_request.dart';
 import '../models/errand.dart';
 import '../models/itinerary_stop.dart';
 import '../models/plan_candidate.dart';
@@ -992,6 +993,33 @@ class AuthNotifier extends Notifier<UserSession> {
     AuthService.persistSession(state);
   }
 
+  void setPendingStoreEdit(bool hasPending, String? summary) {
+    state = state.copyWith(
+      hasPendingStoreEdit: hasPending,
+      pendingStoreEditSummary: summary,
+    );
+    AuthService.persistSession(state);
+  }
+
+  void applyApprovedStoreEdit({
+    required String businessName,
+    required String marketHub,
+    String? stallLocation,
+    required String phone,
+    required String sellerChannel,
+  }) {
+    state = state.copyWith(
+      businessName: businessName,
+      marketHub: marketHub,
+      stallLocation: stallLocation ?? state.stallLocation,
+      phone: phone,
+      sellerChannel: sellerChannel,
+      hasPendingStoreEdit: false,
+      pendingStoreEditSummary: null,
+    );
+    AuthService.persistSession(state);
+  }
+
   void updateUserProfile({
     String? displayName,
     String? email,
@@ -1088,8 +1116,16 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
         final apps = list
             .map((item) =>
                 SellerApplication.fromJson(item as Map<String, dynamic>))
+            .where((app) =>
+                app.id != 'app-seed-001' &&
+                !app.applicantName.toLowerCase().contains('kudirat') &&
+                !app.businessName.toLowerCase().contains('kudirat'))
             .toList();
-        if (apps.isNotEmpty && ref.mounted) {
+        if (apps.length != list.length) {
+          // Re-persist cleansed list without any mock/seed applications
+          _persist(apps);
+        }
+        if (ref.mounted) {
           state = apps;
           ref.read(authProvider.notifier).syncWithSellerApplications(state);
         }
@@ -1117,22 +1153,7 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
   }
 
   List<SellerApplication> _getInitialApplications() {
-    final now = DateTime.now();
-    return [
-      SellerApplication(
-        id: 'app-seed-001',
-        userId: 'usr-kudirat',
-        applicantName: 'Alhaja Kudirat',
-        applicantEmail: 'kudirat.grains@gmail.com',
-        businessName: 'Alhaja Kudirat Grains & Staples',
-        marketHub: 'Bodija Market',
-        sellerChannel: 'Local Market',
-        stallLocation: 'Stall B44, Bodija Market Wholesale Hub',
-        phone: '+234 803 234 5678',
-        status: SellerApplicationStatus.pending,
-        submittedAt: now.subtract(const Duration(hours: 3)),
-      ),
-    ];
+    return const <SellerApplication>[];
   }
 
   void submitApplication({
@@ -1291,6 +1312,140 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
 final sellerApplicationsProvider =
     NotifierProvider<SellerApplicationsNotifier, List<SellerApplication>>(
   SellerApplicationsNotifier.new,
+);
+
+// --- Store Edit Requests State (Admin Verification for Store Profile Modifications) ---
+class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
+  static const String _storageKey = 'smartmove_cached_store_edit_requests';
+
+  @override
+  List<StoreEditRequest> build() {
+    _loadPersisted();
+    return const <StoreEditRequest>[];
+  }
+
+  Future<void> _loadPersisted() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
+        final requests = list
+            .map((item) =>
+                StoreEditRequest.fromJson(item as Map<String, dynamic>))
+            .toList();
+        if (ref.mounted) {
+          state = requests;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(List<StoreEditRequest> requests) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = requests.map((r) => r.toJson()).toList();
+      await prefs.setString(_storageKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  void submitRequest({
+    required UserSession seller,
+    required String proposedBusinessName,
+    required String proposedMarketHub,
+    String? proposedStallLocation,
+    required String proposedPhone,
+    required String proposedSellerChannel,
+  }) {
+    final req = StoreEditRequest(
+      id: 'edit-${DateTime.now().millisecondsSinceEpoch}',
+      sellerId: seller.id,
+      applicantEmail: seller.email,
+      currentBusinessName: seller.businessName ?? '',
+      proposedBusinessName: proposedBusinessName,
+      currentMarketHub: seller.marketHub ?? 'Bodija Market',
+      proposedMarketHub: proposedMarketHub,
+      currentStallLocation: seller.stallLocation,
+      proposedStallLocation: proposedStallLocation,
+      currentPhone: seller.phone,
+      proposedPhone: proposedPhone,
+      currentSellerChannel: seller.sellerChannel ?? 'Local Market',
+      proposedSellerChannel: proposedSellerChannel,
+      status: 'pending',
+      submittedAt: DateTime.now(),
+    );
+
+    state = [req, ...state];
+    _persist(state);
+
+    final summary =
+        'Pending update to "$proposedBusinessName" at $proposedMarketHub';
+    ref.read(authProvider.notifier).setPendingStoreEdit(true, summary);
+  }
+
+  void approveRequest(String requestId, {String? adminNotes}) {
+    StoreEditRequest? approvedReq;
+    state = state.map((r) {
+      if (r.id == requestId) {
+        approvedReq = r.copyWith(
+          status: 'approved',
+          reviewedAt: DateTime.now(),
+          reviewedBy: ref.read(authProvider).displayName,
+        );
+        return approvedReq!;
+      }
+      return r;
+    }).toList();
+    _persist(state);
+
+    if (approvedReq != null) {
+      final currentUser = ref.read(authProvider);
+      if (currentUser.id == approvedReq!.sellerId ||
+          (currentUser.email.isNotEmpty &&
+              currentUser.email.trim().toLowerCase() ==
+                  approvedReq!.applicantEmail.trim().toLowerCase())) {
+        ref.read(authProvider.notifier).applyApprovedStoreEdit(
+              businessName: approvedReq!.proposedBusinessName,
+              marketHub: approvedReq!.proposedMarketHub,
+              stallLocation: approvedReq!.proposedStallLocation,
+              phone: approvedReq!.proposedPhone,
+              sellerChannel: approvedReq!.proposedSellerChannel,
+            );
+      }
+    }
+  }
+
+  void rejectRequest(String requestId, {String? reason}) {
+    StoreEditRequest? rejectedReq;
+    state = state.map((r) {
+      if (r.id == requestId) {
+        rejectedReq = r.copyWith(
+          status: 'rejected',
+          reviewedAt: DateTime.now(),
+          reviewedBy: ref.read(authProvider).displayName,
+          rejectionReason: reason,
+        );
+        return rejectedReq!;
+      }
+      return r;
+    }).toList();
+    _persist(state);
+
+    if (rejectedReq != null) {
+      final currentUser = ref.read(authProvider);
+      if (currentUser.id == rejectedReq!.sellerId ||
+          (currentUser.email.isNotEmpty &&
+              currentUser.email.trim().toLowerCase() ==
+                  rejectedReq!.applicantEmail.trim().toLowerCase())) {
+        ref.read(authProvider.notifier).setPendingStoreEdit(false, null);
+      }
+    }
+  }
+}
+
+final storeEditRequestsProvider =
+    NotifierProvider<StoreEditRequestsNotifier, List<StoreEditRequest>>(
+  StoreEditRequestsNotifier.new,
 );
 
 // --- Location State ---

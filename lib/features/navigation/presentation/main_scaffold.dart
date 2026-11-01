@@ -45,54 +45,57 @@ class MainScaffold extends ConsumerWidget {
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            top: BorderSide(color: AppColors.cardBorder.withValues(alpha: 0.6), width: 1),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppColors.cardBorder.withValues(alpha: 0.6), width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                offset: const Offset(0, -2),
+                blurRadius: 8,
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              offset: const Offset(0, -2),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: currentIndex,
-          onTap: (index) => _onItemTapped(index, context),
-          backgroundColor: Colors.white,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textTertiary,
-          selectedFontSize: 10.5,
-          unselectedFontSize: 10.5,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 10.5),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.5),
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.home_outlined),
-              activeIcon: const Icon(Icons.home),
-              label: homeLabel,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.explore_outlined),
-              activeIcon: const Icon(Icons.explore),
-              label: discoverLabel,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.analytics_outlined),
-              activeIcon: const Icon(Icons.analytics),
-              label: priceLabLabel,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.storefront_outlined),
-              activeIcon: const Icon(Icons.storefront),
-              label: communityLabel,
-            ),
-          ],
+          child: BottomNavigationBar(
+            currentIndex: currentIndex,
+            onTap: (index) => _onItemTapped(index, context),
+            backgroundColor: Colors.white,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: AppColors.textTertiary,
+            selectedFontSize: 10.5,
+            unselectedFontSize: 10.5,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 10.5),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.5),
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            items: [
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.home_outlined),
+                activeIcon: const Icon(Icons.home),
+                label: homeLabel,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.explore_outlined),
+                activeIcon: const Icon(Icons.explore),
+                label: discoverLabel,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.analytics_outlined),
+                activeIcon: const Icon(Icons.analytics),
+                label: priceLabLabel,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.storefront_outlined),
+                activeIcon: const Icon(Icons.storefront),
+                label: communityLabel,
+              ),
+            ],
+          ),
         ),
       ),
     );

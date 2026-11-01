@@ -13,6 +13,7 @@ import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/admin/presentation/superadmin_panel_screen.dart';
 import '../../features/legal/presentation/legal_screen.dart';
+import '../../features/seller/presentation/seller_portal_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -54,12 +55,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/community',
           builder: (context, state) {
-            final tabParam = state.uri.queryParameters['tab'];
-            final initialTab =
-                (tabParam == 'seller' || tabParam == '1' || tabParam == 'portal')
-                    ? 1
-                    : 0;
-            return CommunityScreen(initialTab: initialTab);
+            return const CommunityScreen();
           },
         ),
       ],
@@ -88,6 +84,11 @@ final appRouter = GoRouter(
       path: '/superadmin',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const SuperAdminPanelScreen(),
+    ),
+    GoRoute(
+      path: '/seller-portal',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const SellerPortalScreen(),
     ),
     GoRoute(
       path: '/legal',

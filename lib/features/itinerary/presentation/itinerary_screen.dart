@@ -44,20 +44,22 @@ class ItineraryScreen extends ConsumerWidget {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // Sourcing Channel & Ease of Access Banner
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Row(
-              children: [
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Sourcing Channel & Ease of Access Banner
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Row(
+                children: [
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
@@ -488,6 +490,7 @@ class ItineraryScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

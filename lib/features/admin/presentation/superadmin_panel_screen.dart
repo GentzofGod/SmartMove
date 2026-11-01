@@ -46,62 +46,65 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
           foregroundColor: Colors.white,
           title: const Text('SuperAdmin Console'),
         ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFEBEE),
-                    shape: BoxShape.circle,
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFEBEE),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.lock_person_rounded,
+                      color: Color(0xFFC62828),
+                      size: 48,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.lock_person_rounded,
-                    color: Color(0xFFC62828),
-                    size: 48,
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Access Denied — SuperAdmin Privileges Required',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Access Denied — SuperAdmin Privileges Required',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                  const SizedBox(height: 10),
+                  Text(
+                    userSession.isGuest
+                        ? 'You are currently browsing as a Guest. Platform moderation and governance are strictly restricted to SuperAdmins.'
+                        : 'Your current account (${userSession.displayName}) is signed in with the role "${userSession.role}". Only SuperAdmins have authority to moderate seller applications and market pricing.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  userSession.isGuest
-                      ? 'You are currently browsing as a Guest. Platform moderation and governance are strictly restricted to SuperAdmins.'
-                      : 'Your current account (${userSession.displayName}) is signed in with the role "${userSession.role}". Only SuperAdmins have authority to moderate seller applications and market pricing.',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    height: 1.4,
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/home'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E1145),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                    ),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: Colors.white),
+                    label: const Text('Return to Home',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () => context.go('/home'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E1145),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                  ),
-                  icon: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white),
-                  label: const Text('Return to Home',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w700)),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -286,27 +289,30 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Tab 1: Seller Approvals
-          _buildSellerApplicationsTab(applications, pendingApps, userSession),
+      body: SafeArea(
+        top: false,
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            // Tab 1: Seller Approvals
+            _buildSellerApplicationsTab(applications, pendingApps, userSession),
 
-          // Tab 2: Price Quotes Moderation
-          _buildPriceQuotesModerationTab(
-            observations,
-            verifiedObservations,
-            pendingObservations,
-            flaggedObservations,
-            userSession,
-          ),
+            // Tab 2: Price Quotes Moderation
+            _buildPriceQuotesModerationTab(
+              observations,
+              verifiedObservations,
+              pendingObservations,
+              flaggedObservations,
+              userSession,
+            ),
 
-          // Tab 3: Categories & Markets Governance
-          _buildCategoriesAndMarketsTab(),
+            // Tab 3: Categories & Markets Governance
+            _buildCategoriesAndMarketsTab(),
 
-          // Tab 4: Security & Audit
-          _buildSecurityAndAuditTab(userSession),
-        ],
+            // Tab 4: Security & Audit
+            _buildSecurityAndAuditTab(userSession),
+          ],
+        ),
       ),
     );
   }
@@ -372,6 +378,10 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
           ),
         ),
         const SizedBox(height: 16),
+
+        // Store Profile Modification Requests Section
+        _buildStoreEditRequestsSection(),
+        const SizedBox(height: 12),
 
         // Filter chips
         SingleChildScrollView(
@@ -439,6 +449,218 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
           for (final app in filtered)
             _buildSellerApplicationCard(app),
       ],
+    );
+  }
+
+  Widget _buildStoreEditRequestsSection() {
+    final requests = ref.watch(storeEditRequestsProvider);
+    final pendingRequests = requests.where((r) => r.isPending).toList();
+
+    if (pendingRequests.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFB74D), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.edit_notifications_rounded,
+                  color: Color(0xFFE65100), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Store Profile Edit Requests (${pendingRequests.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFBF360C),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Verified sellers requesting changes to their store name, market hub, or stall location require administrative verification.',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: Color(0xFF795548),
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final req in pendingRequests) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFE082)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Seller: ${req.applicantEmail}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Pending Review',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFE65100)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Store: ',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: Text(
+                          '${req.currentBusinessName}  ➜  ${req.proposedBusinessName}',
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E1145)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Market Hub: ',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: Text(
+                          '${req.currentMarketHub}  ➜  ${req.proposedMarketHub}',
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E1145)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Contact: ',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: Text(
+                          '${req.currentPhone ?? "None"}  ➜  ${req.proposedPhone}',
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E1145)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            ref
+                                .read(storeEditRequestsProvider.notifier)
+                                .approveRequest(req.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Approved store profile changes for ${req.proposedBusinessName}!'),
+                                backgroundColor: const Color(0xFF2E7D32),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.check, size: 14),
+                          label: const Text('Approve Changes',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            ref
+                                .read(storeEditRequestsProvider.notifier)
+                                .rejectRequest(req.id,
+                                    reason:
+                                        'Rejected by admin verification audit.');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Store modification request rejected.'),
+                                backgroundColor: Color(0xFFC62828),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.close, size: 14),
+                          label: const Text('Reject',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w700)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFC62828),
+                            side: const BorderSide(color: Color(0xFFC62828)),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -626,22 +848,31 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.gps_fixed_rounded,
-                            size: 14, color: AppColors.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          'GPS Coordinates: ',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700]),
-                        ),
-                        Text(
-                          '${app.latitude!.toStringAsFixed(4)}° N, ${app.longitude!.toStringAsFixed(4)}° E',
-                          style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(6),
+                            border:
+                                Border.all(color: const Color(0xFFA5D6A7)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.verified_rounded,
+                                  size: 13, color: Color(0xFF2E7D32)),
+                              SizedBox(width: 4),
+                              Text(
+                                'GPS Location Auto-Locked & Verified',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

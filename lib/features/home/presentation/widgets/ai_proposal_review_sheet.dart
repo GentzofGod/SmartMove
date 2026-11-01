@@ -213,21 +213,23 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
     final double budgetVal = double.tryParse(_budgetController.text) ?? widget.proposal.budget;
     final bool isOverBudget = _itemsTotal > budgetVal && budgetVal > 0;
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.90,
-      ),
-      padding: EdgeInsets.only(
-        left: 18,
-        right: 18,
-        top: 14,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+        ),
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 14,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -559,8 +561,9 @@ class _AiProposalReviewSheetState extends State<AiProposalReviewSheet> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildItemCard(int index, ShoppingItem item) {
     final quotes = item.availableSourceQuotes;

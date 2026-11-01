@@ -112,30 +112,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync_rounded, color: AppColors.textPrimary),
-            tooltip: 'Sync Role with Database',
-            onPressed: () async {
-              await ref.read(authProvider.notifier).refreshProfileFromDatabase();
-              if (context.mounted) {
-                final currentRole = ref.read(authProvider).role;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: AppColors.primary,
-                    content: Text('Profile synced with database! Current role: $currentRole'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-        children: [
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+          children: [
           // User Profile Card
           Container(
             padding: const EdgeInsets.all(18),
@@ -184,37 +166,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: userSession.isAdmin
-                                      ? const Color(0xFFEDE7F6)
-                                      : (userSession.isSeller || userSession.isApprovedSeller)
-                                          ? AppColors.badgeSuccessBg
-                                          : AppColors.badgeWarningBg,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  userSession.isGuest
-                                      ? 'Guest'
-                                      : (userSession.isSuperAdmin
-                                          ? 'SuperAdmin'
-                                          : (userSession.isApprovedSeller
-                                              ? (userSession.role == 'Trader' ? 'Trader' : 'Verified Seller')
-                                              : userSession.role)),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                              if (userSession.isAdmin || userSession.isSeller || userSession.isApprovedSeller) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
                                     color: userSession.isAdmin
-                                        ? const Color(0xFF673AB7)
-                                        : (userSession.isSeller || userSession.isApprovedSeller)
-                                            ? AppColors.primary
-                                            : AppColors.badgeWarningText,
+                                        ? const Color(0xFFEDE7F6)
+                                        : AppColors.badgeSuccessBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    userSession.isSuperAdmin
+                                        ? 'SuperAdmin'
+                                        : (userSession.isAdmin
+                                            ? 'Admin'
+                                            : (userSession.role == 'Trader' ? 'Trader' : 'Verified Seller')),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: userSession.isAdmin
+                                          ? const Color(0xFF673AB7)
+                                          : AppColors.primary,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                               const SizedBox(width: 4),
                               IconButton(
                                 key: const ValueKey('btn_edit_user_profile'),
@@ -626,21 +604,52 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                   ],
+                  if (userSession.hasPendingStoreEdit) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFFB74D)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.pending_actions_rounded,
+                              color: Color(0xFFE65100), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              userSession.pendingStoreEditSummary != null
+                                  ? 'Store Edit Pending Review: ${userSession.pendingStoreEditSummary!}'
+                                  : 'Store Edit Pending Admin Verification',
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFBF360C)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       key: const ValueKey('btn_open_seller_portal_profile'),
                       onPressed: () {
-                        context.go('/community?tab=seller');
+                        context.push('/seller-portal');
                       },
                       icon: const Icon(Icons.storefront_rounded, size: 16),
-                      label: const Text('Open Seller Portal', style: TextStyle(fontWeight: FontWeight.w700)),
+                      label: const Text('Open Seller Portal',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
@@ -773,10 +782,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  subtitle: const Text(
-                    'Price alerts, market hours & order deadlines',
-                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
-                  ),
                   trailing: Switch(
                     key: const ValueKey('switch_notifications'),
                     value: _notificationsEnabled,
@@ -836,15 +841,62 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  await ref.read(authProvider.notifier).logout();
-                  if (mounted) {
-                    messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text('Logged out successfully.'),
-                        backgroundColor: AppColors.primary,
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogCtx) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                    );
+                      title: Row(
+                        children: const [
+                          Icon(Icons.logout_rounded,
+                              color: AppColors.badgeErrorText),
+                          SizedBox(width: 8),
+                          Text(
+                            'Sign Out?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      content: const Text(
+                        'Are you sure you want to log out of your SmartMove account? You will need to sign in again to access verified seller privileges and saved data.',
+                        style: TextStyle(fontSize: 13.5, height: 1.4),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogCtx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(dialogCtx, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.badgeErrorBg,
+                            foregroundColor: AppColors.badgeErrorText,
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Sign Out',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true && context.mounted) {
+                    final messenger = ScaffoldMessenger.of(context);
+                    await ref.read(authProvider.notifier).logout();
+                    if (mounted) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Logged out successfully.'),
+                          backgroundColor: AppColors.primary,
+                        ),
+                      );
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -868,8 +920,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 20),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showApplyToBecomeSeller(BuildContext context, UserSession session) {
     final bizController = TextEditingController(text: session.businessName ?? '');
@@ -1051,7 +1104,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Accurate GPS locked: ${result.town}, ${result.city} (${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)})'),
+                                        content: Text('Accurate GPS locked: ${result.town}, ${result.city} (GPS Verified)'),
                                         backgroundColor: AppColors.primary,
                                       ),
                                     );
@@ -1103,9 +1156,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 children: [
                                   Text(
                                     isScanningLocation
-                                        ? 'Scanning high-accuracy GPS coordinates...'
+                                        ? 'Scanning high-accuracy GPS location...'
                                         : (scannedLat != null
-                                            ? 'GPS Locked: ${scannedLat!.toStringAsFixed(4)}° N, ${scannedLon!.toStringAsFixed(4)}° E'
+                                            ? 'Physical Stall GPS Locked & Verified'
                                             : 'Scan Precise Stall GPS Location'),
                                     style: const TextStyle(
                                       fontSize: 12.5,
@@ -1261,6 +1314,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ],
                     ),
+                    if (session.isApprovedSeller) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFFE082)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Icon(Icons.shield_outlined,
+                                color: Color(0xFFE65100), size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Market Credibility Verification: Changes to verified seller store details are submitted to administrators for verification before taking effect.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF795548),
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     const Text(
                       'Business / Stall Name',
@@ -1352,27 +1435,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                         onPressed: () {
-                          ref.read(authProvider.notifier).updateSellerProfile(
-                                businessName: bizController.text.trim().isNotEmpty
-                                    ? bizController.text.trim()
-                                    : null,
-                                marketHub: selectedHub,
-                                sellerChannel: selectedChannel,
-                                phone: phoneController.text.trim().isNotEmpty
-                                    ? phoneController.text.trim()
-                                    : null,
-                              );
-                          Navigator.pop(bottomSheetContext);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Store profile updated successfully!'),
-                              backgroundColor: AppColors.primary,
-                            ),
-                          );
+                          if (session.isApprovedSeller) {
+                            ref
+                                .read(storeEditRequestsProvider.notifier)
+                                .submitRequest(
+                                  seller: session,
+                                  proposedBusinessName: bizController.text
+                                          .trim()
+                                          .isNotEmpty
+                                      ? bizController.text.trim()
+                                      : (session.businessName ?? ''),
+                                  proposedMarketHub: selectedHub,
+                                  proposedStallLocation: session.stallLocation,
+                                  proposedPhone: phoneController.text
+                                          .trim()
+                                          .isNotEmpty
+                                      ? phoneController.text.trim()
+                                      : (session.phone ?? ''),
+                                  proposedSellerChannel: selectedChannel,
+                                );
+                            Navigator.pop(bottomSheetContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Store modifications submitted for admin review!'),
+                                backgroundColor: AppColors.primary,
+                              ),
+                            );
+                          } else {
+                            ref.read(authProvider.notifier).updateSellerProfile(
+                                  businessName: bizController.text.trim().isNotEmpty
+                                      ? bizController.text.trim()
+                                      : null,
+                                  marketHub: selectedHub,
+                                  sellerChannel: selectedChannel,
+                                  phone: phoneController.text.trim().isNotEmpty
+                                      ? phoneController.text.trim()
+                                      : null,
+                                );
+                            Navigator.pop(bottomSheetContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Store profile updated successfully!'),
+                                backgroundColor: AppColors.primary,
+                              ),
+                            );
+                          }
                         },
-                        child: const Text(
-                          'Save Store Profile',
-                          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                        child: Text(
+                          session.isApprovedSeller
+                              ? 'Submit Changes for Admin Review'
+                              : 'Save Store Profile',
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                       ),
                     ),
@@ -1713,14 +1827,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.mic_none_rounded, color: AppColors.primary),
                   title: const Text('Transient Audio Processing', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Voice inputs are processed transiently in RAM and discarded immediately.', style: TextStyle(fontSize: 11)),
+                  subtitle: const Text('Voice inputs are processed securely in real time and discarded immediately.', style: TextStyle(fontSize: 11)),
                 ),
                 const Divider(height: 1),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.storage_outlined, color: AppColors.primary),
                   title: const Text('Local Offline Cache Encrypted', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Your itineraries and preferences reside encrypted on this device.', style: TextStyle(fontSize: 11)),
+                  subtitle: const Text('Your itineraries and preferences remain stored safely on your device.', style: TextStyle(fontSize: 11)),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -1751,7 +1865,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: ElevatedButton.icon(
                     key: const ValueKey('btn_open_full_privacy_policy'),
                     icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('Read Full NDPA Privacy Policy'),
+                    label: const Text('Read Privacy Policy'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -1975,24 +2089,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'SmartMove is an intelligent commodity price comparison and errand planning platform built for everyday shoppers, market merchants, and consumers across Nigeria.',
-                  style: TextStyle(fontSize: 12, height: 1.4, color: AppColors.textPrimary),
+                  'SmartMove is a commodity price comparison platform designed for everyday shoppers, market merchants, and consumers across Nigeria.',
+                  style: TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Key Innovations:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  'Compare live prices across local open markets (Bodija, Mile 12, Wuse) and verified online stores, calculate transport costs, and find the best local deals.',
+                  style: TextStyle(fontSize: 12, height: 1.4, color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 4),
-                const Text('• Dual-Layer Web Search Grounding for fresh produce and appliances', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                const Text('• Push-to-Talk Multi-Dialect Voice Transcribe (Pidgin, Yorùbá, Hausa, Igbo)', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                const Text('• Standardized Landed Cost & Transport Fare Engine', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                const Text('• Supabase Realtime Moderation & Verified Trader Badges', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 const Center(
                   child: Text(
                     '© 2026 SmartMove Technologies. All rights reserved.',
-                    style: TextStyle(fontSize: 10, color: AppColors.textTertiary),
+                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
                   ),
                 ),
               ],

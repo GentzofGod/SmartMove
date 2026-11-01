@@ -130,11 +130,31 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         String? resolvedLocaleId;
         try {
           final systemLocales = await _speechToText.locales();
+          String targetPrefix = 'en_ng';
+          if (_selectedDialect == VoiceDialect.yoruba) {
+            targetPrefix = 'yo';
+          } else if (_selectedDialect == VoiceDialect.hausa) {
+            targetPrefix = 'ha';
+          } else if (_selectedDialect == VoiceDialect.igbo) {
+            targetPrefix = 'ig';
+          } else if (_selectedDialect == VoiceDialect.nigerianPidgin) {
+            targetPrefix = 'pcm';
+          }
+
           for (final loc in systemLocales) {
             final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
-            if (locClean == 'en_ng' || locClean.startsWith('en_ng')) {
+            if (locClean.startsWith(targetPrefix)) {
               resolvedLocaleId = loc.localeId;
               break;
+            }
+          }
+          if (resolvedLocaleId == null) {
+            for (final loc in systemLocales) {
+              final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
+              if (locClean.startsWith('en_ng')) {
+                resolvedLocaleId = loc.localeId;
+                break;
+              }
             }
           }
         } catch (_) {}
@@ -201,13 +221,38 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
     final capturedText = _transcriptionResult?.text.trim() ?? '';
     if (capturedText.isNotEmpty) {
+      const aiService = MetaAiService();
+      final processed = aiService.cleanAndNormalizeMicrophoneSpeech(
+        capturedText,
+        targetDialect: _selectedDialect,
+      );
+
+      final cleanedText =
+          (processed['cleanedText'] as String?) ?? capturedText;
+      final detectedDialect =
+          (processed['detectedDialect'] as VoiceDialect?) ?? _selectedDialect;
+      final englishTranslation =
+          (processed['englishTranslation'] as String?) ?? '';
+      final isTranslated = (processed['isTranslated'] as bool?) ?? false;
+
       if (mounted) {
         setState(() {
           _isTranscribing = false;
-          _transcriptController.text = capturedText;
+          _selectedDialect = detectedDialect;
+          _transcriptController.text = cleanedText;
           _isFallback = false;
+          _transcriptionResult = VoiceTranscriptionResult(
+            text: cleanedText,
+            confidence: _transcriptionResult?.confidence ?? 0.95,
+            modelName: 'Phone Microphone Voice Transcribe',
+            isFallback: false,
+            detectedDialect: detectedDialect,
+            englishTranslation: isTranslated ? englishTranslation : null,
+            isDialectTranslated: isTranslated,
+            note: 'Captured and verified from device microphone',
+          );
           _transcriptionStatus =
-              'SmartMove AI: Voice Input (${_selectedDialect.label})';
+              'SmartMove AI: Voice Input (${detectedDialect.label})';
         });
       }
       return;
@@ -267,34 +312,36 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
 
             // Header
             Row(
@@ -840,6 +887,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
