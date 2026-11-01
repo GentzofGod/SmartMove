@@ -10,6 +10,7 @@ import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/presentation/widgets/commodity_image_widget.dart';
 import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../../core/presentation/widgets/report_modal_sheet.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 
@@ -37,168 +38,33 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
   }
 
   void _showReportStaleDialog(BuildContext context) {
-    String selectedReason = 'Price is higher in market';
-    final notesController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Report Price Observation',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Help the community keep commodity price intelligence honest and up to date.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Reason choices
-                  ...[
-                    'Price is higher in market',
-                    'Seller is out of stock',
-                    'Suspicious / inaccurate report',
-                  ].map((reason) {
-                    final isSelected = selectedReason == reason;
-                    return InkWell(
-                      onTap: () => setModalState(() => selectedReason = reason),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primaryTint
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.cardBorder,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              size: 16,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                reason,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? AppColors.primaryDark
-                                      : AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: notesController,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Optional notes (e.g. Current price seen is ₦1,850)',
-                      hintStyle: const TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.cardBorder,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Report submitted. Thank you for keeping local commodity prices verified!',
-                            ),
-                            backgroundColor: AppColors.primary,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.badgeWarningText,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Submit Observation Flag',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    final observations = ref.read(communityProvider);
+    final matchingObs = observations.cast<PriceObservation?>().firstWhere(
+      (o) =>
+          o != null &&
+          (o.productId == widget.product.id ||
+              o.productName.toLowerCase().contains(widget.product.name.toLowerCase()) ||
+              widget.product.name.toLowerCase().contains(o.productName.toLowerCase())),
+      orElse: () => null,
     );
+
+    final targetObs = matchingObs ??
+        PriceObservation(
+          id: 'obs-${widget.product.id}',
+          productId: widget.product.id,
+          productName: widget.product.name,
+          sellerName: widget.product.bestSeller,
+          marketLocation: widget.product.bestSeller,
+          price: widget.product.lowestPrice,
+          unit: widget.product.standardUnit,
+          timestamp: DateTime.now(),
+          sourceType: ObservationSource.communityReported,
+          submitterName: 'Market Shopper',
+          channel: widget.product.channel,
+          inStock: true,
+        );
+
+    ReportModalSheet.show(context, targetObs);
   }
 
   List<PriceObservation> _getComparisonQuotes(
@@ -987,6 +853,17 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 TraderNegotiationSheet.show(context, source: source);
                               },
                             ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(
+                              obs.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
+                              size: 16,
+                              color: obs.isFlaggedAnomaly ? const Color(0xFFC62828) : AppColors.textTertiary,
+                            ),
+                            tooltip: obs.isFlaggedAnomaly ? 'Listing Reported' : 'Report Product or Seller',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => ReportModalSheet.show(context, obs),
                           ),
                         ],
                       ),
@@ -1935,6 +1812,17 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: Icon(
+                  opt.observation.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
+                  size: 16,
+                  color: opt.observation.isFlaggedAnomaly ? const Color(0xFFC62828) : AppColors.textTertiary,
+                ),
+                tooltip: opt.observation.isFlaggedAnomaly ? 'Listing Reported' : 'Report Product or Seller',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => ReportModalSheet.show(context, opt.observation),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -2065,6 +1953,17 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     TraderNegotiationSheet.show(context, source: source);
                   },
                 ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: Icon(
+                  opt.observation.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
+                  size: 16,
+                  color: opt.observation.isFlaggedAnomaly ? const Color(0xFFC62828) : AppColors.textTertiary,
+                ),
+                tooltip: opt.observation.isFlaggedAnomaly ? 'Listing Reported' : 'Report Product or Seller',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => ReportModalSheet.show(context, opt.observation),
               ),
             ],
           ),

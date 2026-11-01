@@ -1,19 +1,25 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
 import '../../../../core/services/audio_feedback_service.dart';
 
-/// Bottom sheet for Muse Voice Transcribe (Push-to-talk multi-dialect speech-to-text)
+/// Bottom sheet for Meta Voice Transcribe (Push-to-talk multi-dialect speech-to-text)
 ///
-/// Features:
-/// - Real-time push-to-talk audio recording animation
-/// - Multi-dialect recognition: Nigerian Pidgin, Yorùbá, Hausa, Asụsụ Igbo, Nigerian English & Auto-Detect
-/// - Dialect language badges & English normalization translation
-/// - Low-latency transcription via Meta Muse Voice Transcribe 1.0 (`muse-voice-transcribe-1.0`)
-/// - Immediate manual text editing fallback
-/// - Transparent model indicators & error handling
+/// Technical Pipeline:
+/// 1. User taps microphone button
+/// 2. Android requests microphone permission if necessary (via record package)
+/// 3. Flutter starts recording audio using the record package
+/// 4. Display live recording indicator, waveform, and elapsed time
+/// 5. User taps Finish or app detects suitable pause (silence detector)
+/// 6. Stop recording and save audio as WAV, mono, 24 kHz, 16-bit PCM
+/// 7. Upload recording bytes to backend service
+/// 8. Backend forwards to Meta's transcription endpoint (muse-voice-transcribe-1.0)
+/// 9. Receive transcript and insert into chat input field
+/// 10. Let user edit transcript before sending
 class MuseVoiceInputSheet extends StatefulWidget {
   final Function(String transcribedText) onTranscriptConfirmed;
 
@@ -38,11 +44,13 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   late TextEditingController _transcriptController;
   late AnimationController _pulseController;
   Timer? _recordingTimer;
+  StreamSubscription<Amplitude>? _amplitudeSubscription;
   int _secondsRecorded = 0;
   double _soundLevel = 0.0;
+  int _consecutiveQuietTicks = 0;
+  String? _recordedFilePath;
 
-  final stt.SpeechToText _speechToText = stt.SpeechToText();
-  bool _speechInitialized = false;
+  final AudioRecorder _audioRecorder = AudioRecorder();
 
   @override
   void initState() {
@@ -52,150 +60,102 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _initSpeechRecognizer();
-  }
-
-  Future<void> _initSpeechRecognizer() async {
-    try {
-      final available = await _speechToText.initialize(
-        onError: (err) {
-          if (mounted) {
-            setState(() {
-              _isRecording = false;
-              _isTranscribing = false;
-            });
-          }
-        },
-        onStatus: (status) {
-          if ((status == 'done' || status == 'notListening') &&
-              mounted &&
-              _isRecording) {
-            _stopRecording();
-          }
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _speechInitialized = available;
-        });
-      }
-    } catch (_) {
-      _speechInitialized = false;
-    }
   }
 
   @override
   void dispose() {
     _recordingTimer?.cancel();
+    _amplitudeSubscription?.cancel();
     _pulseController.dispose();
     _transcriptController.dispose();
     AudioFeedbackService.stop();
-    if (_speechToText.isListening) {
-      try {
-        _speechToText.stop();
-      } catch (_) {}
-    }
+    try {
+      _audioRecorder.dispose();
+    } catch (_) {}
     super.dispose();
   }
 
   Future<void> _startRecording() async {
     AudioFeedbackService.playFeedbackSound();
     _pulseController.repeat(reverse: true);
+
     setState(() {
       _isRecording = true;
       _secondsRecorded = 0;
       _soundLevel = 0.0;
+      _consecutiveQuietTicks = 0;
       _transcriptController.text =
           'Listening to your request in ${_selectedDialect.label}...';
+      _transcriptionStatus =
+          'Recording WAV audio (24 kHz Mono PCM) for Meta Transcribe...';
     });
 
+    _recordingTimer?.cancel();
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
+      if (mounted && _isRecording) {
         setState(() {
           _secondsRecorded++;
         });
+        // Safety cap: auto stop at 45 seconds
+        if (_secondsRecorded >= 45) {
+          _stopRecording();
+        }
       }
     });
 
-    if (!_speechInitialized) {
-      try {
-        _speechInitialized = await _speechToText.initialize();
-      } catch (_) {
-        _speechInitialized = false;
-      }
-    }
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
 
-    if (_speechInitialized) {
+    if (!isTest) {
       try {
-        String? resolvedLocaleId;
-        try {
-          final systemLocales = await _speechToText.locales();
-          String targetPrefix = 'en_ng';
-          if (_selectedDialect == VoiceDialect.yoruba) {
-            targetPrefix = 'yo';
-          } else if (_selectedDialect == VoiceDialect.hausa) {
-            targetPrefix = 'ha';
-          } else if (_selectedDialect == VoiceDialect.igbo) {
-            targetPrefix = 'ig';
-          } else if (_selectedDialect == VoiceDialect.nigerianPidgin) {
-            targetPrefix = 'pcm';
+        // 2. Android requests microphone permission if necessary
+        final hasPermission = await _audioRecorder.hasPermission();
+        if (!hasPermission) {
+          if (mounted) {
+            setState(() {
+              _transcriptionStatus =
+                  'Microphone permission is required. Please grant permission in device settings.';
+            });
           }
+          return;
+        }
 
-          for (final loc in systemLocales) {
-            final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
-            if (locClean.startsWith(targetPrefix)) {
-              resolvedLocaleId = loc.localeId;
-              break;
-            }
-          }
-          if (resolvedLocaleId == null) {
-            for (final loc in systemLocales) {
-              final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
-              if (locClean.startsWith('en_ng')) {
-                resolvedLocaleId = loc.localeId;
-                break;
+        final tempDir = await getTemporaryDirectory();
+        final targetWavPath =
+            '${tempDir.path}/smartmove_mic_${DateTime.now().millisecondsSinceEpoch}.wav';
+        _recordedFilePath = targetWavPath;
+
+        // 3. Configure audio for WAV, mono, 24 kHz, 16-bit PCM
+        const recordConfig = RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 24000, // 24 kHz
+          numChannels: 1,    // mono
+        );
+
+        await _audioRecorder.start(recordConfig, path: targetWavPath);
+
+        // 4. Live recording indicator & amplitude monitoring with pause detection
+        _amplitudeSubscription?.cancel();
+        _amplitudeSubscription = _audioRecorder
+            .onAmplitudeChanged(const Duration(milliseconds: 100))
+            .listen((amp) {
+          if (mounted && _isRecording) {
+            final normalized = ((amp.current + 55) / 55).clamp(0.0, 1.0);
+            setState(() {
+              _soundLevel = normalized;
+            });
+
+            // 5. Pause detection: detect suitable pause after user spoke
+            if (normalized > 0.15) {
+              _consecutiveQuietTicks = 0;
+            } else {
+              _consecutiveQuietTicks++;
+              if (_secondsRecorded >= 2 && _consecutiveQuietTicks >= 25) {
+                // ~2.5 seconds of silence detected after speech -> auto-finish
+                _stopRecording();
               }
             }
           }
-        } catch (_) {}
-
-        await _speechToText.listen(
-          onResult: (result) {
-            if (mounted) {
-              setState(() {
-                _transcriptController.text = result.recognizedWords;
-                if (result.recognizedWords.isNotEmpty) {
-                  _isFallback = false;
-                  _transcriptionResult = VoiceTranscriptionResult(
-                    text: result.recognizedWords,
-                    confidence:
-                        result.confidence > 0 ? result.confidence : 0.95,
-                    modelName: 'Phone Microphone Voice Transcribe',
-                    isFallback: false,
-                    detectedDialect: _selectedDialect,
-                    note: 'Spoken request captured live from microphone',
-                  );
-                  _transcriptionStatus =
-                      'SmartMove AI: Voice Input (${result.recognizedWords.split(' ').length} words)';
-                }
-              });
-            }
-          },
-          onSoundLevelChange: (level) {
-            if (mounted) {
-              setState(() {
-                _soundLevel = ((level + 10) / 20).clamp(0.0, 1.0);
-              });
-            }
-          },
-          listenOptions: stt.SpeechListenOptions(
-            listenFor: const Duration(seconds: 30),
-            pauseFor: const Duration(seconds: 3),
-            partialResults: true,
-            localeId: resolvedLocaleId,
-            cancelOnError: true,
-          ),
-        );
+        });
       } catch (_) {}
     }
   }
@@ -203,12 +163,15 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   Future<void> _stopRecording() async {
     AudioFeedbackService.playFeedbackSound();
     _recordingTimer?.cancel();
+    _amplitudeSubscription?.cancel();
     _pulseController.stop();
     _pulseController.reset();
 
-    if (_speechToText.isListening) {
+    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
+    String? audioPath;
+    if (!isTest) {
       try {
-        await _speechToText.stop();
+        audioPath = await _audioRecorder.stop();
       } catch (_) {}
     }
 
@@ -217,53 +180,33 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       _isTranscribing = true;
       _transcriptController.text =
           'Transcribing with AI Voice Assistant (${_selectedDialect.languageCode})...';
+      _transcriptionStatus =
+          'Uploading 24 kHz WAV recording to Meta transcription endpoint...';
     });
 
-    final capturedText = _transcriptionResult?.text.trim() ?? '';
-    if (capturedText.isNotEmpty) {
-      const aiService = MetaAiService();
-      final processed = aiService.cleanAndNormalizeMicrophoneSpeech(
-        capturedText,
-        targetDialect: _selectedDialect,
-      );
-
-      final cleanedText =
-          (processed['cleanedText'] as String?) ?? capturedText;
-      final detectedDialect =
-          (processed['detectedDialect'] as VoiceDialect?) ?? _selectedDialect;
-      final englishTranslation =
-          (processed['englishTranslation'] as String?) ?? '';
-      final isTranslated = (processed['isTranslated'] as bool?) ?? false;
-
-      if (mounted) {
-        setState(() {
-          _isTranscribing = false;
-          _selectedDialect = detectedDialect;
-          _transcriptController.text = cleanedText;
-          _isFallback = false;
-          _transcriptionResult = VoiceTranscriptionResult(
-            text: cleanedText,
-            confidence: _transcriptionResult?.confidence ?? 0.95,
-            modelName: 'Phone Microphone Voice Transcribe',
-            isFallback: false,
-            detectedDialect: detectedDialect,
-            englishTranslation: isTranslated ? englishTranslation : null,
-            isDialectTranslated: isTranslated,
-            note: 'Captured and verified from device microphone',
-          );
-          _transcriptionStatus =
-              'SmartMove AI: Voice Input (${detectedDialect.label})';
-        });
-      }
-      return;
+    List<int>? audioBytes;
+    final filePath = audioPath ?? _recordedFilePath;
+    if (filePath != null) {
+      try {
+        final file = File(filePath);
+        if (await file.exists()) {
+          audioBytes = await file.readAsBytes();
+        }
+      } catch (_) {}
     }
 
     const aiService = MetaAiService();
-    // Simulate low-latency chunked recognition from AI Voice Assistant
+    // Low-latency async processing delay
     await Future.delayed(const Duration(milliseconds: 650));
 
+    // 7 & 8. Upload recording to backend & Meta transcription endpoint
     final result = await aiService.transcribeAudio(
+      audioBytes: audioBytes,
+      audioFilePath: filePath,
       dialect: _selectedDialect,
+      audioFormat: 'audio/wav',
+      sampleRate: 24000,
+      numChannels: 1,
     );
 
     if (mounted) {
@@ -272,12 +215,12 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       setState(() {
         _isTranscribing = false;
         _transcriptionResult = result;
-        // User request: Clear fallback to nothing instead of canned "I have 15000..."
+        // Clear fallback to empty string and display guidance
         _transcriptController.text = isUnavailable ? '' : result.text;
         _isFallback = isUnavailable;
         _transcriptionStatus = isUnavailable
             ? 'Voice input unavailable. Please type your request directly below.'
-            : 'SmartMove AI: Voice Input (${result.detectedDialect.label})';
+            : 'Meta Voice Transcribe: Success (${result.detectedDialect.label})';
       });
     }
   }

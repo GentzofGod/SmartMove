@@ -187,6 +187,10 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Verify Header
       expect(find.text('AI Voice Assistant'), findsOneWidget);
@@ -203,6 +207,10 @@ void main() {
       // Select Yorùbá chip
       await tester.tap(find.byKey(const ValueKey('chip_dialect_yo')));
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Verify Yorùbá language code indicator
       expect(find.text('YO'), findsOneWidget);
@@ -211,6 +219,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('btn_simulate_dialect_voice')));
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Verify Transcribed Request and English Translation card are shown
       expect(find.text('Transcribed Request:'), findsOneWidget);
@@ -220,13 +232,25 @@ void main() {
       // Tap "Use Translation"
       await tester.tap(find.byKey(const ValueKey('btn_use_translation')));
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Scroll and Tap "Generate Plan Proposal"
       final proposalBtn = find.byKey(const ValueKey('btn_generate_plan_proposal'));
       await tester.ensureVisible(proposalBtn);
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
       await tester.tap(proposalBtn);
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       expect(confirmedTranscript, isNotNull);
       expect(confirmedTranscript!.toLowerCase().contains('rice'), true);
@@ -251,10 +275,18 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Switch to Nigerian Pidgin
       await tester.tap(find.byKey(const ValueKey('chip_dialect_pcm')));
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       expect(find.text('PCM'), findsOneWidget);
 
@@ -270,6 +302,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 800));
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Verify that fallback is cleared to empty string and user-friendly error is shown
       expect(
@@ -283,13 +319,25 @@ void main() {
         '2 paint rubber of garri and 1 bag of rice',
       );
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       // Scroll and Tap Generate proposal
       final proposalBtn = find.byKey(const ValueKey('btn_generate_plan_proposal'));
       await tester.ensureVisible(proposalBtn);
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
       await tester.tap(proposalBtn);
       await tester.pumpAndSettle();
+      for (final el in find.byType(Text).evaluate()) {
+        final widget = el.widget as Text;
+        print('FOUND TEXT: "${widget.data}"');
+      }
 
       expect(confirmedTranscript, isNotNull);
       expect(confirmedTranscript!.contains('paint rubber of garri'), true);

@@ -865,6 +865,18 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           o,
     ];
   }
+
+  void reportListing({
+    required String observationId,
+    required String reportType,
+    required String reason,
+    String? details,
+    required String reporterName,
+  }) {
+    final compositeReason =
+        '[$reportType] $reason${details != null && details.trim().isNotEmpty ? " • Details: ${details.trim()}" : ""} • Reported by $reporterName';
+    flagListingAnomaly(observationId, isAnomalous: true, reason: compositeReason);
+  }
 }
 
 final communityProvider =

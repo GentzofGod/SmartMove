@@ -139,7 +139,21 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => MuseVoiceInputSheet(
         onTranscriptConfirmed: (text) {
-          _processAiPlan(text);
+          setState(() {
+            _inlinePromptController.text = text;
+            _inlinePromptController.selection = TextSelection.fromPosition(
+              TextPosition(offset: text.length),
+            );
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Voice transcript inserted into chat prompt. Review or edit before sending!',
+              ),
+              backgroundColor: AppColors.primary,
+              duration: Duration(seconds: 3),
+            ),
+          );
         },
       ),
     );
@@ -287,9 +301,15 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                     ),
                   )
-                else
+                else ...[
+                  IconButton(
+                    icon: const Icon(Icons.mic_rounded, color: AppColors.primary, size: 20),
+                    tooltip: 'Record Voice Note (Meta Transcribe)',
+                    onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
+                  ),
                   IconButton(
                     icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary, size: 20),
+                    tooltip: 'Send prompt to AI Planner',
                     onPressed: () {
                       final text = _inlinePromptController.text.trim();
                       if (text.isNotEmpty) {
@@ -297,6 +317,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       }
                     },
                   ),
+                ],
               ],
             ),
           ),

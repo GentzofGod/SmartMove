@@ -43,6 +43,23 @@ if [ ! -f ".env" ]; then
   fi
 fi
 
+# Wire up dart-define arguments from .env
+DART_DEFINE_ARGS=()
+if [ -f ".env" ]; then
+  echo -e "\n${GREEN}[✓] Found .env file, configuring Dart Define environment variables:${NC}"
+  DART_DEFINE_ARGS+=("--dart-define-from-file=.env")
+  while IFS='=' read -r key value || [ -n "$key" ]; do
+    clean_key=$(echo "$key" | tr -d ' \r\n\t')
+    if [[ ! "$clean_key" =~ ^#.* ]] && [ -n "$clean_key" ]; then
+      clean_val=$(echo "$value" | tr -d '\r\n')
+      DART_DEFINE_ARGS+=("--dart-define=$clean_key=$clean_val")
+      # Mask sensitive keys for output
+      masked_val="${clean_val:0:6}...${clean_val: -4}"
+      echo -e "    * Injected: ${clean_key}=${masked_val}"
+    fi
+  done < .env
+fi
+
 # Ensure gradlew is executable
 if [ -f "android/gradlew" ]; then
   chmod +x android/gradlew
@@ -54,21 +71,21 @@ echo -e "\n${BLUE}--> Fetching dependencies (flutter pub get)...${NC}"
 
 # Build APK
 MODE="${1:---split}"
-echo -e "\n${BLUE}--> Starting build (${MODE})...${NC}"
+echo -e "\n${BLUE}--> Starting build (${MODE}) with Dart Define environment...${NC}"
 echo -e "${YELLOW}[Note] Building and assembling Gradle tasks...${NC}"
 
 case "$MODE" in
   --universal)
     echo "Building universal release APK..."
-    /data/workspace/flutter/bin/flutter build apk --release -v
+    /data/workspace/flutter/bin/flutter build apk --release "${DART_DEFINE_ARGS[@]}"
     ;;
   --debug)
     echo "Building debug APK..."
-    /data/workspace/flutter/bin/flutter build apk --debug -v
+    /data/workspace/flutter/bin/flutter build apk --debug "${DART_DEFINE_ARGS[@]}"
     ;;
   --split|*)
     echo "Building split APKs per ABI (arm64-v8a, armeabi-v7a, x86_64)..."
-    /data/workspace/flutter/bin/flutter build apk --release --split-per-abi -v
+    /data/workspace/flutter/bin/flutter build apk --release --split-per-abi "${DART_DEFINE_ARGS[@]}"
     ;;
 esac
 

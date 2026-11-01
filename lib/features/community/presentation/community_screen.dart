@@ -8,6 +8,7 @@ import '../../../core/models/seller_application.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../../core/presentation/widgets/commodity_image_widget.dart';
 import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../../core/presentation/widgets/report_modal_sheet.dart';
 import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/localization/app_language.dart';
@@ -54,15 +55,17 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     'crate',
   ];
 
-  void _showAddObservationDialog(BuildContext context, {bool isSellerDirect = false}) {
+  void _showAddObservationDialog(BuildContext context) {
     final userSession = ref.read(authProvider);
+    final applications = ref.read(sellerApplicationsProvider);
+
     if (userSession.isGuest) {
       showDialog(
         context: context,
         builder: (dialogCtx) => AlertDialog(
           title: const Text('Sign In Required'),
           content: const Text(
-            'Guest users can explore market prices. To publish community price quotes or manage commodity listings, please sign in or create an account.',
+            'Guest users can explore market prices. To publish community price quotes, please sign in or create an account.',
           ),
           actions: [
             TextButton(
@@ -81,18 +84,96 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       );
       return;
     }
-    final productController = TextEditingController();
-    final sellerController = TextEditingController(
-      text: isSellerDirect && userSession.businessName != null ? userSession.businessName! : '',
+
+    // Check if user is a verified seller. Verified sellers cannot post through community channels.
+    final isVerifiedSeller = userSession.isApprovedSeller ||
+        userSession.role == 'Trader' ||
+        applications.any((a) =>
+            (!userSession.isGuest &&
+                userSession.email.isNotEmpty &&
+                a.applicantEmail.trim().toLowerCase() ==
+                    userSession.email.trim().toLowerCase() &&
+                a.status == SellerApplicationStatus.approved));
+
+    if (isVerifiedSeller) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.storefront_rounded, color: AppColors.primary),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Verified Seller Portal Notice',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Verified sellers cannot post listings through general community channels.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Please publish and manage your official inventory, pricing, stock levels, and stall location directly in your dedicated Seller Portal to maintain verified merchant status and stall geolocation.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text(
+                'Dismiss',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.storefront_rounded, size: 16),
+              label: const Text('Go to Seller Portal'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                context.push('/seller-portal');
+              },
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final posterNameController = TextEditingController(
+      text: userSession.displayName.isNotEmpty ? userSession.displayName : '',
     );
+    final productController = TextEditingController();
+    final sellerController = TextEditingController();
     final priceController = TextEditingController();
     final unitController = TextEditingController(text: '1kg');
     final brandController = TextEditingController();
     final notesController = TextEditingController();
-    String submitterRole = isSellerDirect ? 'Trader' : userSession.role;
-    String channel = isSellerDirect && userSession.sellerChannel != null
-        ? userSession.sellerChannel!
-        : 'Local Market';
+    String channel = 'Local Market';
     String category = 'Groceries';
     bool inStock = true;
 
@@ -132,12 +213,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          isSellerDirect ? 'Submit Seller Price Listing' : 'Report Price Observation',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                        const Expanded(
+                          child: Text(
+                            'Report Price Observation',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                         IconButton(
@@ -191,6 +274,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     ),
                     const SizedBox(height: 10),
 
+                    // Poster Name Attribution
+                    TextField(
+                      controller: posterNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Your Name (Poster Name)',
+                        hintText: 'e.g. Aisha B., Chidi K., Mama Tolu',
+                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+                        helperText: 'Your name will be displayed on this community price contribution',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
                     TextField(
                       controller: productController,
                       onChanged: (_) => setModalState(() {}),
@@ -217,7 +315,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     TextField(
                       controller: sellerController,
                       decoration: InputDecoration(
-                        labelText: isSellerDirect ? 'Business / Stall Name' : 'Market / Store Name',
+                        labelText: 'Market / Store Name',
                         hintText: 'e.g. Bodija Market Stall 14, Jumia, Dugbe Mart',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -302,9 +400,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                           children: [
                             const Icon(Icons.calculate_outlined, size: 16, color: AppColors.primary),
                             const SizedBox(width: 6),
-                            Text(
-                              'Standardized Unit Price: ₦${previewStandardized.toStringAsFixed(0)} / $baseUnit',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                            Expanded(
+                              child: Text(
+                                'Standardized Unit Price: ₦${previewStandardized.toStringAsFixed(0)} / $baseUnit',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -404,17 +505,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                         onPressed: () {
                           final price = double.tryParse(priceController.text.trim());
                           if (productController.text.trim().isNotEmpty && price != null) {
+                            final posterName = posterNameController.text.trim().isNotEmpty
+                                ? posterNameController.text.trim()
+                                : (userSession.displayName.trim().isNotEmpty
+                                    ? userSession.displayName.trim()
+                                    : 'Community Shopper');
+
                             ref.read(communityProvider.notifier).addObservation(
                                   productName: productController.text.trim(),
                                   sellerName: sellerController.text.trim().isNotEmpty
                                       ? sellerController.text.trim()
-                                      : (isSellerDirect && userSession.businessName != null
-                                          ? userSession.businessName!
-                                          : 'Local Market'),
+                                      : 'Local Market',
                                   price: price,
                                   unit: unitController.text.trim(),
-                                  submitterName: isSellerDirect ? 'You (Verified Seller)' : userSession.displayName,
-                                  submitterRole: submitterRole,
+                                  submitterName: posterName,
+                                  submitterRole: 'Customer',
                                   channel: channel,
                                   category: category,
                                   brandOrGrade: brandController.text.trim().isNotEmpty
@@ -427,16 +532,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                                 );
                             Navigator.pop(bottomCtx);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(isSellerDirect
-                                    ? 'Commodity listing published to SmartMove!'
-                                    : 'Price observation submitted to community!'),
+                              const SnackBar(
+                                content: Text('Price observation submitted to community!'),
                                 backgroundColor: AppColors.primary,
                               ),
                             );
                           }
                         },
-                        child: Text(isSellerDirect ? 'Publish Listing' : 'Submit Observation'),
+                        child: const Text('Submit Observation'),
                       ),
                     ),
                   ],
@@ -979,9 +1082,40 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   ),
                 ],
               ),
+              // Submitter / Poster Name attribution
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    _isVerifiedSellerObs(obs)
+                        ? Icons.verified_user_outlined
+                        : Icons.person_pin_circle_outlined,
+                    size: 13,
+                    color: _isVerifiedSellerObs(obs)
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _isVerifiedSellerObs(obs)
+                          ? 'Verified Seller: ${obs.sellerName}'
+                          : 'Posted by: ${obs.submitterName.trim().isNotEmpty ? obs.submitterName : 'Community Contributor'}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: _isVerifiedSellerObs(obs)
+                            ? AppColors.primaryDark
+                            : AppColors.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
 
-              // Verification badge & time
+              // Verification badge, time, and Report button
               Row(
                 children: [
                   Container(
@@ -1015,8 +1149,80 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    key: ValueKey('btn_report_obs_${obs.id}'),
+                    onTap: () => ReportModalSheet.show(context, obs),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: obs.isFlaggedAnomaly
+                            ? const Color(0xFFFFEBEE)
+                            : AppColors.background,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: obs.isFlaggedAnomaly
+                              ? const Color(0xFFE57373)
+                              : AppColors.cardBorder,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            obs.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
+                            size: 13,
+                            color: obs.isFlaggedAnomaly
+                                ? const Color(0xFFC62828)
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            obs.isFlaggedAnomaly ? 'Reported' : 'Report',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: obs.isFlaggedAnomaly
+                                  ? const Color(0xFFC62828)
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
+              if (obs.isFlaggedAnomaly && obs.anomalyReason != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFFCDD2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFC62828)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Flagged for Moderation: ${obs.anomalyReason}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFC62828),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
 
               // Action Buttons: Locate on Map & Chat & Buy

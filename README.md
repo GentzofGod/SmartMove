@@ -8,7 +8,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?logo=dart)](https://dart.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Database-3ECF8E?logo=supabase)](https://supabase.com)
 [![Meta AI](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%20%26%20Voice%20%26%20Vision-0668E1?logo=meta)](https://about.meta.com)
-[![Tests](https://img.shields.io/badge/Tests-207%20Passing-success?logo=checkmarx)](test/)
+[![Tests](https://img.shields.io/badge/Tests-214%20Passing-success?logo=checkmarx)](test/)
 [![Analyzer](https://img.shields.io/badge/Analyzer-0%20Issues-success)](lib/)
 
 ---
@@ -105,6 +105,31 @@ SmartMove has undergone continuous iterative development and real-world hardenin
   - **`Verified Sellers (N)`**: Listings from registered market traders with confirmed stalls.
   - **`Community Reports (N)`**: Crowdsourced price reports submitted by community shoppers.
 - **Single-Line Category Filter Chips**: Clean horizontal category row (`All`, `Groceries`, `Electronics`, `Pharmacy`, `Others`) with contextual category icons, instant counts, and empty-state resilience.
+
+### 15. 🚩 Comprehensive Product & Seller Reporting System (`ReportModalSheet`)
+- **Report Inaccurate or Abusive Listings**: Accessible via dedicated Report flag buttons across both `CommunityScreen` listings and `ProductDetailSheet` quotes.
+- **Granular Issue Categorization**:
+  - **Product Issues**: Inaccurate or fake prices, phantom / permanently out-of-stock items, counterfeit / damaged goods, packaging unit discrepancies, and incorrect category tags.
+  - **Seller / Stall Issues**: Refusal to honor advertised prices, fake / non-existent stall addresses, unreachable / invalid phone numbers, rude or unprofessional trader conduct, and suspected scammer / imposter activity.
+- **Direct Moderation Queue Pipeline**: Flags listings as anomalies in `CommunityNotifier.reportListing(...)`, highlights reported items with an alert banner (`Flagged for Moderation`), and submits detailed reports with reporter attribution directly to the SuperAdmin console.
+
+### 16. 👤 Community Posts Poster Name Attribution
+- **Contributor Transparency**: Every crowdsourced community price observation prominently displays the contributor's name (`Posted by: <name>`) alongside the location and timestamp.
+- **Attribution Input Field**: General shoppers can customize their poster attribution name when submitting new price reports via the Community addition sheet.
+- **Distinction from Verified Merchants**: Verified seller inventory cards clearly bear `Verified Seller: <businessName>` to distinguish official merchant listings from crowdsourced shopper reports.
+
+### 17. 🚪 Verified Seller Community Posting Restriction & Portal Routing
+- **Enforced Merchant Integrity**: Verified and approved traders are restricted from publishing inventory through general community channels to ensure all merchant listings maintain verified stall geolocations, official business metadata, and live stock tracking.
+- **Automatic Portal Redirect**: When an approved seller taps the add button in the Community tab, a dedicated "Verified Seller Portal Notice" dialog guides them to manage and publish their inventory directly within their official **Seller Portal** (`/seller-portal`).
+
+### 18. 🎙️ End-to-End High-Fidelity Audio Recording & Meta Voice Transcription Pipeline
+- **Modern Audio Capture (`record: ^7.1.2`)**: Replaced fragile on-device STT with cross-platform native audio recording using `AudioRecorder`.
+- **Automated Microphone Permissions**: Verifies and requests Android runtime microphone permission (`android.permission.RECORD_AUDIO`) on-demand when the mic button is tapped.
+- **Strict Audio Specification**: Formats recorded audio to **WAV, mono, 24 kHz, 16-bit PCM** (`RecordConfig(encoder: AudioEncoder.wav, sampleRate: 24000, numChannels: 1)`) matching Meta's ASR transcription models.
+- **Live Recording Indicator & Elapsed Time**: Displays real-time dynamic amplitude waveforms and ticking elapsed timer (`00:01`, `00:02`...) tracking active session duration.
+- **Adaptive Silence & Pause Detection**: Monitors audio amplitude stream (`onAmplitudeChanged`) and auto-stops recording after 2.5s of quiet once speech starts, or immediately when the user taps "Finish".
+- **Meta Transcription Endpoint Integration**: Uploads the WAV payload with audio metadata headers to the backend proxy directing to Meta's `muse-voice-transcribe-1.0` ASR endpoint.
+- **Editable Chat Input Field Insertion**: Injects the returned transcript directly into the chat input field on the home screen, keeping the input focused and allowing the user to review, edit, or adjust the prompt before sending.
 
 ---
 
@@ -212,7 +237,18 @@ Strict separation of concerns ensures normal shoppers and guests see only custom
 ```
 
 ### 🎙️ Meta Muse Voice Transcribe (`muse-voice-transcribe-1.0`)
-- Transcribes spoken audio with push-to-talk waveforms.
+SmartMove implements an end-to-end 10-step high-fidelity acoustic pipeline for vernacular speech:
+1. **User taps microphone button**: Available directly within the chat prompt input field as a prefix/suffix action or dedicated quick action.
+2. **Android requests microphone permission**: Checks `AudioRecorder.hasPermission()`, requesting Android `android.permission.RECORD_AUDIO` if not yet granted.
+3. **Flutter starts recording audio**: Initializes `AudioRecorder` using `package:record/record.dart`.
+4. **Live recording indicator & elapsed time**: Renders dynamic pulsing waveform bars and ticking timer (`00:01`, `00:02`...) tracking active session duration.
+5. **Finish tap or pause detection**: Users can tap Finish, or the silence detection listener automatically concludes the session upon detecting a 2.5s pause after speech.
+6. **WAV mono 24 kHz 16-bit PCM conversion**: The audio stream is finalized into an uncompressed WAV format (`AudioEncoder.wav`, 24,000 Hz sample rate, single mono channel, 16-bit PCM).
+7. **Upload recording to backend**: The client sends the WAV binary payload to the secure backend proxy (`MetaAiService.transcribeAudio`).
+8. **Backend sends to Meta transcription endpoint**: Dispatches payload with audio metadata to Meta's `muse-voice-transcribe-1.0` ASR model.
+9. **Receive transcript & insert into chat input field**: Delivers the high-accuracy vernacular transcript directly into `_inlinePromptController.text`.
+10. **User reviews & edits before sending**: The text field remains active and focused with cursor positioned at the end, allowing full user review and editing before tapping Send.
+
 - Auto-detects dialects and vernacular phrasing across West African languages:
   - **Nigerian English** (`en-NG`)
   - **Nigerian Pidgin** (`pcm-NG`)
