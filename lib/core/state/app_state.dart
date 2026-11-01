@@ -864,11 +864,13 @@ final communityProvider =
 class AuthNotifier extends Notifier<UserSession> {
   final UserSession? _initialSession;
   AuthNotifier([this._initialSession]);
+  bool _manuallySet = false;
 
   @override
   UserSession build() {
     final initial = _initialSession;
     if (initial != null) {
+      _manuallySet = true;
       return initial;
     }
     _restoreSession();
@@ -933,8 +935,9 @@ class AuthNotifier extends Notifier<UserSession> {
 
   Future<void> _restoreSession() async {
     final session = await AuthService.restorePersistedSession();
-    if (ref.mounted) {
+    if (ref.mounted && !_manuallySet) {
       state = session;
+      syncWithSellerApplications(ref.read(sellerApplicationsProvider));
     }
   }
 
@@ -947,8 +950,10 @@ class AuthNotifier extends Notifier<UserSession> {
   }
 
   void setSession(UserSession session) {
+    _manuallySet = true;
     state = session;
-    AuthService.persistSession(session);
+    syncWithSellerApplications(ref.read(sellerApplicationsProvider));
+    AuthService.persistSession(state);
   }
 
   void updateRole(String newRole) {

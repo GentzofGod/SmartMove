@@ -297,16 +297,62 @@ class AuthService {
       }
     } catch (_) {}
 
+    // Check seller_applications table for approved or pending trader records
+    try {
+      final appRows = await client
+          .from('seller_applications')
+          .select()
+          .or('user_id.eq.${user.id},applicant_email.eq.${user.email ?? ''}')
+          .order('submitted_at', ascending: false)
+          .limit(1);
+      final List<dynamic> appList = appRows as List<dynamic>;
+      if (appList.isNotEmpty) {
+        final appRow = appList.first as Map<String, dynamic>;
+        final statusStr = appRow['status']?.toString();
+        if (statusStr != null && statusStr.isNotEmpty) {
+          appStatus = statusStr;
+        }
+        if (appRow['business_name'] != null) {
+          businessName = appRow['business_name']?.toString();
+        }
+        if (appRow['market_hub'] != null) {
+          marketHub = appRow['market_hub']?.toString();
+        }
+        if (appRow['seller_channel'] != null) {
+          sellerChannel = appRow['seller_channel']?.toString();
+        }
+        if (appRow['phone'] != null) {
+          phone = appRow['phone']?.toString();
+        }
+        if (appRow['stall_location'] != null) {
+          stallLocation = appRow['stall_location']?.toString();
+        }
+        if (appRow['latitude'] != null) {
+          latitude = double.tryParse(appRow['latitude'].toString());
+        }
+        if (appRow['longitude'] != null) {
+          longitude = double.tryParse(appRow['longitude'].toString());
+        }
+      }
+    } catch (_) {}
+
+    final isApprovedSellerApp =
+        appStatus == SellerApplicationStatus.approved.name;
+
     // 2. Check auth.users app_metadata / user_metadata as fallback
     final appMeta = user.appMetadata;
     final userMeta = user.userMetadata ?? {};
-    final rawRole = dbRole ??
-        appMeta['role']?.toString() ??
-        userMeta['role']?.toString() ??
-        'Customer';
+    final rawRole = isApprovedSellerApp
+        ? 'Trader'
+        : (dbRole ??
+            appMeta['role']?.toString() ??
+            userMeta['role']?.toString() ??
+            'Customer');
 
     final parsedRole = UserRole.fromString(rawRole);
-    final canonicalRole = parsedRole.label; // 'Customer', 'Trader', 'Admin', 'SuperAdmin'
+    final canonicalRole = isApprovedSellerApp
+        ? 'Trader'
+        : parsedRole.label; // 'Customer', 'Trader', 'Admin', 'SuperAdmin'
 
     final name = displayName ??
         (userMeta['name'] as String?) ??

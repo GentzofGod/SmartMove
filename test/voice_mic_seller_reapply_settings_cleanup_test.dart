@@ -7,6 +7,7 @@ import 'package:smartmove/core/services/auth_service.dart';
 import 'package:smartmove/core/state/app_state.dart';
 import 'package:smartmove/features/home/presentation/widgets/muse_voice_input_sheet.dart';
 import 'package:smartmove/features/profile/presentation/profile_screen.dart';
+import 'package:smartmove/features/community/presentation/community_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -180,6 +181,47 @@ void main() {
       // Must show Registered Seller Profile and NOT "Apply to Become a Verified Seller"
       expect(find.text('Registered Seller Profile'), findsOneWidget);
       expect(find.text('Open Seller Portal'), findsOneWidget);
+      expect(find.text('Apply to Become a Verified Seller'), findsNothing);
+      expect(find.text('Reapply as Verified Seller'), findsNothing);
+    });
+
+    testWidgets('CommunityScreen renders Seller Portal without prompt to reapply when approved', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      const applicantEmail = 'kudirat.grains@gmail.com';
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Approve Kudirat's application
+      container.read(sellerApplicationsProvider.notifier).approveApplication('app-seed-001');
+
+      final kudiratSession = UserSession(
+        id: 'usr-kudirat',
+        email: applicantEmail,
+        displayName: 'Alhaja Kudirat',
+        role: 'Customer',
+        sellerApplicationStatus: SellerApplicationStatus.none,
+        isGuest: false,
+      );
+      container.read(authProvider.notifier).setSession(kudiratSession);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(body: CommunityScreen()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to Seller Portal tab
+      await tester.tap(find.text('Seller Portal'));
+      await tester.pumpAndSettle();
+
+      // Must not show prompt to apply
       expect(find.text('Apply to Become a Verified Seller'), findsNothing);
       expect(find.text('Reapply as Verified Seller'), findsNothing);
     });

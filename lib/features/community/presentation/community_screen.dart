@@ -441,7 +441,48 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   Widget build(BuildContext context) {
     final observations = ref.watch(communityProvider);
     final applications = ref.watch(sellerApplicationsProvider);
-    final userSession = ref.watch(authProvider);
+    final rawUserSession = ref.watch(authProvider);
+
+    final matchingApp = applications.cast<SellerApplication?>().firstWhere(
+          (a) =>
+              a != null &&
+              (a.userId == rawUserSession.id ||
+                  (!rawUserSession.isGuest &&
+                      rawUserSession.email.isNotEmpty &&
+                      a.applicantEmail.trim().toLowerCase() ==
+                          rawUserSession.email.trim().toLowerCase())),
+          orElse: () => null,
+        );
+
+    final userSession = (matchingApp != null &&
+            matchingApp.status == SellerApplicationStatus.approved &&
+            !rawUserSession.isApprovedSeller)
+        ? rawUserSession.copyWith(
+            role: 'Trader',
+            sellerApplicationStatus: SellerApplicationStatus.approved,
+            businessName:
+                rawUserSession.businessName ?? matchingApp.businessName,
+            marketHub: rawUserSession.marketHub ?? matchingApp.marketHub,
+            sellerChannel:
+                rawUserSession.sellerChannel ?? matchingApp.sellerChannel,
+            phone: rawUserSession.phone ?? matchingApp.phone,
+            stallLocation:
+                rawUserSession.stallLocation ?? matchingApp.stallLocation,
+            latitude: rawUserSession.latitude ?? matchingApp.latitude,
+            longitude: rawUserSession.longitude ?? matchingApp.longitude,
+          )
+        : (matchingApp != null &&
+                matchingApp.status == SellerApplicationStatus.pending &&
+                !rawUserSession.isApprovedSeller &&
+                !rawUserSession.isPendingSeller)
+            ? rawUserSession.copyWith(
+                sellerApplicationStatus: SellerApplicationStatus.pending,
+                businessName:
+                    rawUserSession.businessName ?? matchingApp.businessName,
+                marketHub: rawUserSession.marketHub ?? matchingApp.marketHub,
+                phone: rawUserSession.phone ?? matchingApp.phone,
+              )
+            : rawUserSession;
 
     final pendingAppsCount = applications
         .where((a) => a.status == SellerApplicationStatus.pending)

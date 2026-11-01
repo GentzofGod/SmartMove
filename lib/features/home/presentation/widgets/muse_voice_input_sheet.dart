@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
+import '../../../../core/services/audio_feedback_service.dart';
 
 /// Bottom sheet for Muse Voice Transcribe (Push-to-talk multi-dialect speech-to-text)
 ///
@@ -38,6 +39,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   late AnimationController _pulseController;
   Timer? _recordingTimer;
   int _secondsRecorded = 0;
+  double _soundLevel = 0.0;
 
   final stt.SpeechToText _speechToText = stt.SpeechToText();
   bool _speechInitialized = false;
@@ -87,6 +89,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     _recordingTimer?.cancel();
     _pulseController.dispose();
     _transcriptController.dispose();
+    AudioFeedbackService.stop();
     if (_speechToText.isListening) {
       try {
         _speechToText.stop();
@@ -96,10 +99,12 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   }
 
   Future<void> _startRecording() async {
+    AudioFeedbackService.playFeedbackSound();
     _pulseController.repeat(reverse: true);
     setState(() {
       _isRecording = true;
       _secondsRecorded = 0;
+      _soundLevel = 0.0;
       _transcriptController.text =
           'Listening to your request in ${_selectedDialect.label}...';
     });
@@ -122,11 +127,18 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
     if (_speechInitialized) {
       try {
-        String? localeId;
-        if (_selectedDialect == VoiceDialect.nigerianEnglish ||
-            _selectedDialect == VoiceDialect.nigerianPidgin) {
-          localeId = 'en_NG';
-        }
+        String? resolvedLocaleId;
+        try {
+          final systemLocales = await _speechToText.locales();
+          for (final loc in systemLocales) {
+            final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
+            if (locClean == 'en_ng' || locClean.startsWith('en_ng')) {
+              resolvedLocaleId = loc.localeId;
+              break;
+            }
+          }
+        } catch (_) {}
+
         await _speechToText.listen(
           onResult: (result) {
             if (mounted) {
@@ -149,11 +161,18 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
               });
             }
           },
+          onSoundLevelChange: (level) {
+            if (mounted) {
+              setState(() {
+                _soundLevel = ((level + 10) / 20).clamp(0.0, 1.0);
+              });
+            }
+          },
           listenOptions: stt.SpeechListenOptions(
             listenFor: const Duration(seconds: 30),
             pauseFor: const Duration(seconds: 3),
             partialResults: true,
-            localeId: localeId,
+            localeId: resolvedLocaleId,
             cancelOnError: true,
           ),
         );
@@ -162,6 +181,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   }
 
   Future<void> _stopRecording() async {
+    AudioFeedbackService.playFeedbackSound();
     _recordingTimer?.cancel();
     _pulseController.stop();
     _pulseController.reset();
@@ -445,7 +465,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                       animation: _pulseController,
                       builder: (context, child) {
                         final scale = _isRecording
-                            ? 1.0 + (_pulseController.value * 0.15)
+                            ? 1.0 +
+                                (_pulseController.value * 0.12) +
+                                (_soundLevel * 0.22)
                             : 1.0;
                         return Transform.scale(
                           scale: scale,
@@ -495,6 +517,26 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                           : AppColors.textPrimary,
                     ),
                   ),
+                  if (_isRecording) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(7, (i) {
+                        final waveHeight =
+                            8.0 + (_soundLevel * (i.isEven ? 22.0 : 16.0));
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 80),
+                          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                          width: 4,
+                          height: waveHeight,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD32F2F),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                   const SizedBox(height: 8),
 
                   // Guidance note for selected dialect
@@ -749,6 +791,17 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: const BorderSide(color: AppColors.cardBorder),
+                ),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.volume_up_rounded,
+                      color: AppColors.primary),
+                  tooltip: 'Play Audio / Read Aloud',
+                  onPressed: () {
+                    final text = _transcriptController.text.trim();
+                    if (text.isNotEmpty) {
+                      AudioFeedbackService.speak(text);
+                    }
+                  },
                 ),
                 filled: true,
                 fillColor: Colors.white,
