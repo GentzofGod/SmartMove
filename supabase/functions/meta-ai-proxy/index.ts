@@ -229,6 +229,46 @@ serve(async (req) => {
       });
     }
 
+    // 4. Meta Responses API with Native Search Grounding (dev.meta.ai/docs/search-grounding)
+    if (
+      action === "search_grounding" ||
+      action === "responses" ||
+      action === "search_products"
+    ) {
+      const {
+        input,
+        prompt,
+        model = "muse-spark-1.3",
+        include = ["web_search_call.results"],
+        tools = [{ type: "web_search" }],
+      } = payload || {};
+
+      const searchInput =
+        input ||
+        prompt ||
+        "Search online store products and current market prices in Nigeria on Jumia, Konga, and local markets";
+
+      const metaResponse = await fetch("https://api.meta.ai/v1/responses", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${META_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          input: searchInput,
+          tools,
+          include,
+        }),
+      });
+
+      const result = await metaResponse.json();
+      return new Response(JSON.stringify(result), {
+        status: metaResponse.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(
       JSON.stringify({ error: `Unknown action: ${action}` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

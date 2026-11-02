@@ -640,18 +640,26 @@ class DecisionEngine {
 
       // Option B: Online E-Commerce Catalogs
       if (planId == 'plan-b') {
-        final outlet = isHardwareOrSpares
-            ? (userCity.contains('lagos')
-                ? 'Coker Engineering & Tooling Hub'
-                : 'Precision Engineering & Machine Spares Hub')
-            : (isElectronicsOrAppliances
-                ? 'Jumia Official Electronics & Appliance Store'
-                : 'Jumia / Verified Online Store');
+        final outlet = (item.matchedVendorName != null &&
+                item.matchedVendorName!.isNotEmpty &&
+                item.matchedVendorName != 'Online / Store Reference')
+            ? item.matchedVendorName!
+            : (isHardwareOrSpares
+                ? (userCity.contains('lagos')
+                    ? 'Coker Engineering & Tooling Hub'
+                    : 'Precision Engineering & Machine Spares Hub')
+                : (isElectronicsOrAppliances
+                    ? 'Jumia Official Electronics & Appliance Store'
+                    : 'Jumia / Verified Online Store'));
         final location = isHardwareOrSpares
             ? (userCity.contains('lagos')
                 ? 'Coker Commercial Equipment Zone'
                 : '$displayCity Central Engineering District')
             : 'Online E-Commerce (1-2 Day Express Delivery)';
+
+        final effectiveWebUrl = item.webReferenceUrl ??
+            (item.referenceLinks.isNotEmpty ? item.referenceLinks.first : null) ??
+            WebSearchGroundingService.buildJumiaSearchUrl(item.productName);
 
         sources.add(
           ItemAcquisitionSource(
@@ -671,7 +679,7 @@ class DecisionEngine {
             isPlatformRegisteredTrader: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
+            webUrl: effectiveWebUrl,
             inStock: true,
             brandOrGrade: item.brandOrGrade ?? 'Verified Online Spec',
           ),

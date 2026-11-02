@@ -273,6 +273,70 @@ class OnlinePriceResearchPlan {
       'Market benchmark range: ₦${estimatedBenchmarkMin.toStringAsFixed(0)} - ₦${estimatedBenchmarkMax.toStringAsFixed(0)} per $standardizedUnit.';
 }
 
+/// Represents a URL citation annotation returned by Meta Model API Responses endpoint (dev.meta.ai/docs/search-grounding)
+class MetaUrlCitation {
+  final String url;
+  final String title;
+  final int startIndex;
+  final int endIndex;
+  final String citedPassage;
+
+  const MetaUrlCitation({
+    required this.url,
+    required this.title,
+    required this.startIndex,
+    required this.endIndex,
+    required this.citedPassage,
+  });
+
+  factory MetaUrlCitation.fromJson(Map<String, dynamic> json, {String fullText = ''}) {
+    final start = (json['start_index'] as num?)?.toInt() ?? 0;
+    final end = (json['end_index'] as num?)?.toInt() ?? 0;
+    String passage = '';
+    if (fullText.isNotEmpty && start >= 0 && end <= fullText.length && start <= end) {
+      passage = fullText.substring(start, end).trim();
+    }
+    return MetaUrlCitation(
+      url: json['url']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      startIndex: start,
+      endIndex: end,
+      citedPassage: passage,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'url': url,
+    'title': title,
+    'start_index': startIndex,
+    'end_index': endIndex,
+    'cited_passage': citedPassage,
+  };
+}
+
+/// Represents the structured outcome of a Meta Search Grounding operation
+class MetaSearchGroundingResult {
+  final String rawOutputText;
+  final List<MetaUrlCitation> citations;
+  final List<String> searchQueries;
+  final List<Map<String, dynamic>> rawResults;
+  final List<LiveWebVendorResult> discoveredVendors;
+  final List<ShoppingItem> groundedItems;
+  final double? estimatedBudget;
+  final bool isSearchTriggered;
+
+  const MetaSearchGroundingResult({
+    required this.rawOutputText,
+    required this.citations,
+    required this.searchQueries,
+    required this.rawResults,
+    required this.discoveredVendors,
+    required this.groundedItems,
+    this.estimatedBudget,
+    required this.isSearchTriggered,
+  });
+}
+
 /// Result of evaluating duplicate listing detection
 class DuplicateMatchResult {
   final PriceObservation observation;
@@ -1571,6 +1635,284 @@ class MetaAiService {
     return sanitized.trim();
   }
 
+  // --- 2.5. Meta Search Grounding (dev.meta.ai/docs/search-grounding) ---
+
+  /// Executes Meta Search Grounding via the Responses API (POST /v1/responses with tools: [{"type": "web_search"}])
+  /// as documented in dev.meta.ai/docs/search-grounding.
+  /// Looks up products and current Nigerian market prices that are not listed in the app's local seller catalog.
+  Future<MetaSearchGroundingResult?> executeSearchGrounding({
+    required String prompt,
+    String? city,
+    List<String>? uncatalogedCommodities,
+  }) async {
+    final targetCity = city != null && city.trim().isNotEmpty ? city.trim() : 'Nigeria';
+    final String searchInput;
+    if (uncatalogedCommodities != null && uncatalogedCommodities.isNotEmpty) {
+      searchInput =
+          'User requests products not in local catalog: "${uncatalogedCommodities.join(', ')}" in $targetCity. '
+          'Search live e-commerce stores (Jumia, Konga, Supermart, Market lines) in Nigeria. '
+          'Return current market prices in Naira (₦), specifications, units, and direct store URLs. '
+          'Format response as JSON with keys: "budget" (number), "shopping_items" (array of {name, quantity, unit, estimated_unit_price, brand_or_grade, web_reference_url, matched_vendor}).';
+    } else {
+      searchInput =
+          'User request: "$prompt" in $targetCity. '
+          'Search live e-commerce stores (Jumia, Konga, Supermart, Market lines) in Nigeria for current market prices in Naira (₦), specifications, and store URLs. '
+          'Format response as JSON with keys: "budget" (number), "shopping_items" (array of {name, quantity, unit, estimated_unit_price, brand_or_grade, web_reference_url, matched_vendor}).';
+    }
+
+    dynamic rawResponse;
+
+    // 1. Attempt direct Meta Responses API call if API key is configured
+    if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse('$effectiveEndpoint/v1/responses'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $effectiveApiKey',
+              },
+              body: jsonEncode({
+                'model': 'muse-spark-1.3',
+                'input': searchInput,
+                'tools': [
+                  {'type': 'web_search'}
+                ],
+                'include': ['web_search_call.results'],
+              }),
+            )
+            .timeout(const Duration(seconds: 25));
+
+        if (response.statusCode == 200) {
+          rawResponse = jsonDecode(response.body);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Attempt Supabase Edge Proxy (action: 'search_grounding')
+    if (rawResponse == null && SupabaseDataService.isConnected) {
+      try {
+        final proxyRes = await _invokeEdgeProxy(
+          action: 'search_grounding',
+          payload: {
+            'prompt': searchInput,
+            'input': searchInput,
+            'model': 'muse-spark-1.3',
+            'include': ['web_search_call.results'],
+            'tools': [
+              {'type': 'web_search'}
+            ],
+          },
+        );
+        if (proxyRes.isSuccess && proxyRes.data != null) {
+          rawResponse = proxyRes.data;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Parse Responses API response structure
+    if (rawResponse is Map) {
+      return _parseResponsesApiGrounding(rawResponse, uncatalogedCommodities: uncatalogedCommodities);
+    }
+
+    return null;
+  }
+
+  /// Visible for testing parser for dev.meta.ai Responses API search grounding payloads
+  static MetaSearchGroundingResult parseResponsesApiGroundingForTesting(
+    Map<dynamic, dynamic> response, {
+    List<String>? uncatalogedCommodities,
+  }) =>
+      _parseResponsesApiGrounding(response, uncatalogedCommodities: uncatalogedCommodities);
+
+  static MetaSearchGroundingResult _parseResponsesApiGrounding(
+    Map<dynamic, dynamic> response, {
+    List<String>? uncatalogedCommodities,
+  }) {
+    final searchQueries = <String>[];
+    final rawResults = <Map<String, dynamic>>[];
+    final citations = <MetaUrlCitation>[];
+    final discoveredVendors = <LiveWebVendorResult>[];
+    String fullOutputText = '';
+    bool isSearchTriggered = false;
+
+    final outputList = response['output'] as List<dynamic>? ?? [];
+
+    for (final item in outputList) {
+      if (item is! Map) continue;
+      final type = item['type']?.toString();
+
+      if (type == 'web_search_call') {
+        isSearchTriggered = true;
+        final callData = item['web_search_call'] as Map<dynamic, dynamic>? ?? item;
+        final q = callData['query']?.toString();
+        if (q != null && q.isNotEmpty) {
+          searchQueries.add(q);
+        }
+        final results = callData['results'] as List<dynamic>?;
+        if (results != null) {
+          for (final res in results) {
+            if (res is Map) {
+              final mapRes = Map<String, dynamic>.from(res);
+              rawResults.add(mapRes);
+              final title = mapRes['title']?.toString() ?? 'Live Store Listing';
+              final url = mapRes['url']?.toString() ?? '';
+              final snippet = mapRes['snippet']?.toString() ?? '';
+              if (url.isNotEmpty) {
+                final priceMatch = RegExp(
+                  r'(?:₦|NGN|N)\s*([\d,]+(?:\.\d+)?)',
+                  caseSensitive: false,
+                ).firstMatch('$title $snippet');
+                final detectedPrice = priceMatch != null
+                    ? double.tryParse(priceMatch.group(1)!.replaceAll(',', ''))
+                    : null;
+
+                discoveredVendors.add(
+                  LiveWebVendorResult(
+                    vendorName: _extractDomainName(url),
+                    title: title,
+                    snippet: snippet,
+                    targetUrl: url,
+                    detectedPrice: detectedPrice,
+                    priceDisplay: detectedPrice != null
+                        ? '₦${detectedPrice.toStringAsFixed(0)}'
+                        : 'Live Online Quote',
+                    channel: url.contains('jumia') || url.contains('konga')
+                        ? 'E-Commerce Marketplace'
+                        : 'Online Vendor',
+                    badge: 'Meta Search Grounded',
+                    isDelivery: true,
+                    isPhysicalLocation: false,
+                  ),
+                );
+              }
+            }
+          }
+        }
+      } else if (type == 'message') {
+        final contentList = item['content'] as List<dynamic>? ?? [];
+        for (final part in contentList) {
+          if (part is! Map) continue;
+          final partType = part['type']?.toString();
+          if (partType == 'text') {
+            final text = part['text']?.toString() ?? '';
+            fullOutputText += text;
+
+            final annotations = part['annotations'] as List<dynamic>? ?? [];
+            for (final ann in annotations) {
+              if (ann is Map && ann['type']?.toString() == 'url_citation') {
+                isSearchTriggered = true;
+                final citation = MetaUrlCitation.fromJson(
+                  Map<String, dynamic>.from(ann),
+                  fullText: text,
+                );
+                citations.add(citation);
+
+                if (citation.url.isNotEmpty &&
+                    !discoveredVendors.any((v) => v.targetUrl == citation.url)) {
+                  final priceMatch = RegExp(
+                    r'(?:₦|NGN|N)\s*([\d,]+(?:\.\d+)?)',
+                    caseSensitive: false,
+                  ).firstMatch(citation.citedPassage);
+                  final detectedPrice = priceMatch != null
+                      ? double.tryParse(priceMatch.group(1)!.replaceAll(',', ''))
+                      : null;
+
+                  discoveredVendors.add(
+                    LiveWebVendorResult(
+                      vendorName: _extractDomainName(citation.url),
+                      title: citation.title.isNotEmpty ? citation.title : 'Cited Live Source',
+                      snippet: citation.citedPassage.isNotEmpty
+                          ? citation.citedPassage
+                          : 'Live ground source from ${citation.title}',
+                      targetUrl: citation.url,
+                      detectedPrice: detectedPrice,
+                      priceDisplay: detectedPrice != null
+                          ? '₦${detectedPrice.toStringAsFixed(0)}'
+                          : 'Live Verified Quote',
+                      channel: citation.url.contains('jumia') || citation.url.contains('konga')
+                          ? 'E-Commerce Platform'
+                          : 'Live Catalog Source',
+                      badge: 'Meta Search Grounded',
+                      isDelivery: true,
+                      isPhysicalLocation: false,
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    final groundedItems = <ShoppingItem>[];
+    double? budget;
+    final parsedJson = const MetaAiService()._parseFlexibleAiResponse(fullOutputText);
+    if (parsedJson is Map) {
+      budget = (parsedJson['budget'] as num?)?.toDouble();
+      final itemsRaw = parsedJson['shopping_items'] as List<dynamic>?;
+      if (itemsRaw != null) {
+        for (final it in itemsRaw) {
+          if (it is Map) {
+            final name = (it['name'] ?? it['productName'])?.toString().trim() ?? '';
+            if (name.isNotEmpty) {
+              final qty = (it['quantity'] as num?)?.toDouble() ?? 1.0;
+              final unit = it['unit']?.toString() ?? 'item';
+              final price = (it['estimated_unit_price'] ?? it['price'] as num?)?.toDouble() ?? 1000.0;
+              final brand = it['brand_or_grade']?.toString();
+              final webUrl = it['web_reference_url']?.toString() ??
+                  (citations.isNotEmpty ? citations.first.url : null);
+              final matchedVendor = it['matched_vendor']?.toString() ??
+                  (discoveredVendors.isNotEmpty ? discoveredVendors.first.vendorName : 'Live Web Sourced');
+
+              groundedItems.add(
+                ShoppingItem(
+                  id: 'item-grounded-${DateTime.now().millisecondsSinceEpoch}-${groundedItems.length}',
+                  productName: name,
+                  quantity: qty,
+                  unit: unit,
+                  estimatedUnitPrice: price,
+                  brandOrGrade: brand,
+                  webReferenceUrl: webUrl,
+                  matchedVendorName: matchedVendor,
+                  referenceLinks: citations.map((c) => c.url).toList(),
+                ),
+              );
+            }
+          }
+        }
+      }
+    }
+
+    return MetaSearchGroundingResult(
+      rawOutputText: fullOutputText,
+      citations: citations,
+      searchQueries: searchQueries,
+      rawResults: rawResults,
+      discoveredVendors: discoveredVendors,
+      groundedItems: groundedItems,
+      estimatedBudget: budget,
+      isSearchTriggered: isSearchTriggered,
+    );
+  }
+
+  static String _extractDomainName(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final host = uri.host.toLowerCase();
+      if (host.contains('jumia')) return 'Jumia Nigeria';
+      if (host.contains('konga')) return 'Konga Online';
+      if (host.contains('jiji')) return 'Jiji Nigeria';
+      if (host.contains('supermart')) return 'Supermart.ng';
+      if (host.contains('pricepally')) return 'Pricepally';
+      final cleanHost = host.replaceFirst(RegExp(r'^www\.'), '');
+      return cleanHost.isNotEmpty ? cleanHost : 'Online Store';
+    } catch (_) {
+      return 'Online Vendor';
+    }
+  }
+
   // --- 3. Muse Spark Structured Extraction & Proposal ---
 
   /// Parse natural language request into a validated AI Plan Proposal with multi-layer web grounding
@@ -1785,9 +2127,67 @@ class MetaAiService {
     final searchResultsByItem = <String, List<LiveWebVendorResult>>{};
     final allDiscoveredVendors = <LiveWebVendorResult>[];
 
-    // Layer 2: Search in-app sellers database first, then stores & e-commerce catalogs concurrently
+    // Detect items that are uncataloged among verified in-app sellers
+    final uncatalogedCommodities = <String>[];
+    for (final item in baseProposal.shoppingItems) {
+      final itemLower = item.productName.toLowerCase();
+      final itemTokens = itemLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
+      final hasInApp = inAppObservations?.any((obs) {
+        final pLower = obs.productName.toLowerCase();
+        if (pLower.contains(itemLower) || itemLower.contains(pLower)) return true;
+        final obsTokens = pLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
+        if (obsTokens.intersection(itemTokens).isNotEmpty) return true;
+        if ((itemLower.contains('oil') || itemLower.contains('ororo')) && pLower.contains('oil')) return true;
+        return false;
+      }) ?? false;
+      if (!hasInApp) {
+        uncatalogedCommodities.add(item.productName);
+      }
+    }
+
+    // Execute Meta Search Grounding for uncataloged items via Responses API (dev.meta.ai/docs/search-grounding)
+    MetaSearchGroundingResult? metaGroundingResult;
+    if (uncatalogedCommodities.isNotEmpty && (hasValidAuth || SupabaseDataService.isConnected)) {
+      try {
+        metaGroundingResult = await executeSearchGrounding(
+          prompt: rawPrompt,
+          city: city,
+          uncatalogedCommodities: uncatalogedCommodities,
+        );
+      } catch (_) {}
+    }
+
+    // If Search Grounding provided grounded items, enrich baseProposal items
+    var effectiveBaseProposal = baseProposal;
+    if (metaGroundingResult != null && metaGroundingResult.groundedItems.isNotEmpty) {
+      final updatedItems = <ShoppingItem>[];
+      for (final item in baseProposal.shoppingItems) {
+        final match = metaGroundingResult.groundedItems.firstWhere(
+          (gi) {
+            final giLower = gi.productName.toLowerCase();
+            final itemLower = item.productName.toLowerCase();
+            return giLower.contains(itemLower) || itemLower.contains(giLower);
+          },
+          orElse: () => item,
+        );
+        if (match != item) {
+          updatedItems.add(item.copyWith(
+            estimatedUnitPrice: match.estimatedUnitPrice > 0 ? match.estimatedUnitPrice : item.estimatedUnitPrice,
+            webReferenceUrl: match.webReferenceUrl ?? item.webReferenceUrl,
+            matchedVendorName: match.matchedVendorName ?? item.matchedVendorName,
+            brandOrGrade: match.brandOrGrade ?? item.brandOrGrade,
+            referenceLinks: match.referenceLinks.isNotEmpty ? match.referenceLinks : item.referenceLinks,
+          ));
+        } else {
+          updatedItems.add(item);
+        }
+      }
+      effectiveBaseProposal = baseProposal.copyWith(shoppingItems: updatedItems);
+    }
+
+    // Layer 2: Search in-app sellers database first, then search grounding & e-commerce catalogs concurrently
     await Future.wait(
-      baseProposal.shoppingItems.map((item) async {
+      effectiveBaseProposal.shoppingItems.map((item) async {
         try {
           final inAppVendorsForItem = <LiveWebVendorResult>[];
           if (inAppObservations != null && inAppObservations.isNotEmpty) {
@@ -1829,16 +2229,34 @@ class MetaAiService {
             }
           }
 
+          final isUncataloged = inAppVendorsForItem.isEmpty;
+          final groundedVendorsForItem = <LiveWebVendorResult>[];
+
+          if (isUncataloged && metaGroundingResult != null) {
+            for (final gv in metaGroundingResult.discoveredVendors) {
+              final gvLower = '${gv.title} ${gv.snippet} ${gv.targetUrl}'.toLowerCase();
+              final itemLower = item.productName.toLowerCase();
+              final tokens = itemLower.split(RegExp(r'\s+')).where((t) => t.length >= 3);
+              if (gvLower.contains(itemLower) || tokens.any((t) => gvLower.contains(t))) {
+                groundedVendorsForItem.add(gv);
+              }
+            }
+            if (groundedVendorsForItem.isEmpty && uncatalogedCommodities.length == 1) {
+              groundedVendorsForItem.addAll(metaGroundingResult.discoveredVendors);
+            }
+          }
+
           final vendors = await WebSearchGroundingService.fetchLiveWebVendors(
             item.productName,
             city: city,
             benchmarkPrice: item.estimatedUnitPrice,
           );
 
-          // IN-APP VERIFIED SELLERS ARE ALWAYS COMBED AND PLACED FIRST BEFORE ONLINE STORES
+          // IN-APP VERIFIED SELLERS ARE ALWAYS COMBED AND PLACED FIRST BEFORE SEARCH GROUNDING & WEB STORES
           final combined = <LiveWebVendorResult>[
             ...inAppVendorsForItem,
-            ...vendors,
+            ...groundedVendorsForItem,
+            ...vendors.where((v) => !groundedVendorsForItem.any((gv) => gv.targetUrl == v.targetUrl)),
           ];
 
           if (combined.isNotEmpty) {
@@ -1850,7 +2268,7 @@ class MetaAiService {
     );
 
     if (allDiscoveredVendors.isEmpty) {
-      return baseProposal;
+      return effectiveBaseProposal;
     }
 
     // Layer 3: AI Structuring & Harmonization
@@ -1858,7 +2276,7 @@ class MetaAiService {
       try {
         final promptPayload = {
           'user_request': rawPrompt,
-          'derived_items': baseProposal.shoppingItems.map((i) => {
+          'derived_items': effectiveBaseProposal.shoppingItems.map((i) => {
             'name': i.productName,
             'quantity': i.quantity,
             'unit': i.unit,
@@ -1937,7 +2355,7 @@ class MetaAiService {
 
     return _harmonizeLocally(
       rawPrompt: rawPrompt,
-      baseProposal: baseProposal,
+      baseProposal: effectiveBaseProposal,
       searchResultsByItem: searchResultsByItem,
       allDiscoveredVendors: allDiscoveredVendors,
       city: city,
@@ -1983,15 +2401,18 @@ class MetaAiService {
         item.copyWith(
           estimatedUnitPrice: groundedPrice,
           webReferenceUrl: bestVendor?.targetUrl ??
+              item.webReferenceUrl ??
               WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
           referenceLinks: refLinks.isNotEmpty
               ? refLinks
-              : [
-                  WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
-                  WebSearchGroundingService.buildKongaSearchUrl(item.productName),
-                  WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: city),
-                ],
-          matchedVendorName: bestVendor?.vendorName ?? 'Online / Store Reference',
+              : (item.referenceLinks.isNotEmpty
+                  ? item.referenceLinks
+                  : [
+                      WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
+                      WebSearchGroundingService.buildKongaSearchUrl(item.productName),
+                      WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: city),
+                    ]),
+          matchedVendorName: bestVendor?.vendorName ?? item.matchedVendorName ?? 'Online / Store Reference',
           availableSourceQuotes: vendors,
         ),
       );
@@ -4090,10 +4511,26 @@ class MetaAiService {
       benchmarkPrice: benchmarkPrice,
     );
 
-    // IN-APP VERIFIED SELLERS ARE PLACED FIRST BEFORE ONLINE E-COMMERCE STORES
+    // If commodity is uncataloged among local sellers, invoke Meta Search Grounding
+    final groundedVendors = <LiveWebVendorResult>[];
+    if (inAppVendors.isEmpty && (hasValidAuth || SupabaseDataService.isConnected)) {
+      try {
+        final groundingRes = await executeSearchGrounding(
+          prompt: 'Current retail price and vendors for $clean in ${city ?? "Nigeria"}',
+          city: city,
+          uncatalogedCommodities: [clean],
+        );
+        if (groundingRes != null && groundingRes.discoveredVendors.isNotEmpty) {
+          groundedVendors.addAll(groundingRes.discoveredVendors);
+        }
+      } catch (_) {}
+    }
+
+    // IN-APP VERIFIED SELLERS ARE PLACED FIRST BEFORE SEARCH GROUNDING & WEB STORES
     final allVendors = <LiveWebVendorResult>[
       ...inAppVendors,
-      ...webVendors,
+      ...groundedVendors,
+      ...webVendors.where((wv) => !groundedVendors.any((gv) => gv.targetUrl == wv.targetUrl)),
     ];
 
     final pricesWithVal = allVendors
@@ -4135,6 +4572,10 @@ class MetaAiService {
     if (inAppVendors.isNotEmpty) {
       recommendation =
           'Meta AI Verified Local Inventory Priority: Found ${inAppVendors.length} active in-app seller quote(s) for "$clean" in local physical hubs (${inAppVendors.first.vendorName} at ${inAppVendors.first.priceDisplay}). Online stores (Jumia, Konga) are ranked below as secondary alternatives.';
+    } else if (groundedVendors.isNotEmpty) {
+      final top = groundedVendors.first;
+      recommendation =
+          'Meta AI Search Grounding: "$clean" is not currently listed by local registered sellers. Real-time web search discovered live quotes from ${top.vendorName} (${top.priceDisplay}) and verified online vendors. View citation links to inspect full specifications.';
     } else if (isElectronics) {
       recommendation =
           'Meta AI Price Intelligence: For $clean, Konga and Jiji offer competitive merchant listings, while Jumia provides verified manufacturer warranty with door-to-door delivery. For immediate inspection, local electronics dealers in ${city ?? 'your local area'} allow in-person testing before payment.';
@@ -4149,8 +4590,10 @@ class MetaAiService {
     return LiveAiMultiVendorComparison(
       commodityName: clean,
       summary: inAppVendors.isNotEmpty
-          ? 'Meta AI prioritized ${inAppVendors.length} verified in-app market seller(s) ahead of ${webVendors.length} web alternatives.'
-          : 'Meta AI discovered ${webVendors.length} live vendor alternatives across online ecommerce and local physical hubs.',
+          ? 'Meta AI prioritized ${inAppVendors.length} verified in-app market seller(s) ahead of web alternatives.'
+          : (groundedVendors.isNotEmpty
+              ? 'Meta AI Search Grounding discovered ${groundedVendors.length} verified web vendor quote(s) for uncataloged product "$clean".'
+              : 'Meta AI discovered ${webVendors.length} live vendor alternatives across online ecommerce and local physical hubs.'),
       lowestPrice: minPrice,
       highestPrice: maxPrice,
       priceSpreadDisplay: spreadDisplay,
