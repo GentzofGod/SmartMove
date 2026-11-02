@@ -41,20 +41,24 @@ serve(async (req) => {
         language = "en",
         mode = "PUSH_TO_TALK",
         prompt,
+        keywords,
         audioFormat = "audio/wav",
-        audioEncoding = "PCM_16BIT",
-        encoding = "PCM_16BIT",
         sampleRate = 24000,
         channels = 1,
       } = payload || {};
 
-      const effectiveAudioEncoding =
+      // Normalize audioEncoding: Meta Voyager ASR expects "WAV"
+      const rawEncoding = (
         payload?.audioEncoding ||
         payload?.audio_encoding ||
         payload?.encoding ||
-        audioEncoding ||
-        encoding ||
-        "PCM_16BIT";
+        "WAV"
+      ).toString().toUpperCase();
+
+      const effectiveAudioEncoding =
+        rawEncoding === "PCM_16BIT" || rawEncoding === "PCM" || rawEncoding === "WAV"
+          ? "WAV"
+          : rawEncoding;
 
       // Convert base64 audio to binary Blob for multipart/form-data
       let audioBlob: Blob;
@@ -69,6 +73,33 @@ serve(async (req) => {
         audioBlob = new Blob([], { type: audioFormat });
       }
 
+      if (audioBlob.size <= 44) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "empty_audio",
+              type: "invalid_request_error",
+              message:
+                "The recorded audio is empty or too short. Please hold the record button and speak clearly.",
+            },
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const defaultKeywords = [
+        "garri",
+        "rice",
+        "eggs",
+        "oil",
+        "yam",
+        "tomatoes",
+        "Bodija market",
+        "Abeokuta",
+        "Lagos",
+        "Ibadan",
+      ];
+
       const formData = new FormData();
       formData.append(
         "request",
@@ -77,14 +108,10 @@ serve(async (req) => {
             JSON.stringify({
               model: "muse-voice-transcribe-1.0",
               audioEncoding: effectiveAudioEncoding,
-              audio_encoding: effectiveAudioEncoding.toLowerCase(),
-              encoding: effectiveAudioEncoding,
-              audioFormat,
-              sampleRate,
-              channels,
-              language,
               mode,
-              task: "transcribe",
+              language,
+              keywords:
+                Array.isArray(keywords) && keywords.length > 0 ? keywords : defaultKeywords,
               prompt:
                 prompt ||
                 "West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market",
@@ -94,16 +121,15 @@ serve(async (req) => {
         )
       );
 
-      // Also append audioEncoding as top-level form fields for gateways requiring standalone parameters
-      formData.append("audioEncoding", effectiveAudioEncoding);
-      formData.append("audio_encoding", effectiveAudioEncoding.toLowerCase());
-      formData.append("encoding", effectiveAudioEncoding);
+      // Meta Voyager ASR strictly expects only 'request' and 'audio' multipart fields.
+      // Standalone fields like audioEncoding cause HTTP 400 Malformed request.
       formData.append("audio", audioBlob, "recording.wav");
 
       const metaResponse = await fetch("https://api.meta.ai/v1/asr/transcribe", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${META_API_KEY}`,
+          "Accept": "application/json",
         },
         body: formData,
       });

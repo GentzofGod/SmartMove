@@ -727,6 +727,20 @@ class MetaAiService {
         detailMessage = errObj is Map
             ? (errObj['message'] ?? errObj.toString())
             : errObj.toString();
+      } else if (e.details is String) {
+        try {
+          final decoded = jsonDecode(e.details as String);
+          if (decoded is Map && decoded['error'] != null) {
+            final errObj = decoded['error'];
+            detailMessage = errObj is Map
+                ? (errObj['message'] ?? errObj.toString())
+                : errObj.toString();
+          } else {
+            detailMessage = e.details as String;
+          }
+        } catch (_) {
+          detailMessage = e.details as String;
+        }
       } else if (e.details != null) {
         detailMessage = e.details.toString();
       } else if (e.reasonPhrase != null) {
@@ -787,30 +801,29 @@ class MetaAiService {
         try {
           final uri = Uri.parse('$effectiveEndpoint/v1/asr/transcribe');
           final request = http.MultipartRequest('POST', uri)
-            ..headers['Authorization'] = 'Bearer $effectiveApiKey';
+            ..headers['Authorization'] = 'Bearer $effectiveApiKey'
+            ..headers['Accept'] = 'application/json';
 
           request.fields['request'] = jsonEncode({
             'model': 'muse-voice-transcribe-1.0',
-            'audioEncoding': 'PCM_16BIT',
-            'audio_encoding': 'pcm_16bit',
-            'encoding': 'PCM_16BIT',
-            'audioFormat': audioFormat,
-            'sampleRate': sampleRate,
-            'channels': numChannels,
-            'language': dialect.languageCode,
+            'audioEncoding': 'WAV',
             'mode': 'PUSH_TO_TALK',
-            'task': 'transcribe',
+            'language': dialect.languageCode,
+            'keywords': [
+              'garri',
+              'rice',
+              'eggs',
+              'oil',
+              'yam',
+              'tomatoes',
+              'Bodija market',
+              'Abeokuta',
+              'Lagos',
+              'Ibadan',
+            ],
             'prompt':
                 'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
           });
-
-          // Top-level multipart fields for compatibility with various Meta ASR gateways
-          request.fields['audioEncoding'] = 'PCM_16BIT';
-          request.fields['encoding'] = 'PCM_16BIT';
-          request.fields['audio_encoding'] = 'pcm_16bit';
-          request.fields['sampleRate'] = sampleRate.toString();
-          request.fields['channels'] = numChannels.toString();
-          request.fields['audioFormat'] = audioFormat;
 
           if (audioBytes != null && audioBytes.isNotEmpty) {
             request.files.add(http.MultipartFile.fromBytes(
@@ -853,13 +866,23 @@ class MetaAiService {
           payload: {
             if (audioBytes != null) 'audioBase64': base64Encode(audioBytes),
             'audioFormat': audioFormat,
-            'audioEncoding': 'PCM_16BIT',
-            'audio_encoding': 'pcm_16bit',
-            'encoding': 'PCM_16BIT',
+            'audioEncoding': 'WAV',
             'sampleRate': sampleRate,
             'channels': numChannels,
             'language': dialect.languageCode,
             'mode': 'PUSH_TO_TALK',
+            'keywords': [
+              'garri',
+              'rice',
+              'eggs',
+              'oil',
+              'yam',
+              'tomatoes',
+              'Bodija market',
+              'Abeokuta',
+              'Lagos',
+              'Ibadan',
+            ],
             'prompt':
                 'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
           },
@@ -903,6 +926,17 @@ class MetaAiService {
             detectedDialect: resolvedDialect,
             englishTranslation: translation,
             isDialectTranslated: translation != null && translation.isNotEmpty,
+          );
+        } else if (transcribedText != null && transcribedText.isEmpty) {
+          return VoiceTranscriptionResult(
+            text: '',
+            confidence: 0.0,
+            modelName: 'SmartMove Voice AI',
+            isFallback: false,
+            hasError: false,
+            note:
+                'No recognizable speech detected in audio. Please speak clearly into the microphone and try again.',
+            detectedDialect: dialect,
           );
         }
       }

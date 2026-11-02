@@ -249,23 +249,22 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     );
 
     if (mounted) {
-      final isUnavailable =
-          result.isFallback || result.hasError || result.text.isEmpty;
+      final isUnavailable = result.isFallback || result.hasError;
       setState(() {
         _isTranscribing = false;
         _transcriptionResult = result;
         // Insert transcript into text field so user can edit before confirming
-        _transcriptController.text = isUnavailable ? '' : result.text;
+        _transcriptController.text = result.text;
         _isFallback = isUnavailable;
         if (result.hasError) {
           _transcriptionStatus = result.errorMessage ??
               'Voice transcription error occurred. Check connection or settings.';
+        } else if (result.text.isEmpty) {
+          _transcriptionStatus = result.note ??
+              'No speech recognized in audio. Please speak clearly into the microphone.';
         } else if (result.isFallback) {
           _transcriptionStatus = result.note ??
               'Offline mode active. Check network connection or type below.';
-        } else if (result.text.isEmpty) {
-          _transcriptionStatus =
-              'No speech recognized in audio. Please speak clearly into the microphone.';
         } else {
           _transcriptionStatus =
               'AI Voice Assistant: Success (${result.detectedDialect.label})';
