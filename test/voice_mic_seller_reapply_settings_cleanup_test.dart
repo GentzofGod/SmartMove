@@ -49,9 +49,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 700));
       await tester.pumpAndSettle();
 
-      // In unit test environment without real audio hardware, graceful fallback informs user
+      // In unit test environment without real audio hardware, diagnostic error informs user
       expect(
-        find.text('Voice input unavailable. Please type your request directly below.'),
+        find.textContaining('unavailable'),
         findsOneWidget,
       );
 

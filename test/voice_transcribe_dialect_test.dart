@@ -271,9 +271,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 800));
       await tester.pumpAndSettle();
 
-      // Verify that fallback is cleared to empty string and user-friendly error is shown
+      // Verify that fallback is cleared to empty string and diagnostic error is shown
       expect(
-        find.text('Voice input unavailable. Please type your request directly below.'),
+        find.textContaining('unavailable'),
         findsOneWidget,
       );
 

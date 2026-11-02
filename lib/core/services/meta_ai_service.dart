@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:io';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/errand.dart';
 import '../models/plan_candidate.dart';
 import '../models/ai_proposal.dart';
 import '../models/product.dart';
 import '../models/price_observation.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'commodity_comparison_service.dart';
 import 'location_service.dart';
 import 'supabase_data_service.dart';
@@ -552,6 +555,44 @@ class PaperNoteScanResult {
 ///   4. Verified records only: Model explains plans using only actual computed records; never invents data.
 ///   5. Schema validation: Validates all model JSON and sanitizes values before UI consumption.
 ///   6. 100% resilient fallback: Graceful handling of network timeouts, rate limits, and offline demos.
+/// Structured result of invoking the Supabase Edge Function proxy
+class ProxyCallResult {
+  final bool isSuccess;
+  final dynamic data;
+  final int? statusCode;
+  final String? errorMessage;
+  final dynamic details;
+
+  const ProxyCallResult({
+    required this.isSuccess,
+    this.data,
+    this.statusCode,
+    this.errorMessage,
+    this.details,
+  });
+
+  factory ProxyCallResult.success(dynamic data, {int statusCode = 200}) {
+    return ProxyCallResult(
+      isSuccess: true,
+      data: data,
+      statusCode: statusCode,
+    );
+  }
+
+  factory ProxyCallResult.failure(
+    String message, {
+    int? statusCode,
+    dynamic details,
+  }) {
+    return ProxyCallResult(
+      isSuccess: false,
+      statusCode: statusCode,
+      errorMessage: message,
+      details: details,
+    );
+  }
+}
+
 class MetaAiService {
   final String? apiKey;
   final String? endpoint;
@@ -640,13 +681,18 @@ class MetaAiService {
       SupabaseDataService.isConnected;
 
   /// Securely invokes the deployed Supabase Edge Function (meta-ai-proxy)
-  /// keeping Meta Model API secrets server-side.
-  Future<dynamic> _invokeEdgeProxy({
+  /// keeping Meta Model API secrets server-side and reporting exact errors.
+  Future<ProxyCallResult> _invokeEdgeProxy({
     required String action,
     required Map<String, dynamic> payload,
   }) async {
     final client = SupabaseDataService.client;
-    if (client == null) return null;
+    if (client == null) {
+      return ProxyCallResult.failure(
+        'Cloud Supabase client is uninitialized. Verify your network or Supabase credentials.',
+        statusCode: 0,
+      );
+    }
     try {
       final response = await client.functions.invoke(
         'meta-ai-proxy',
@@ -657,12 +703,62 @@ class MetaAiService {
       ).timeout(const Duration(seconds: 25));
 
       if (response.status == 200 && response.data != null) {
-        return response.data;
+        return ProxyCallResult.success(response.data, statusCode: 200);
+      } else {
+        String detailMessage = '';
+        if (response.data is Map && (response.data as Map)['error'] != null) {
+          final errObj = (response.data as Map)['error'];
+          detailMessage = errObj is Map
+              ? (errObj['message'] ?? errObj.toString())
+              : errObj.toString();
+        } else if (response.data != null) {
+          detailMessage = response.data.toString();
+        }
+        return ProxyCallResult.failure(
+          'Edge Function returned HTTP ${response.status}${detailMessage.isNotEmpty ? ': $detailMessage' : ''}',
+          statusCode: response.status,
+          details: response.data,
+        );
       }
-    } catch (_) {
-      // Supabase Edge Function error or network timeout
+    } on FunctionException catch (e) {
+      String detailMessage = '';
+      if (e.details is Map && (e.details as Map)['error'] != null) {
+        final errObj = (e.details as Map)['error'];
+        detailMessage = errObj is Map
+            ? (errObj['message'] ?? errObj.toString())
+            : errObj.toString();
+      } else if (e.details != null) {
+        detailMessage = e.details.toString();
+      } else if (e.reasonPhrase != null) {
+        detailMessage = e.reasonPhrase!;
+      }
+      final statusStr = e.status > 0 ? 'HTTP ${e.status}' : 'Connection failure';
+      return ProxyCallResult.failure(
+        'Edge Function ($statusStr)${detailMessage.isNotEmpty ? ': $detailMessage' : ''}',
+        statusCode: e.status,
+        details: e.details,
+      );
+    } on SocketException catch (e) {
+      return ProxyCallResult.failure(
+        'Network error reaching Supabase Edge Function: ${e.message}',
+        statusCode: 0,
+      );
+    } on http.ClientException catch (e) {
+      return ProxyCallResult.failure(
+        'Connection error: ${e.message}',
+        statusCode: 0,
+      );
+    } on TimeoutException {
+      return ProxyCallResult.failure(
+        'Edge Function timed out after 25s. Check network connection.',
+        statusCode: 408,
+      );
+    } catch (err) {
+      return ProxyCallResult.failure(
+        'Edge Function call error: $err',
+        statusCode: 500,
+      );
     }
-    return null;
   }
 
   // --- 1. Muse Voice Transcribe (Speech-to-Text) ---
@@ -680,91 +776,123 @@ class MetaAiService {
     int sampleRate = 24000,
     int numChannels = 1,
   }) async {
+    String? detailedFailureReason;
+
     // If authenticated Meta Model API or proxy is configured:
     if (hasValidAuth) {
-      try {
-        dynamic data;
-        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+      dynamic data;
+
+      // 1. Direct Meta Model API (if effectiveApiKey configured)
+      if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+        try {
           final uri = Uri.parse('$effectiveEndpoint/v1/asr/transcribe');
-          final response = await http
-              .post(
-                uri,
-                headers: {
-                  'Authorization': 'Bearer $effectiveApiKey',
-                  'Content-Type': 'application/json',
-                },
-                body: jsonEncode({
-                  'model': 'muse-voice-transcribe-1.0',
-                  if (audioBytes != null) 'audioBase64': base64Encode(audioBytes),
-                  'audioFormat': audioFormat,
-                  'sampleRate': sampleRate,
-                  'channels': numChannels,
-                  'encoding': 'PCM_16BIT',
-                  'language': dialect.languageCode,
-                  'mode': 'PUSH_TO_TALK',
-                  'task': 'transcribe',
-                  'prompt':
-                      'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
-                }),
-              )
-              .timeout(const Duration(seconds: 25));
+          final request = http.MultipartRequest('POST', uri)
+            ..headers['Authorization'] = 'Bearer $effectiveApiKey';
+
+          request.fields['request'] = jsonEncode({
+            'model': 'muse-voice-transcribe-1.0',
+            'language': dialect.languageCode,
+            'mode': 'PUSH_TO_TALK',
+            'task': 'transcribe',
+            'prompt':
+                'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
+          });
+
+          if (audioBytes != null && audioBytes.isNotEmpty) {
+            request.files.add(http.MultipartFile.fromBytes(
+              'audio',
+              audioBytes,
+              filename: 'recording.wav',
+              contentType: MediaType('audio', 'wav'),
+            ));
+          }
+
+          final streamedResponse =
+              await request.send().timeout(const Duration(seconds: 25));
+          final response = await http.Response.fromStream(streamedResponse);
 
           if (response.statusCode == 200) {
             data = jsonDecode(response.body);
+          } else {
+            try {
+              final errJson = jsonDecode(response.body);
+              final errObj = errJson['error'];
+              final errMsg = errObj is Map
+                  ? (errObj['message'] ?? errObj.toString())
+                  : errObj?.toString() ?? response.body;
+              detailedFailureReason =
+                  'Direct Meta API HTTP ${response.statusCode}: $errMsg';
+            } catch (_) {
+              detailedFailureReason =
+                  'Direct Meta API HTTP ${response.statusCode}: ${response.reasonPhrase ?? response.body}';
+            }
           }
-        } else if (SupabaseDataService.isConnected) {
-          data = await _invokeEdgeProxy(
-            action: 'transcribe',
-            payload: {
-              if (audioBytes != null) 'audioBase64': base64Encode(audioBytes),
-              'audioFormat': audioFormat,
-              'sampleRate': sampleRate,
-              'channels': numChannels,
-              'encoding': 'PCM_16BIT',
-              'language': dialect.languageCode,
-              'mode': 'PUSH_TO_TALK',
-              'prompt':
-                  'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
-            },
+        } catch (err) {
+          detailedFailureReason = 'Direct Meta API connection error: $err';
+        }
+      }
+
+      // 2. Supabase Edge Proxy (if direct call didn't yield data and Supabase is connected)
+      if (data == null && SupabaseDataService.isConnected) {
+        final proxyRes = await _invokeEdgeProxy(
+          action: 'transcribe',
+          payload: {
+            if (audioBytes != null) 'audioBase64': base64Encode(audioBytes),
+            'audioFormat': audioFormat,
+            'sampleRate': sampleRate,
+            'channels': numChannels,
+            'encoding': 'PCM_16BIT',
+            'language': dialect.languageCode,
+            'mode': 'PUSH_TO_TALK',
+            'prompt':
+                'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
+          },
+        );
+
+        if (proxyRes.isSuccess && proxyRes.data != null) {
+          data = proxyRes.data;
+        } else {
+          detailedFailureReason = proxyRes.errorMessage ??
+              'Edge Function failed with HTTP ${proxyRes.statusCode ?? 'unknown'}';
+        }
+      }
+
+      if (data is Map) {
+        String? transcribedText;
+        if (data['turns'] is List && (data['turns'] as List).isNotEmpty) {
+          transcribedText = (data['turns'] as List)
+              .map((t) => t is Map ? (t['transcript'] ?? t['text'] ?? '') : '')
+              .where((s) => s.toString().isNotEmpty)
+              .join(' ');
+        } else {
+          transcribedText = (data['text'] ?? data['transcript'])?.toString();
+        }
+        if (transcribedText != null && transcribedText.isNotEmpty) {
+          final resolvedDialect = (dialect == VoiceDialect.autoDetect)
+              ? detectDialect(transcribedText)
+              : dialect;
+          final translation = (resolvedDialect != VoiceDialect.nigerianEnglish &&
+                  resolvedDialect != VoiceDialect.autoDetect)
+              ? (data['translation']?.toString() ??
+                  translateDialectToEnglish(transcribedText, dialect: resolvedDialect))
+              : null;
+
+          return VoiceTranscriptionResult(
+            text: transcribedText,
+            confidence: (data['confidence'] as num?)?.toDouble() ?? 0.96,
+            modelName: 'SmartMove Voice AI',
+            isFallback: false,
+            note:
+                'SmartMove AI: Speech transcribed in ${resolvedDialect.label} via Voice AI (Success)',
+            detectedDialect: resolvedDialect,
+            englishTranslation: translation,
+            isDialectTranslated: translation != null && translation.isNotEmpty,
           );
         }
-
-        if (data is Map) {
-          String? transcribedText;
-          if (data['turns'] is List && (data['turns'] as List).isNotEmpty) {
-            transcribedText = (data['turns'] as List)
-                .map((t) => t is Map ? (t['transcript'] ?? t['text'] ?? '') : '')
-                .where((s) => s.toString().isNotEmpty)
-                .join(' ');
-          } else {
-            transcribedText = (data['text'] ?? data['transcript'])?.toString();
-          }
-          if (transcribedText != null && transcribedText.isNotEmpty) {
-            final resolvedDialect = (dialect == VoiceDialect.autoDetect)
-                ? detectDialect(transcribedText)
-                : dialect;
-            final translation = (resolvedDialect != VoiceDialect.nigerianEnglish &&
-                    resolvedDialect != VoiceDialect.autoDetect)
-                ? (data['translation']?.toString() ??
-                    translateDialectToEnglish(transcribedText, dialect: resolvedDialect))
-                : null;
-
-            return VoiceTranscriptionResult(
-              text: transcribedText,
-              confidence: (data['confidence'] as num?)?.toDouble() ?? 0.96,
-              modelName: 'SmartMove Voice AI',
-              isFallback: false,
-              note:
-                  'SmartMove AI: Speech transcribed in ${resolvedDialect.label} via Voice AI (Success)',
-              detectedDialect: resolvedDialect,
-              englishTranslation: translation,
-              isDialectTranslated: translation != null && translation.isNotEmpty,
-            );
-          }
-        }
-      } catch (err) {
-        // Fall back gracefully to local speech transcription
       }
+    } else {
+      detailedFailureReason =
+          'Neither direct MODEL_API_KEY nor Cloud Supabase edge proxy is connected.';
     }
 
     // If explicit simulated voice sample was provided (e.g. Sample button or unit testing):
@@ -819,11 +947,14 @@ class MetaAiService {
     }
 
     // If real audio recording bytes were provided and cloud transcription failed/unconfigured:
-    // Report a user-friendly error instead of falling back to canned speech.
+    // Report the real diagnostic error clearly instead of an opaque canned string!
     if (audioBytes != null && audioBytes.isNotEmpty) {
+      final diagnosticSuffix = detailedFailureReason != null && detailedFailureReason.isNotEmpty
+          ? ': $detailedFailureReason'
+          : '';
       return VoiceTranscriptionResult.error(
         message:
-            'Meta AI voice transcription is currently unavailable. Please check your network connection or enter commodities manually.',
+            'Meta AI voice transcription is currently unavailable$diagnosticSuffix. Please check your network connection or enter commodities manually.',
         detectedDialect: dialect,
       );
     }
@@ -1252,10 +1383,13 @@ class MetaAiService {
             body = jsonDecode(response.body);
           }
         } else if (SupabaseDataService.isConnected) {
-          body = await _invokeEdgeProxy(
+          final proxyRes = await _invokeEdgeProxy(
             action: 'vision',
             payload: {'imageBase64': base64Image},
           );
+          if (proxyRes.isSuccess && proxyRes.data != null) {
+            body = proxyRes.data;
+          }
         }
 
         if (body is Map) {
@@ -1454,25 +1588,31 @@ class MetaAiService {
           } catch (_) {
             // Direct call failed or timed out; try Edge Proxy if connected
             if (SupabaseDataService.isConnected) {
-              body = await _invokeEdgeProxy(
+              final proxyRes = await _invokeEdgeProxy(
                 action: 'parse_request',
                 payload: {
                   'prompt': sanitizedPrompt,
                   'contextRecords': const [],
                 },
               );
-              if (body != null) statusCode = 200;
+              if (proxyRes.isSuccess && proxyRes.data != null) {
+                body = proxyRes.data;
+                statusCode = 200;
+              }
             }
           }
         } else if (SupabaseDataService.isConnected) {
-          body = await _invokeEdgeProxy(
+          final proxyRes = await _invokeEdgeProxy(
             action: 'parse_request',
             payload: {
               'prompt': sanitizedPrompt,
               'contextRecords': const [],
             },
           );
-          if (body != null) statusCode = 200;
+          if (proxyRes.isSuccess && proxyRes.data != null) {
+            body = proxyRes.data;
+            statusCode = 200;
+          }
         }
 
         if (body is Map) {
@@ -4678,8 +4818,8 @@ class MetaAiService {
             'prompt': prompt,
           },
         );
-        if (res != null && res is Map) {
-          final raw = res['text'] ?? res['answer'] ?? res['content'];
+        if (res.isSuccess && res.data != null && res.data is Map) {
+          final raw = res.data['text'] ?? res.data['answer'] ?? res.data['content'];
           if (raw != null) {
             final text = raw.toString().trim();
             if (text.isNotEmpty) {

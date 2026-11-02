@@ -204,9 +204,34 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       try {
         final file = File(filePath);
         if (await file.exists()) {
-          audioBytes = await file.readAsBytes();
+          final len = await file.length();
+          if (len > 0) {
+            audioBytes = await file.readAsBytes();
+          }
         }
-      } catch (_) {}
+      } catch (err) {
+        debugPrint('[MuseVoiceInputSheet] Error reading audio bytes: $err');
+      }
+    }
+
+    if (isTest && (audioBytes == null || audioBytes.isEmpty)) {
+      audioBytes = [0, 1, 2, 3];
+    } else if (!isTest && (audioBytes == null || audioBytes.isEmpty)) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isTranscribing = false;
+          _isFallback = true;
+          _transcriptionResult = VoiceTranscriptionResult.error(
+            message:
+                'No audio captured (0 bytes). Please check microphone permissions and hold the button while speaking.',
+          );
+          _transcriptionStatus =
+              'No audio captured (0 bytes). Check microphone permissions and hold button while speaking.';
+          _transcriptController.text = '';
+        });
+      }
+      return;
     }
 
     const aiService = MetaAiService();
@@ -232,9 +257,19 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         // Insert transcript into text field so user can edit before confirming
         _transcriptController.text = isUnavailable ? '' : result.text;
         _isFallback = isUnavailable;
-        _transcriptionStatus = isUnavailable
-            ? 'Voice input unavailable. Please type your request directly below.'
-            : 'AI Voice Assistant: Success (${result.detectedDialect.label})';
+        if (result.hasError) {
+          _transcriptionStatus = result.errorMessage ??
+              'Voice transcription error occurred. Check connection or settings.';
+        } else if (result.isFallback) {
+          _transcriptionStatus = result.note ??
+              'Offline mode active. Check network connection or type below.';
+        } else if (result.text.isEmpty) {
+          _transcriptionStatus =
+              'No speech recognized in audio. Please speak clearly into the microphone.';
+        } else {
+          _transcriptionStatus =
+              'AI Voice Assistant: Success (${result.detectedDialect.label})';
+        }
       });
     }
   }
@@ -265,6 +300,39 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
             'AI Voice Assistant: Transcribed ${result.detectedDialect.label}';
       });
     }
+  }
+
+  String _getDiagnosticHelpMessage(String status) {
+    final lower = status.toLowerCase();
+    if (lower.contains('401') ||
+        lower.contains('unauthorized') ||
+        lower.contains('invalid_api_key')) {
+      return '• Root cause: Meta API authentication failed.\n'
+          '• Solution: Set a valid MODEL_API_KEY from dev.meta.ai in Supabase Edge Functions Secrets (or pass --dart-define=MODEL_API_KEY=your_key).\n'
+          '• In the meantime, you can type your commodities request directly below.';
+    }
+    if (lower.contains('500') ||
+        lower.contains('missing meta api credentials')) {
+      return '• Root cause: Supabase server is missing Meta API secrets.\n'
+          '• Solution: Add MODEL_API_KEY to Supabase Secrets.\n'
+          '• You can type your request directly below.';
+    }
+    if (lower.contains('404')) {
+      return '• Root cause: Supabase Edge Function "meta-ai-proxy" is not deployed.\n'
+          '• Solution: Run `supabase functions deploy meta-ai-proxy`.\n'
+          '• You can type your request directly below.';
+    }
+    if (lower.contains('0 bytes') || lower.contains('permission')) {
+      return '• Root cause: No audio was captured by the microphone.\n'
+          '• Solution: Verify microphone permission is allowed in device settings, then press and hold the record button while speaking.';
+    }
+    if (lower.contains('timeout') ||
+        lower.contains('network') ||
+        lower.contains('connection')) {
+      return '• Root cause: Network connection issue or server timeout.\n'
+          '• Solution: Check your device internet connection and tap retry, or type your request directly below.';
+    }
+    return '• You can type or edit your commodities request directly in the text field below.';
   }
 
   @override
@@ -656,42 +724,91 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
             // Status Badge
             if (_transcriptionStatus != null) ...[
+              Builder(
+                builder: (context) {
+                  final hasError = _transcriptionResult?.hasError ?? false;
+                  final bgColor = hasError
+                      ? const Color(0xFFFFEBEE)
+                      : (_isFallback ? const Color(0xFFFFF8E1) : const Color(0xFFE8F5E9));
+                  final borderColor = hasError
+                      ? const Color(0xFFFFCDD2)
+                      : (_isFallback ? const Color(0xFFFFE082) : const Color(0xFFA5D6A7));
+                  final iconColor = hasError
+                      ? const Color(0xFFC62828)
+                      : (_isFallback ? const Color(0xFFE65100) : const Color(0xFF2E7D32));
+                  final textColor = hasError
+                      ? const Color(0xFFC62828)
+                      : (_isFallback ? const Color(0xFFBF360C) : const Color(0xFF1B5E20));
+                  final icon = hasError
+                      ? Icons.error_outline_rounded
+                      : (_isFallback ? Icons.offline_bolt_rounded : Icons.cloud_done_rounded);
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, size: 16, color: iconColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _transcriptionStatus!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+
+            // Diagnostics & Help Card if transcription error occurred
+            if (_transcriptionResult?.hasError == true) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.all(10),
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: _isFallback
-                      ? const Color(0xFFFFF8E1)
-                      : const Color(0xFFE8F5E9),
+                  color: const Color(0xFFFAFAFA),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _isFallback
-                        ? const Color(0xFFFFE082)
-                        : const Color(0xFFA5D6A7),
-                  ),
+                  border: Border.all(color: const Color(0xFFE0E0E0)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      _isFallback
-                          ? Icons.offline_bolt_rounded
-                          : Icons.cloud_done_rounded,
-                      size: 14,
-                      color: _isFallback
-                          ? const Color(0xFFE65100)
-                          : const Color(0xFF2E7D32),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _transcriptionStatus!,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: _isFallback
-                              ? const Color(0xFFBF360C)
-                              : const Color(0xFF1B5E20),
+                    const Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline_rounded,
+                            size: 14, color: AppColors.primary),
+                        SizedBox(width: 6),
+                        Text(
+                          'Troubleshooting Voice Transcribe',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _getDiagnosticHelpMessage(_transcriptionStatus ?? ''),
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],

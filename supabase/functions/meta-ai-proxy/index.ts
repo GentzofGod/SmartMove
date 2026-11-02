@@ -36,23 +36,47 @@ serve(async (req) => {
 
     // 1. Muse Voice Transcribe Gateway (dev.meta.ai/docs asr transcribe)
     if (action === "transcribe") {
-      const { audioBase64, language = "en", mode = "PUSH_TO_TALK", prompt } = payload || {};
+      const { audioBase64, language = "en", mode = "PUSH_TO_TALK", prompt, audioFormat = "audio/wav" } = payload || {};
+
+      // Convert base64 audio to binary Blob for multipart/form-data
+      let audioBlob: Blob;
+      if (audioBase64 && typeof audioBase64 === "string") {
+        const binaryStr = atob(audioBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        audioBlob = new Blob([bytes], { type: audioFormat });
+      } else {
+        audioBlob = new Blob([], { type: audioFormat });
+      }
+
+      const formData = new FormData();
+      formData.append(
+        "request",
+        new Blob(
+          [
+            JSON.stringify({
+              model: "muse-voice-transcribe-1.0",
+              language,
+              mode,
+              task: "transcribe",
+              prompt:
+                prompt ||
+                "West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market",
+            }),
+          ],
+          { type: "application/json" }
+        )
+      );
+      formData.append("audio", audioBlob, "recording.wav");
+
       const metaResponse = await fetch("https://api.meta.ai/v1/asr/transcribe", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${META_API_KEY}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: "muse-voice-transcribe-1.0",
-          audio: audioBase64,
-          language,
-          mode,
-          task: "transcribe",
-          prompt:
-            prompt ||
-            "West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market",
-        }),
+        body: formData,
       });
 
       const result = await metaResponse.json();
