@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_colors.dart';
@@ -41,10 +43,16 @@ class SellerLocationMapSheet extends ConsumerStatefulWidget {
   });
 
   factory SellerLocationMapSheet.fromObservation(PriceObservation obs) {
+    final cleanStall = (obs.notes != null &&
+            !obs.notes!.toLowerCase().contains('submitted via') &&
+            !obs.notes!.toLowerCase().contains('smartmove app'))
+        ? obs.notes
+        : null;
+
     return SellerLocationMapSheet(
       sellerName: obs.sellerName,
       marketLocation: obs.marketLocation,
-      stallLocation: obs.notes,
+      stallLocation: cleanStall,
       sellerLat: obs.latitude,
       sellerLng: obs.longitude,
       productName: obs.productName,
@@ -113,36 +121,14 @@ class SellerLocationMapSheet extends ConsumerStatefulWidget {
 
 class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet> {
   late final MapController _mapController;
-
-  static const Map<String, LatLng> _hubCoordinates = {
-    'bodija': LatLng(7.4243, 3.9168),
-    'dugbe': LatLng(7.3916, 3.8797),
-    'oje': LatLng(7.3871, 3.9110),
-    'oja oba': LatLng(7.3752, 3.8963),
-    'gbagi': LatLng(7.3965, 3.9638),
-    'abeokuta': LatLng(7.1475, 3.3619),
-    'kuto': LatLng(7.1420, 3.3550),
-    'itoku': LatLng(7.1550, 3.3400),
-    'omida': LatLng(7.1480, 3.3450),
-    'lafenwa': LatLng(7.1700, 3.3300),
-    'ibara': LatLng(7.1557, 3.3451),
-    'sagamu': LatLng(6.8400, 3.6500),
-    'ijebu': LatLng(6.8200, 3.9200),
-    'mile 12': LatLng(6.6020, 3.3900),
-    'oyingbo': LatLng(6.4950, 3.3780),
-    'tejuosho': LatLng(6.5150, 3.3640),
-    'balogun': LatLng(6.4550, 3.3850),
-    'alaba': LatLng(6.4620, 3.1930),
-    'wuse': LatLng(9.0600, 7.4680),
-    'utako': LatLng(9.0700, 7.4390),
-    'kano': LatLng(12.0000, 8.5200),
-    'port harcourt': LatLng(4.8360, 7.0500),
-  };
+  LatLng? _dynamicallyGeocodedPos;
+  bool _isGeocoding = false;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
+    _attemptDynamicGeocodingIfNeeded();
   }
 
   @override
@@ -151,12 +137,85 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
     super.dispose();
   }
 
+  String? _resolveStallLocation() {
+    if (widget.stallLocation != null && widget.stallLocation!.trim().isNotEmpty) {
+      final s = widget.stallLocation!.trim();
+      if (!s.toLowerCase().contains('submitted via') && !s.toLowerCase().contains('smartmove app')) {
+        return s;
+      }
+    }
+    final sName = widget.sellerName.toLowerCase().trim();
+    try {
+      final applications = ref.read(sellerApplicationsProvider);
+      for (final a in applications) {
+        if (a.businessName.toLowerCase().trim() == sName ||
+            a.applicantName.toLowerCase().trim() == sName) {
+          if (a.stallLocation != null && a.stallLocation!.trim().isNotEmpty) {
+            return a.stallLocation!.trim();
+          }
+        }
+      }
+      final session = ref.read(authProvider);
+      if (session.businessName?.toLowerCase().trim() == sName ||
+          session.displayName.toLowerCase().trim() == sName) {
+        if (session.stallLocation != null && session.stallLocation!.trim().isNotEmpty) {
+          return session.stallLocation!.trim();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String? _resolveContactPhone() {
+    if (widget.contactPhone != null && widget.contactPhone!.trim().isNotEmpty) {
+      return widget.contactPhone!.trim();
+    }
+    final sName = widget.sellerName.toLowerCase().trim();
+    try {
+      final applications = ref.read(sellerApplicationsProvider);
+      for (final a in applications) {
+        if (a.businessName.toLowerCase().trim() == sName ||
+            a.applicantName.toLowerCase().trim() == sName) {
+          if (a.phone.trim().isNotEmpty) return a.phone.trim();
+        }
+      }
+      final session = ref.read(authProvider);
+      if (session.businessName?.toLowerCase().trim() == sName ||
+          session.displayName.toLowerCase().trim() == sName) {
+        if (session.phone != null && session.phone!.trim().isNotEmpty) {
+          return session.phone!.trim();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String get exactShopAddress {
+    final stall = _resolveStallLocation();
+    final market = widget.marketLocation.trim();
+    if (stall != null && stall.isNotEmpty) {
+      if (market.isNotEmpty && !stall.toLowerCase().contains(market.toLowerCase())) {
+        return '$stall, $market';
+      }
+      return stall;
+    }
+    return market.isNotEmpty ? market : 'Exact stall location not listed';
+  }
+
   LatLng? _resolveSellerCoordinates() {
+    // 1. Direct explicit coordinates from widget
     if (widget.sellerLat != null && widget.sellerLng != null && widget.sellerLat != 0.0) {
       return LatLng(widget.sellerLat!, widget.sellerLng!);
     }
 
-    // 1. Try extracting explicit Lat / Lon from stallLocation or marketLocation string
+    // 2. Coordinates from PriceObservation
+    if (widget.observation?.latitude != null &&
+        widget.observation?.longitude != null &&
+        widget.observation!.latitude != 0.0) {
+      return LatLng(widget.observation!.latitude!, widget.observation!.longitude!);
+    }
+
+    // 3. Explicit Lat / Lon in stall or market string
     final marketString = '${widget.stallLocation ?? ""} ${widget.marketLocation}'.trim();
     final coordMatch = RegExp(r'Lat:\s*([0-9.-]+).*?Lon:\s*([0-9.-]+)', caseSensitive: false).firstMatch(marketString);
     if (coordMatch != null) {
@@ -167,10 +226,10 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
       }
     }
 
-    // 2. Try looking up seller in sellerApplicationsProvider or currentUser session
+    // 4. Coordinates from verified seller applications or current session
+    final sName = widget.sellerName.toLowerCase().trim();
     try {
       final applications = ref.read(sellerApplicationsProvider);
-      final sName = widget.sellerName.toLowerCase().trim();
       for (final a in applications) {
         if (a.businessName.toLowerCase().trim() == sName ||
             a.applicantName.toLowerCase().trim() == sName) {
@@ -188,41 +247,79 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
       }
     } catch (_) {}
 
-    // 3. Match market location against known hub coordinates
-    final marketQuery = marketString.toLowerCase();
-    for (final entry in _hubCoordinates.entries) {
-      if (marketQuery.contains(entry.key)) {
-        return entry.value;
-      }
+    // 5. Dynamically geocoded coordinates (from real live OSM Nominatim query)
+    if (_dynamicallyGeocodedPos != null) {
+      return _dynamicallyGeocodedPos;
     }
 
-    // 4. City-level resolution if market location mentions a known city
-    if (marketQuery.contains('abeokuta') || marketQuery.contains('ogun')) {
-      return const LatLng(7.1475, 3.3619);
-    }
-    if (marketQuery.contains('lagos') || marketQuery.contains('ikeja')) {
-      return const LatLng(6.6020, 3.3515);
-    }
-    if (marketQuery.contains('abuja') || marketQuery.contains('fct')) {
-      return const LatLng(9.0765, 7.3986);
-    }
-
-    // Return null if coordinates are unknown so UI reports accurately without fake fallback
+    // Absolutely NO hardcoded fallback coordinates!
     return null;
   }
 
-  Future<void> _openExternalNavigation(LatLng sellerPos) async {
-    final lat = sellerPos.latitude;
-    final lng = sellerPos.longitude;
-    final label = Uri.encodeComponent('${widget.sellerName} (${widget.marketLocation})');
-    final geoUri = Uri.parse('geo:$lat,$lng?q=$lat,$lng($label)');
-    final webMapsUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+  Future<void> _attemptDynamicGeocodingIfNeeded() async {
+    if (_resolveSellerCoordinates() != null) return;
+
+    final query = exactShopAddress;
+    if (query.isEmpty || query.contains('not listed')) return;
+
+    setState(() => _isGeocoding = true);
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent("$query, Nigeria")}&format=json&limit=1',
+      );
+      final res = await http.get(uri, headers: {
+        'User-Agent': 'SmartMoveApp/1.0',
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as List<dynamic>;
+        if (data.isNotEmpty) {
+          final first = data.first as Map<String, dynamic>;
+          final lat = double.tryParse(first['lat']?.toString() ?? '');
+          final lon = double.tryParse(first['lon']?.toString() ?? '');
+          if (lat != null && lon != null && mounted) {
+            setState(() {
+              _dynamicallyGeocodedPos = LatLng(lat, lon);
+              _isGeocoding = false;
+            });
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() => _isGeocoding = false);
+    }
+  }
+
+  Future<void> _openExternalNavigation(LatLng? sellerPos) async {
+    final addressQuery = '${widget.sellerName}, $exactShopAddress';
+    final queryEncoded = Uri.encodeComponent(addressQuery);
+
+    final geoUri = sellerPos != null
+        ? Uri.parse('geo:${sellerPos.latitude},${sellerPos.longitude}?q=${sellerPos.latitude},${sellerPos.longitude}($queryEncoded)')
+        : Uri.parse('geo:0,0?q=$queryEncoded');
+
+    final webMapsUri = sellerPos != null
+        ? Uri.parse('https://www.google.com/maps/search/?api=1&query=${sellerPos.latitude},${sellerPos.longitude}')
+        : Uri.parse('https://www.google.com/maps/search/?api=1&query=$queryEncoded');
 
     try {
       if (await canLaunchUrl(geoUri)) {
         await launchUrl(geoUri, mode: LaunchMode.externalApplication);
       } else if (await canLaunchUrl(webMapsUri)) {
         await launchUrl(webMapsUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _callSeller(String phone) async {
+    final telUri = Uri.parse('tel:${phone.replaceAll(RegExp(r'[^0-9+]'), '')}');
+    try {
+      if (await canLaunchUrl(telUri)) {
+        await launchUrl(telUri);
       }
     } catch (_) {}
   }
@@ -507,49 +604,120 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                   ),
                 ],
               )
-            : Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFF8E1),
-                          shape: BoxShape.circle,
+                  : Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE8F5E9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.store_mall_directory_rounded,
+                                  color: Color(0xFF2E7D32), size: 48),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Stall GPS Not Yet Calibrated',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 18),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${widget.sellerName} is listed at "${widget.marketLocation}", but precise GPS stall coordinates have not been submitted.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade700,
+                                  height: 1.4),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F8E9),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFFAED581)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.pin_drop_rounded, color: Color(0xFF2E7D32), size: 18),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'EXACT SHOP / STALL ADDRESS',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF2E7D32),
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    exactShopAddress,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                  if (_resolveStallLocation() != null) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Market / District: ${widget.marketLocation}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              _isGeocoding
+                                  ? 'Locating exact coordinates on map...'
+                                  : 'Navigate directly to this shop using Google Maps or contact the seller below.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: Colors.grey.shade600,
+                                  height: 1.3),
+                            ),
+                            const SizedBox(height: 18),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1976D2),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => _openExternalNavigation(null),
+                                icon: const Icon(Icons.map_rounded, size: 20),
+                                label: const Text(
+                                  'Find Exact Shop on Google Maps',
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.location_off_rounded,
-                            color: Color(0xFFF57F17), size: 40),
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Stall GPS Not Yet Calibrated',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${widget.sellerName} is listed at "${widget.marketLocation}", but precise GPS stall coordinates have not been submitted.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                            height: 1.4),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Contact the seller via In-App Chat or Phone Call below for direct stall directions.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                            height: 1.3),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
 
             // Bottom Seller & Product Navigation Sheet
@@ -582,18 +750,22 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.stallLocation != null && widget.stallLocation!.isNotEmpty
-                                    ? widget.stallLocation!
-                                    : widget.marketLocation,
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                exactShopAddress,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 2),
                               Text(
-                                '${widget.marketLocation} • ${distanceKm != null ? "${distanceKm.toStringAsFixed(1)} km away" : "Physical Store"}',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                distanceKm != null
+                                    ? '${distanceKm.toStringAsFixed(1)} km away • Verified Outlet'
+                                    : 'Verified Physical Outlet',
+                                style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
                               ),
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -650,7 +822,7 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                     // Actions Row
                     Row(
                       children: [
-                        // Open External GPS Directions
+                        // Open External Directions (Google Maps / GPS)
                         Expanded(
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
@@ -658,14 +830,25 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                               side: const BorderSide(color: AppColors.primary),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            onPressed: sellerPos != null
-                                ? () => _openExternalNavigation(sellerPos)
-                                : null,
+                            onPressed: () => _openExternalNavigation(sellerPos),
                             icon: const Icon(Icons.directions_outlined, size: 18),
                             label: const Text('Directions', style: TextStyle(fontWeight: FontWeight.w700)),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        if (_resolveContactPhone() != null && _resolveContactPhone()!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFE8F5E9),
+                              foregroundColor: const Color(0xFF2E7D32),
+                              padding: const EdgeInsets.all(12),
+                            ),
+                            tooltip: 'Call Seller: ${_resolveContactPhone()!}',
+                            icon: const Icon(Icons.call_rounded, size: 20),
+                            onPressed: () => _callSeller(_resolveContactPhone()!),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
                         // Chat & Buy
                         Expanded(
                           child: ElevatedButton.icon(

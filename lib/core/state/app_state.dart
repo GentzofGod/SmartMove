@@ -824,21 +824,77 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       if (cachedJson != null && cachedJson.isNotEmpty) {
         final decoded = jsonDecode(cachedJson) as List<dynamic>;
         if (decoded.isNotEmpty) {
-          state = decoded
+          final items = decoded
               .map((j) => PriceObservation.fromJson(j as Map<String, dynamic>))
+              .where((o) =>
+                  !o.id.startsWith('obs-seed') &&
+                  !o.sellerName.toLowerCase().contains('kudirat') &&
+                  !o.sellerName.toLowerCase().contains('demo') &&
+                  !o.sellerName.toLowerCase().contains('seed'))
               .toList();
+          state = items;
+          if (items.length != decoded.length) {
+            _persist(items);
+          }
         }
       }
     } catch (_) {}
 
     final live = await SupabaseDataService.fetchObservations();
-    if (live != null && live.isNotEmpty) {
-      // Merge live with any local user-created listings not yet in live
-      final liveIds = live.map((o) => o.id).toSet();
-      final localOnly = state.where((o) => !liveIds.contains(o.id)).toList();
-      state = [...localOnly, ...live];
-      _persist(state);
+    if (live != null) {
+      if (live.isEmpty) {
+        // Authoritative live database has 0 records; wipe cached mock/stale entries
+        state = [];
+        _persist(state);
+      } else {
+        final liveIds = live.map((o) => o.id).toSet();
+        final localOnly = state
+            .where((o) =>
+                !liveIds.contains(o.id) &&
+                !o.id.startsWith('obs-seed') &&
+                !o.sellerName.toLowerCase().contains('demo') &&
+                !o.sellerName.toLowerCase().contains('seed'))
+            .toList();
+        state = [...localOnly, ...live];
+        _persist(state);
+      }
     }
+  }
+
+  Future<void> refreshFromCloud({bool purgeLocalMock = false}) async {
+    if (purgeLocalMock) {
+      await purgeDemoObservations();
+    }
+    final live = await SupabaseDataService.fetchObservations();
+    if (live != null) {
+      if (live.isEmpty) {
+        state = [];
+      } else {
+        final liveIds = live.map((o) => o.id).toSet();
+        final localOnly = purgeLocalMock
+            ? <PriceObservation>[]
+            : state
+                .where((o) =>
+                    !liveIds.contains(o.id) &&
+                    !o.id.startsWith('obs-seed') &&
+                    !o.sellerName.toLowerCase().contains('demo') &&
+                    !o.sellerName.toLowerCase().contains('seed'))
+                .toList();
+        state = [...localOnly, ...live];
+      }
+      await _persist(state);
+    }
+  }
+
+  Future<void> purgeDemoObservations() async {
+    state = state
+        .where((o) =>
+            !o.id.startsWith('obs-seed') &&
+            !o.sellerName.toLowerCase().contains('kudirat') &&
+            !o.sellerName.toLowerCase().contains('demo') &&
+            !o.sellerName.toLowerCase().contains('seed'))
+        .toList();
+    await _persist(state);
   }
 
   Future<void> _persist(List<PriceObservation> list) async {
@@ -1327,9 +1383,12 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
             .map((item) =>
                 SellerApplication.fromJson(item as Map<String, dynamic>))
             .where((app) =>
-                app.id != 'app-seed-001' &&
+                !app.id.startsWith('app-seed') &&
                 !app.applicantName.toLowerCase().contains('kudirat') &&
-                !app.businessName.toLowerCase().contains('kudirat'))
+                !app.businessName.toLowerCase().contains('kudirat') &&
+                !app.applicantEmail.toLowerCase().contains('seed') &&
+                !app.applicantEmail.toLowerCase().contains('demo') &&
+                !app.businessName.toLowerCase().contains('demo'))
             .toList();
         if (apps.length != list.length) {
           // Re-persist cleansed list without any mock/seed applications
@@ -1353,7 +1412,15 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
 
   Future<void> _fetchLive() async {
     final live = await SupabaseDataService.fetchSellerApplications();
-    if (live != null && live.isNotEmpty && ref.mounted) {
+    if (live != null && ref.mounted) {
+      if (live.isEmpty) {
+        // Authoritative live database has 0 applications; clear state
+        state = const <SellerApplication>[];
+        _persist(state);
+        ref.read(authProvider.notifier).syncWithSellerApplications(state);
+        return;
+      }
+
       final liveEmails = live
           .map((a) => a.applicantEmail.trim().toLowerCase())
           .where((e) => e.isNotEmpty)
@@ -1362,8 +1429,19 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       final liveIds = live.map((a) => a.id).toSet();
 
       final localOnly = state.where((a) {
-        if (liveIds.contains(a.id)) return false;
-        if (a.userId.isNotEmpty && liveUserIds.contains(a.userId)) return false;
+        if (a.id.startsWith('app-seed')) {
+          return false;
+        }
+        if (a.applicantEmail.toLowerCase().contains('demo') ||
+            a.applicantEmail.toLowerCase().contains('seed')) {
+          return false;
+        }
+        if (liveIds.contains(a.id)) {
+          return false;
+        }
+        if (a.userId.isNotEmpty && liveUserIds.contains(a.userId)) {
+          return false;
+        }
         if (a.applicantEmail.isNotEmpty &&
             liveEmails.contains(a.applicantEmail.trim().toLowerCase())) {
           return false;
@@ -1375,6 +1453,50 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       _persist(state);
       ref.read(authProvider.notifier).syncWithSellerApplications(state);
     }
+  }
+
+  Future<void> refreshFromCloud({bool purgeLocalMock = false}) async {
+    if (purgeLocalMock) {
+      await purgeDemoApplications();
+    }
+    final live = await SupabaseDataService.fetchSellerApplications();
+    if (live != null && ref.mounted) {
+      if (live.isEmpty) {
+        state = const <SellerApplication>[];
+      } else {
+        if (purgeLocalMock) {
+          state = live;
+        } else {
+          final liveIds = live.map((a) => a.id).toSet();
+          final localOnly = state.where((a) =>
+              !a.id.startsWith('app-seed') &&
+              !a.applicantEmail.toLowerCase().contains('demo') &&
+              !a.applicantEmail.toLowerCase().contains('seed') &&
+              !liveIds.contains(a.id)).toList();
+          state = [...live, ...localOnly];
+        }
+      }
+      await _persist(state);
+      ref.read(authProvider.notifier).syncWithSellerApplications(state);
+    }
+  }
+
+  Future<void> purgeDemoApplications() async {
+    state = state.where((a) =>
+        !a.id.startsWith('app-seed') &&
+        !a.applicantName.toLowerCase().contains('kudirat') &&
+        !a.businessName.toLowerCase().contains('kudirat') &&
+        !a.applicantEmail.toLowerCase().contains('seed') &&
+        !a.applicantEmail.toLowerCase().contains('demo') &&
+        !a.businessName.toLowerCase().contains('demo')).toList();
+    await _persist(state);
+    ref.read(authProvider.notifier).syncWithSellerApplications(state);
+  }
+
+  Future<void> clearAllApplications() async {
+    state = const <SellerApplication>[];
+    await _persist(state);
+    ref.read(authProvider.notifier).syncWithSellerApplications(state);
   }
 
   List<SellerApplication> _getInitialApplications() {
@@ -1664,12 +1786,38 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
         final requests = list
             .map((item) =>
                 StoreEditRequest.fromJson(item as Map<String, dynamic>))
+            .where((r) =>
+                !r.id.startsWith('edit-seed') &&
+                !r.applicantEmail.toLowerCase().contains('seed') &&
+                !r.applicantEmail.toLowerCase().contains('demo') &&
+                !r.proposedBusinessName.toLowerCase().contains('demo') &&
+                !r.currentBusinessName.toLowerCase().contains('demo'))
             .toList();
+        if (requests.length != list.length) {
+          _persist(requests);
+        }
         if (ref.mounted) {
           state = requests;
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> purgeDemoRequests() async {
+    state = state
+        .where((r) =>
+            !r.id.startsWith('edit-seed') &&
+            !r.applicantEmail.toLowerCase().contains('seed') &&
+            !r.applicantEmail.toLowerCase().contains('demo') &&
+            !r.proposedBusinessName.toLowerCase().contains('demo') &&
+            !r.currentBusinessName.toLowerCase().contains('demo'))
+        .toList();
+    await _persist(state);
+  }
+
+  Future<void> clearAllRequests() async {
+    state = const <StoreEditRequest>[];
+    await _persist(state);
   }
 
   Future<void> _persist(List<StoreEditRequest> requests) async {

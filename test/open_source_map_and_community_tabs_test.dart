@@ -33,6 +33,8 @@ void main() {
         channel: 'Local Market',
         category: 'Groceries',
         inStock: true,
+        latitude: 7.4243,
+        longitude: 3.9168,
       );
 
       final container = ProviderContainer();
@@ -73,7 +75,7 @@ void main() {
 
       // Verify seller stall info
       expect(find.text('Iya Basira Store'), findsWidgets);
-      expect(find.text('Section B, Stall 14'), findsOneWidget);
+      expect(find.text('Section B, Stall 14, Bodija Market'), findsWidgets);
       expect(find.text('Royal Stallion Rice'), findsOneWidget);
       expect(find.text('In Stock'), findsOneWidget);
 

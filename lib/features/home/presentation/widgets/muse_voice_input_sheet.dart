@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
+import '../../../../core/services/meta_live_transcriber.dart';
 import '../../../../core/services/audio_feedback_service.dart';
 
 /// Bottom sheet for Meta Voice Transcribe (Push-to-talk multi-dialect speech-to-text)
@@ -51,6 +53,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   int _consecutiveQuietTicks = 0;
   String? _recordedFilePath;
   String _capturedSpeechFromMic = '';
+  MetaLiveTranscriber? _liveTranscriber;
 
   final AudioRecorder _audioRecorder = AudioRecorder();
   final stt.SpeechToText _speechToText = stt.SpeechToText();
@@ -96,6 +99,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     _pulseController.dispose();
     _transcriptController.dispose();
     AudioFeedbackService.stop();
+    _liveTranscriber?.dispose();
     if (_speechToText.isListening) {
       try {
         _speechToText.stop();
@@ -140,8 +144,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
     if (!isTest) {
       try {
-        // 2. Android requests microphone permission if necessary
-        final hasPermission = await _audioRecorder.hasPermission();
+        // 2. Android requests microphone permission via permission_handler & record
+        final micPerm = await Permission.microphone.request();
+        final hasPermission = micPerm.isGranted || await _audioRecorder.hasPermission();
         if (!hasPermission) {
           if (mounted) {
             setState(() {
@@ -151,6 +156,37 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
           }
           return;
         }
+
+        // Connect real-time Meta WebSocket transcriber
+        _liveTranscriber = MetaLiveTranscriber(
+          onPartialTranscript: (partial) {
+            if (mounted && _isRecording && partial.isNotEmpty) {
+              _capturedSpeechFromMic = partial;
+              setState(() {
+                _transcriptController.text = partial;
+                _transcriptionStatus =
+                    'Live streaming words via Meta ASR (${_selectedDialect.label})...';
+              });
+            }
+          },
+          onFinalTranscript: (finalTxt) {
+            if (mounted && finalTxt.isNotEmpty) {
+              _capturedSpeechFromMic = finalTxt;
+              setState(() {
+                _transcriptController.text = finalTxt;
+              });
+            }
+          },
+          onSpeechComplete: () {
+            if (mounted && _isRecording) {
+              _stopRecording();
+            }
+          },
+          onError: (err) {
+            debugPrint('[MuseVoiceInputSheet] Live ASR note: $err');
+          },
+        );
+        _liveTranscriber!.start(dialect: _selectedDialect);
 
         final tempDir = await getTemporaryDirectory();
         final targetWavPath =
@@ -260,6 +296,12 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     final isTest = Platform.environment.containsKey('FLUTTER_TEST');
     String? audioPath;
     if (!isTest) {
+      if (_liveTranscriber != null) {
+        try {
+          await _liveTranscriber!.stop();
+        } catch (_) {}
+        _liveTranscriber = null;
+      }
       if (_speechToText.isListening) {
         try {
           await _speechToText.stop();

@@ -189,17 +189,16 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
             ),
           ),
           IconButton(
+            key: const ValueKey('btn_superadmin_purge_demo'),
+            tooltip: 'Purge Demo Records & Clean Sync',
+            icon: const Icon(Icons.cleaning_services_rounded, color: Color(0xFFFFD54F)),
+            onPressed: () => _confirmAndPurgeDemoData(context),
+          ),
+          IconButton(
+            key: const ValueKey('btn_superadmin_refresh'),
             tooltip: 'Refresh & Sync',
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('SuperAdmin moderation queue refreshed.'),
-                  backgroundColor: Color(0xFF4A148C),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
+            onPressed: () => _syncAllQueues(context),
           ),
         ],
         bottom: TabBar(
@@ -2406,5 +2405,76 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _syncAllQueues(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Synchronizing moderation queues with live database...'),
+        backgroundColor: Color(0xFF4A148C),
+        duration: Duration(milliseconds: 900),
+      ),
+    );
+    await ref.read(sellerApplicationsProvider.notifier).refreshFromCloud();
+    await ref.read(communityProvider.notifier).refreshFromCloud();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admin queues successfully synchronized with live database.'),
+          backgroundColor: Color(0xFF2E7D32),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmAndPurgeDemoData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.cleaning_services_rounded, color: Color(0xFFC62828)),
+            SizedBox(width: 8),
+            Text('Purge Demo Records'),
+          ],
+        ),
+        content: const Text(
+          'This will remove all lingering local demo/seed seller applications, mock store edit requests, and test price observations from device storage, then force a clean sync with your live database.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC62828),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Purge & Sync Live'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await ref.read(sellerApplicationsProvider.notifier).refreshFromCloud(purgeLocalMock: true);
+      await ref.read(sellerApplicationsProvider.notifier).purgeDemoApplications();
+      await ref.read(storeEditRequestsProvider.notifier).purgeDemoRequests();
+      await ref.read(communityProvider.notifier).refreshFromCloud(purgeLocalMock: true);
+      await ref.read(communityProvider.notifier).purgeDemoObservations();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All demo requests and mock data purged. Synced with live database.'),
+            backgroundColor: Color(0xFF2E7D32),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }
