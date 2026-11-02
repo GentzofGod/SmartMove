@@ -750,7 +750,7 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                exactShopAddress,
+                                LocationService.cleanDisplayAddress(exactShopAddress),
                                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,

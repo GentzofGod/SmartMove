@@ -5,6 +5,7 @@ import '../models/commodity_category.dart';
 import '../models/errand.dart';
 import '../models/seller_application.dart';
 import '../models/trader_chat_message.dart';
+import '../models/store_edit_request.dart';
 
 class SupabaseDataService {
   static SupabaseClient? get _client {
@@ -64,15 +65,23 @@ class SupabaseDataService {
   }
 
   /// Create a new commodity category (SuperAdmin)
-  static Future<bool> insertCategory(CommodityCategory category) async {
+  static Future<CommodityCategory?> insertCategory(CommodityCategory category) async {
     final client = _client;
-    if (client == null) return false;
+    if (client == null) return null;
 
     try {
-      await client.from('commodity_categories').insert(category.toDbMap());
-      return true;
+      final response = await client
+          .from('commodity_categories')
+          .insert(category.toDbMap())
+          .select()
+          .maybeSingle();
+
+      if (response != null) {
+        return CommodityCategory.fromJson(response);
+      }
+      return null;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 
@@ -82,10 +91,21 @@ class SupabaseDataService {
     if (client == null) return false;
 
     try {
-      await client
-          .from('commodity_categories')
-          .update(category.toDbMap())
-          .eq('id', category.id);
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(category.id);
+
+      if (isUuid) {
+        await client
+            .from('commodity_categories')
+            .update(category.toDbMap())
+            .eq('id', category.id);
+      } else {
+        await client
+            .from('commodity_categories')
+            .update(category.toDbMap())
+            .eq('slug', category.slug);
+      }
       return true;
     } catch (_) {
       return false;
@@ -93,12 +113,20 @@ class SupabaseDataService {
   }
 
   /// Delete a category (SuperAdmin)
-  static Future<bool> deleteCategory(String categoryId) async {
+  static Future<bool> deleteCategory(String categoryId, {String? slug}) async {
     final client = _client;
     if (client == null) return false;
 
     try {
-      await client.from('commodity_categories').delete().eq('id', categoryId);
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(categoryId);
+
+      if (isUuid) {
+        await client.from('commodity_categories').delete().eq('id', categoryId);
+      } else if (slug != null && slug.isNotEmpty) {
+        await client.from('commodity_categories').delete().eq('slug', slug);
+      }
       return true;
     } catch (_) {
       return false;
@@ -290,6 +318,116 @@ class SupabaseDataService {
       if (longitude != null) payload['longitude'] = longitude;
 
       await client.from('price_observations').insert(payload);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update an existing price observation in Cloud Supabase (Sellers & Admins)
+  static Future<bool> updateObservation({
+    required String id,
+    String? productName,
+    double? price,
+    String? unit,
+    String? category,
+    String? brandOrGrade,
+    String? notes,
+    bool? inStock,
+    String? imageUrl,
+    String? marketLocation,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final updateData = <String, dynamic>{
+        'product_name': ?productName,
+        'price': ?price,
+        'unit': ?unit,
+        'category': ?category,
+        'brand_or_grade': ?brandOrGrade,
+        'notes': ?notes,
+        'in_stock': ?inStock,
+        'image_url': ?imageUrl,
+        'market_location': ?marketLocation,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+      };
+
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(id);
+
+      if (isUuid) {
+        await client.from('price_observations').update(updateData).eq('id', id);
+      } else if (productName != null) {
+        await client.from('price_observations').update(updateData).eq('product_name', productName);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete a price observation from Cloud Supabase
+  static Future<bool> deleteObservation(String id, {String? productName}) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(id);
+
+      if (isUuid) {
+        await client.from('price_observations').delete().eq('id', id);
+      } else if (productName != null) {
+        await client.from('price_observations').delete().eq('product_name', productName);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Toggle in_stock status of an observation in Cloud Supabase
+  static Future<bool> toggleObservationStock(String id, bool inStock) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(id);
+
+      if (isUuid) {
+        await client.from('price_observations').update({'in_stock': inStock}).eq('id', id);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update observation verification flag in Cloud Supabase (Admin moderation)
+  static Future<bool> verifyObservation(String id, bool isVerified) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(id);
+
+      if (isUuid) {
+        await client.from('price_observations').update({
+          'is_verified': isVerified,
+          'source_type': isVerified ? 'trader_confirmed' : 'community_reported',
+        }).eq('id', id);
+      }
       return true;
     } catch (_) {
       return false;
@@ -564,6 +702,121 @@ class SupabaseDataService {
         await client.from('profiles').update(updateData).eq('id', userId);
       } else if (email != null && email.isNotEmpty) {
         await client.from('profiles').update(updateData).eq('email', email.trim().toLowerCase());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update an existing user/trader profile details in Cloud Supabase
+  static Future<bool> updateProfile({
+    required String userId,
+    String? email,
+    String? businessName,
+    String? marketHub,
+    String? sellerChannel,
+    String? stallLocation,
+    double? latitude,
+    double? longitude,
+    String? phone,
+  }) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final updateData = <String, dynamic>{
+        'business_name': ?businessName,
+        'market_hub': ?marketHub,
+        'seller_channel': ?sellerChannel,
+        'stall_location': ?stallLocation,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'phone': ?phone,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(userId);
+
+      if (isUuid) {
+        await client.from('profiles').update(updateData).eq('id', userId);
+      } else if (email != null && email.isNotEmpty) {
+        await client.from('profiles').update(updateData).eq('email', email.trim().toLowerCase());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetch all store edit requests from Cloud Supabase
+  static Future<List<StoreEditRequest>?> fetchStoreEditRequests() async {
+    final client = _client;
+    if (client == null) return null;
+
+    try {
+      final response = await client
+          .from('store_edit_requests')
+          .select()
+          .order('submitted_at', ascending: false);
+
+      final List<dynamic> data = response as List<dynamic>;
+      return data
+          .map((j) => StoreEditRequest.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Submit a store edit request to Cloud Supabase
+  static Future<bool> insertStoreEditRequest(StoreEditRequest request) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final payload = Map<String, dynamic>.from(request.toJson());
+      // Let DB generate UUID if id is local string
+      if (!RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(request.id)) {
+        payload.remove('id');
+      }
+      await client.from('store_edit_requests').insert(payload);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update store edit request review status in Cloud Supabase (Admin moderation)
+  static Future<bool> updateStoreEditRequestStatus({
+    required String requestId,
+    required String status,
+    String? reviewerName,
+    String? rejectionReason,
+  }) async {
+    final client = _client;
+    if (client == null) return false;
+
+    try {
+      final updateData = <String, dynamic>{
+        'status': status,
+        'reviewed_at': DateTime.now().toIso8601String(),
+        'reviewed_by': ?reviewerName,
+        'rejection_reason': ?rejectionReason,
+      };
+
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(requestId);
+
+      if (isUuid) {
+        await client
+            .from('store_edit_requests')
+            .update(updateData)
+            .eq('id', requestId);
       }
       return true;
     } catch (_) {

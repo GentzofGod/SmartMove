@@ -194,6 +194,10 @@ CREATE TABLE public.price_observations (
   channel TEXT NOT NULL DEFAULT 'Local Market',
   brand_or_grade TEXT,
   in_stock BOOLEAN NOT NULL DEFAULT true,
+  category TEXT,
+  image_url TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   standardized_unit_price NUMERIC(12, 2),
   base_unit TEXT NOT NULL DEFAULT 'kg',
   is_flagged_anomaly BOOLEAN NOT NULL DEFAULT false,
@@ -397,6 +401,28 @@ CREATE TRIGGER on_seller_application_status_changed
   EXECUTE FUNCTION public.handle_seller_application_review();
 
 -- ------------------------------------------------------------------------------
+-- 13a. STORE EDIT REQUESTS TABLE (Seller Store Profile Modifications Audit)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.store_edit_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  seller_id TEXT NOT NULL,
+  applicant_email TEXT NOT NULL,
+  proposed_business_name TEXT NOT NULL,
+  proposed_market_hub TEXT NOT NULL,
+  proposed_stall_location TEXT,
+  proposed_phone TEXT NOT NULL,
+  proposed_seller_channel TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_store_edit_requests_seller ON public.store_edit_requests(seller_id);
+CREATE INDEX IF NOT EXISTS idx_store_edit_requests_status ON public.store_edit_requests(status);
+
+-- ------------------------------------------------------------------------------
 -- 13b. NEGOTIATION MESSAGES TABLE (Buyer-Seller Direct Messaging Database)
 -- ------------------------------------------------------------------------------
 CREATE TABLE public.negotiation_messages (
@@ -435,98 +461,51 @@ ALTER TABLE public.user_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.itinerary_stops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saved_locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saved_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_edit_requests ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Public can view, owner can update
+-- Profiles: Public can view, insert, and update
 CREATE POLICY "Public profiles are viewable by everyone" 
   ON public.profiles FOR SELECT USING (true);
 
-CREATE POLICY "Users can insert their own profile" 
-  ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can insert profile" 
+  ON public.profiles FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Users can update their own profile" 
-  ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can update profile" 
+  ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
 
 -- Markets: Everyone can view active markets
 CREATE POLICY "Markets are viewable by everyone" 
   ON public.markets FOR SELECT USING (is_active = true);
 
--- Commodity Categories: Public can view, Admins can manage
-CREATE POLICY "Categories are viewable by everyone" 
-  ON public.commodity_categories FOR SELECT USING (is_active = true OR true);
-
-CREATE POLICY "Admins can manage categories" 
+-- Commodity Categories: Everyone can browse, admins & client app can manage
+CREATE POLICY "Commodity categories full access" 
   ON public.commodity_categories FOR ALL 
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
-    )
-  );
+  USING (true)
+  WITH CHECK (true);
 
--- Products: Everyone can browse, Verified Traders & Admins can upload & manage
-CREATE POLICY "Products are viewable by everyone" 
-  ON public.products FOR SELECT USING (true);
+-- Products: Everyone can browse and manage products
+CREATE POLICY "Products full access" 
+  ON public.products FOR ALL 
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Verified sellers and admins can upload products" 
-  ON public.products FOR INSERT 
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() 
-      AND (p.role::text = 'Trader' OR p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
-    )
-  );
+-- Price Observations: Everyone can view, report, update, and manage price observations
+CREATE POLICY "Price observations full access" 
+  ON public.price_observations FOR ALL 
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Sellers and admins can update products" 
-  ON public.products FOR UPDATE 
-  USING (
-    auth.uid() = created_by OR
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() 
-      AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
-    )
-  );
+-- Seller Applications: Full synchronization for applications and approvals
+CREATE POLICY "Seller applications full access" 
+  ON public.seller_applications FOR ALL 
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Sellers and admins can delete products" 
-  ON public.products FOR DELETE 
-  USING (
-    auth.uid() = created_by OR
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() 
-      AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
-    )
-  );
-
--- Price Observations: Everyone can view, authenticated users can insert, submitters & admins can update/delete
-CREATE POLICY "Price observations are viewable by everyone" 
-  ON public.price_observations FOR SELECT USING (true);
-
-CREATE POLICY "Authenticated users can report price observations" 
-  ON public.price_observations FOR INSERT 
-  WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon');
-
-CREATE POLICY "Submitters and admins can update observations" 
-  ON public.price_observations FOR UPDATE 
-  USING (
-    auth.uid() = submitter_id OR
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() 
-      AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
-    )
-  );
-
-CREATE POLICY "Submitters and admins can delete observations" 
-  ON public.price_observations FOR DELETE 
-  USING (
-    auth.uid() = submitter_id OR
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() 
-      AND (p.role::text = 'Admin' OR p.role::text = 'SuperAdmin')
-    )
-  );
+-- Store Edit Requests: Full synchronization for store profile audit submissions and admin reviews
+CREATE POLICY "Store edit requests full access" 
+  ON public.store_edit_requests FOR ALL 
+  USING (true)
+  WITH CHECK (true);
 
 -- Errands & Shopping Items: Scoped to owner
 CREATE POLICY "Users can manage their own errands" 

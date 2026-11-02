@@ -28,6 +28,9 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
       if (sellerName.isNotEmpty) {
         ref.read(traderChatProvider.notifier).syncSellerInquiries(sellerName);
       }
+      ref.read(communityProvider.notifier).fetchLive();
+      ref.read(storeEditRequestsProvider.notifier).fetchLive();
+      ref.read(sellerApplicationsProvider.notifier).fetchLive();
     });
   }
 
@@ -956,8 +959,12 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
         TextEditingController(text: session.businessName ?? '');
     final phoneController =
         TextEditingController(text: session.phone ?? '');
+    final stallController =
+        TextEditingController(text: session.stallLocation ?? session.marketHub ?? '');
+    double? scannedLat = session.latitude;
+    double? scannedLon = session.longitude;
+    bool isScanningLocation = false;
     final userLoc = ref.read(locationProvider);
-    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Kuto Market, Abeokuta');
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
     showModalBottomSheet(
@@ -1050,42 +1057,129 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
-                        'Market Hub Base',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Physical Store / Stall Address',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          if (scannedLat != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.badgeSuccessBg,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.check_circle_rounded,
+                                      size: 12, color: AppColors.primary),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'GPS Verified',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedHub,
-                        items: {
-                          selectedHub,
-                          if (session.marketHub != null && session.marketHub!.isNotEmpty) session.marketHub!,
-                          'Kuto Market, Abeokuta',
-                          'Itoku Market, Abeokuta',
-                          'Omida Market, Abeokuta',
-                          'Bodija Market',
-                          'Dugbe Market',
-                          'Oje Market',
-                          'Oja Oba Market',
-                          'Gbagi Market',
-                          'Mile 12 Market, Lagos',
-                          'Computer Village, Lagos',
-                          'Wuse Market, Abuja',
-                          'Online Store',
-                        }
-                            .where((h) => h.isNotEmpty)
-                            .map((hub) => DropdownMenuItem(
-                                value: hub, child: Text(hub)))
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setModalState(() => selectedHub = val);
-                          }
-                        },
+                      TextField(
+                        controller: stallController,
                         decoration: InputDecoration(
+                          hintText: 'e.g. Shop 14, Commercial District, Abeokuta',
                           border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: isScanningLocation
+                            ? null
+                            : () async {
+                                setModalState(() => isScanningLocation = true);
+                                try {
+                                  final activeLoc = ref.read(locationProvider);
+                                  final result =
+                                      await LocationService.scanDetailedStallLocation(
+                                    fallback:
+                                        activeLoc.isSet ? activeLoc : null,
+                                  );
+                                  if (result != null) {
+                                    final prefix = stallController.text.trim();
+                                    final detailed = result.formatStallAddress(
+                                      prefix: prefix.isNotEmpty &&
+                                              !prefix.contains('Lat:')
+                                          ? prefix
+                                          : null,
+                                    );
+                                    stallController.text = detailed;
+                                    scannedLat = result.latitude;
+                                    scannedLon = result.longitude;
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'GPS location locked: ${result.town}, ${result.city} (Verified)'),
+                                          backgroundColor: AppColors.primary,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (_) {
+                                } finally {
+                                  setModalState(() => isScanningLocation = false);
+                                }
+                              },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: scannedLat != null
+                                ? AppColors.badgeSuccessBg
+                                : AppColors.primaryTint,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: scannedLat != null
+                                  ? AppColors.primary
+                                  : AppColors.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                scannedLat != null
+                                    ? Icons.gps_fixed_rounded
+                                    : Icons.my_location_rounded,
+                                size: 18,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  isScanningLocation
+                                      ? 'Scanning GPS location...'
+                                      : (scannedLat != null
+                                          ? 'GPS Location Locked (Accurate Plain-Text Address)'
+                                          : '📍 Scan Current GPS Location'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -1148,6 +1242,10 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                             ),
                           ),
                           onPressed: () {
+                            final chosenStall = stallController.text.trim();
+                            final hubLocation = chosenStall.isNotEmpty
+                                ? chosenStall
+                                : (session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Local Store'));
                             if (session.isApprovedSeller) {
                               ref
                                   .read(storeEditRequestsProvider.notifier)
@@ -1158,9 +1256,10 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                             .isNotEmpty
                                         ? bizController.text.trim()
                                         : (session.businessName ?? ''),
-                                    proposedMarketHub: selectedHub,
-                                    proposedStallLocation:
-                                        session.stallLocation,
+                                    proposedMarketHub: hubLocation,
+                                    proposedStallLocation: chosenStall.isNotEmpty
+                                        ? chosenStall
+                                        : session.stallLocation,
                                     proposedPhone: phoneController.text
                                             .trim()
                                             .isNotEmpty
@@ -1185,7 +1284,10 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                             .isNotEmpty
                                         ? bizController.text.trim()
                                         : null,
-                                    marketHub: selectedHub,
+                                    marketHub: hubLocation,
+                                    stallLocation: chosenStall.isNotEmpty ? chosenStall : null,
+                                    latitude: scannedLat,
+                                    longitude: scannedLon,
                                     sellerChannel: selectedChannel,
                                     phone: phoneController.text
                                             .trim()
@@ -1235,7 +1337,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     double? scannedLon = session.longitude;
     bool isScanningLocation = false;
     final userLoc = ref.read(locationProvider);
-    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : 'Kuto Market, Abeokuta');
+    String selectedHub = session.marketHub ?? (userLoc.isSet ? userLoc.displayLocation : '');
     String selectedChannel = session.sellerChannel ?? 'Local Market';
 
     showModalBottomSheet(
@@ -1303,43 +1405,6 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Text('Market Hub Base *',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedHub,
-                        items: {
-                          selectedHub,
-                          if (session.marketHub != null && session.marketHub!.isNotEmpty) session.marketHub!,
-                          'Kuto Market, Abeokuta',
-                          'Itoku Market, Abeokuta',
-                          'Omida Market, Abeokuta',
-                          'Bodija Market',
-                          'Dugbe Market',
-                          'Oje Market',
-                          'Oja Oba Market',
-                          'Gbagi Market',
-                          'Mile 12 Market, Lagos',
-                          'Computer Village, Lagos',
-                          'Wuse Market, Abuja',
-                          'Online Store',
-                        }
-                            .where((h) => h.isNotEmpty)
-                            .map((hub) => DropdownMenuItem(
-                                value: hub, child: Text(hub)))
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setModalState(() => selectedHub = val);
-                          }
-                        },
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
                       const Text('Phone / WhatsApp *',
                           style: TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w700)),
@@ -1362,7 +1427,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         controller: stallController,
                         decoration: InputDecoration(
                           hintText:
-                              'e.g. Line 4, Stall 22B, Bodija Wholesale Hub',
+                              'e.g. Shop 14, Commercial District, Abeokuta',
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
@@ -1392,9 +1457,9 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                     stallController.text = detailed;
                                     scannedLat = result.latitude;
                                     scannedLon = result.longitude;
-                                    if (result.closestHub.isNotEmpty) {
-                                      selectedHub = result.closestHub;
-                                    }
+                                    selectedHub = result.closestHub.isNotEmpty
+                                        ? result.closestHub
+                                        : (result.town.isNotEmpty ? result.town : detailed);
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
@@ -1526,12 +1591,18 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                               return;
                             }
 
+                            final hubToSave = selectedHub.isNotEmpty
+                                ? selectedHub
+                                : (stall.isNotEmpty
+                                    ? stall
+                                    : (activeLoc.isSet ? activeLoc.displayLocation : 'Local Market'));
+
                             ref
                                 .read(sellerApplicationsProvider.notifier)
                                 .submitApplication(
                                   user: session,
                                   businessName: bName,
-                                  marketHub: selectedHub,
+                                  marketHub: hubToSave,
                                   sellerChannel: selectedChannel,
                                   phone: phone,
                                   stallLocation: stall,
@@ -1638,6 +1709,22 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Sync Database',
+            icon: const Icon(Icons.sync_rounded, color: AppColors.primary),
+            onPressed: () async {
+              ref.read(communityProvider.notifier).fetchLive();
+              ref.read(storeEditRequestsProvider.notifier).fetchLive();
+              ref.read(sellerApplicationsProvider.notifier).fetchLive();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Refreshed seller listings and profile from database!'),
+                  duration: Duration(seconds: 1),
+                  backgroundColor: AppColors.primary,
+                ),
+              );
+            },
+          ),
           if (userSession.canModerate)
             Padding(
               padding: const EdgeInsets.only(right: 8.0),

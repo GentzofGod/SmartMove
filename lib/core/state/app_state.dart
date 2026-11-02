@@ -557,6 +557,14 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
     }
   }
 
+  Future<void> fetchLive() async {
+    final live = await SupabaseDataService.fetchCategories();
+    if (live != null && live.isNotEmpty) {
+      state = live;
+      _persist(live);
+    }
+  }
+
   Future<void> _persist(List<CommodityCategory> categories) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -569,10 +577,11 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
     required String name,
     String? description,
     String? iconName,
-  }) {
+  }) async {
     final slug = name.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    final tempId = 'cat-${DateTime.now().millisecondsSinceEpoch}';
     final newCat = CommodityCategory(
-      id: 'cat-${DateTime.now().millisecondsSinceEpoch}',
+      id: tempId,
       name: name.trim(),
       slug: slug,
       description: description?.trim() ?? 'Managed market category',
@@ -582,7 +591,15 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
     );
     state = [...state, newCat];
     _persist(state);
-    SupabaseDataService.insertCategory(newCat);
+
+    final inserted = await SupabaseDataService.insertCategory(newCat);
+    if (inserted != null) {
+      state = [
+        for (final c in state)
+          if (c.slug == slug || c.id == tempId) inserted else c,
+      ];
+      _persist(state);
+    }
   }
 
   void updateCategory({
@@ -610,9 +627,10 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
   }
 
   void deleteCategory(String id) {
+    final catToDelete = state.firstWhere((c) => c.id == id, orElse: () => state.first);
     state = state.where((c) => c.id != id).toList();
     _persist(state);
-    SupabaseDataService.deleteCategory(id);
+    SupabaseDataService.deleteCategory(id, slug: catToDelete.slug);
   }
 }
 
@@ -861,6 +879,18 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     }
   }
 
+  Future<void> fetchLive() async {
+    final live = await SupabaseDataService.fetchObservations();
+    if (live != null) {
+      if (live.isEmpty) {
+        state = [];
+      } else {
+        state = live;
+      }
+      _persist(state);
+    }
+  }
+
   Future<void> refreshFromCloud({bool purgeLocalMock = false}) async {
     if (purgeLocalMock) {
       await purgeDemoObservations();
@@ -1002,6 +1032,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           o,
     ];
     _persist(state);
+    SupabaseDataService.verifyObservation(id, isVerified);
   }
 
   void updateListingPrice(String id, double newPrice) {
@@ -1022,6 +1053,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           o,
     ];
     _persist(state);
+    SupabaseDataService.updateObservation(id: id, price: newPrice);
   }
 
   void updateListingDetails({
@@ -1071,25 +1103,51 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           o,
     ];
     _persist(state);
+    SupabaseDataService.updateObservation(
+      id: id,
+      productName: productName,
+      price: price,
+      unit: unit,
+      category: category,
+      brandOrGrade: brandOrGrade,
+      notes: notes,
+      inStock: inStock,
+      imageUrl: imageUrl,
+      marketLocation: marketLocation,
+      latitude: latitude,
+      longitude: longitude,
+    );
   }
 
   void toggleListingStock(String id) {
+    bool? newStock;
     state = [
       for (final o in state)
-        if (o.id == id)
-          o.copyWith(
-            inStock: !o.inStock,
+        if (o.id == id) () {
+          final next = !o.inStock;
+          newStock = next;
+          return o.copyWith(
+            inStock: next,
             timestamp: DateTime.now(),
-          )
+          );
+        }()
         else
           o,
     ];
     _persist(state);
+    if (newStock != null) {
+      SupabaseDataService.toggleObservationStock(id, newStock!);
+    }
   }
 
   void deleteListing(String id) {
+    final deleted = state.where((o) => o.id == id).toList();
     state = state.where((o) => o.id != id).toList();
     _persist(state);
+    SupabaseDataService.deleteObservation(
+      id,
+      productName: deleted.isNotEmpty ? deleted.first.productName : null,
+    );
   }
 
   void flagListingAnomaly(String id, {required bool isAnomalous, String? reason}) {
@@ -1244,6 +1302,8 @@ class AuthNotifier extends Notifier<UserSession> {
     String? sellerChannel,
     String? phone,
     String? stallLocation,
+    double? latitude,
+    double? longitude,
     bool? hasPendingStoreEdit,
     String? pendingStoreEditSummary,
   }) {
@@ -1253,10 +1313,23 @@ class AuthNotifier extends Notifier<UserSession> {
       sellerChannel: sellerChannel ?? state.sellerChannel,
       phone: phone ?? state.phone,
       stallLocation: stallLocation ?? state.stallLocation,
+      latitude: latitude ?? state.latitude,
+      longitude: longitude ?? state.longitude,
       hasPendingStoreEdit: hasPendingStoreEdit ?? state.hasPendingStoreEdit,
       pendingStoreEditSummary: pendingStoreEditSummary ?? state.pendingStoreEditSummary,
     );
     AuthService.persistSession(state);
+    SupabaseDataService.updateProfile(
+      userId: state.id,
+      email: state.email,
+      businessName: state.businessName,
+      marketHub: state.marketHub,
+      sellerChannel: state.sellerChannel,
+      stallLocation: state.stallLocation,
+      latitude: state.latitude,
+      longitude: state.longitude,
+      phone: state.phone,
+    );
   }
 
   void setPendingStoreEdit(bool hasPending, String? summary) {
@@ -1453,6 +1526,10 @@ class SellerApplicationsNotifier extends Notifier<List<SellerApplication>> {
       _persist(state);
       ref.read(authProvider.notifier).syncWithSellerApplications(state);
     }
+  }
+
+  Future<void> fetchLive() async {
+    await _fetchLive();
   }
 
   Future<void> refreshFromCloud({bool purgeLocalMock = false}) async {
@@ -1801,6 +1878,20 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
         }
       }
     } catch (_) {}
+
+    final live = await SupabaseDataService.fetchStoreEditRequests();
+    if (live != null && live.isNotEmpty && ref.mounted) {
+      state = live;
+      _persist(live);
+    }
+  }
+
+  Future<void> fetchLive() async {
+    final live = await SupabaseDataService.fetchStoreEditRequests();
+    if (live != null && live.isNotEmpty && ref.mounted) {
+      state = live;
+      _persist(live);
+    }
   }
 
   Future<void> purgeDemoRequests() async {
@@ -1856,6 +1947,7 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
 
     state = [req, ...state];
     _persist(state);
+    SupabaseDataService.insertStoreEditRequest(req);
 
     final summary =
         'Pending update to "$proposedBusinessName" at $proposedMarketHub';
@@ -1878,6 +1970,11 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
     _persist(state);
 
     if (approvedReq != null) {
+      SupabaseDataService.updateStoreEditRequestStatus(
+        requestId: requestId,
+        status: 'approved',
+        reviewerName: ref.read(authProvider).displayName,
+      );
       ref.read(sellerApplicationsProvider.notifier).updateApplicationStoreDetails(
             userId: approvedReq!.sellerId,
             userEmail: approvedReq!.applicantEmail,
@@ -1921,6 +2018,12 @@ class StoreEditRequestsNotifier extends Notifier<List<StoreEditRequest>> {
     _persist(state);
 
     if (rejectedReq != null) {
+      SupabaseDataService.updateStoreEditRequestStatus(
+        requestId: requestId,
+        status: 'rejected',
+        reviewerName: ref.read(authProvider).displayName,
+        rejectionReason: reason,
+      );
       ref.read(sellerApplicationsProvider.notifier).updateApplicationStoreDetails(
             userId: rejectedReq!.sellerId,
             userEmail: rejectedReq!.applicantEmail,

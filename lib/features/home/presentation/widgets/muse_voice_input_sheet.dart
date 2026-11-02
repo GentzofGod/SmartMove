@@ -150,6 +150,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
         if (!hasPermission) {
           if (mounted) {
             setState(() {
+              _isRecording = false;
               _transcriptionStatus =
                   'Microphone permission is required. Please grant permission in device settings.';
             });
@@ -260,27 +261,29 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
             }
           } catch (_) {}
 
-          await _speechToText.listen(
-            onResult: (result) {
-              if (mounted && _isRecording) {
-                final words = result.recognizedWords.trim();
-                if (words.isNotEmpty) {
-                  _capturedSpeechFromMic = words;
-                  setState(() {
-                    _transcriptController.text = words;
-                  });
+          try {
+            await _speechToText.listen(
+              onResult: (result) {
+                if (mounted && _isRecording) {
+                  final words = result.recognizedWords.trim();
+                  if (words.isNotEmpty) {
+                    _capturedSpeechFromMic = words;
+                    setState(() {
+                      _transcriptController.text = words;
+                    });
+                  }
                 }
-              }
-            },
-            listenOptions: stt.SpeechListenOptions(
-              localeId: resolvedLocaleId,
-              listenFor: const Duration(seconds: 45),
-              pauseFor: const Duration(seconds: 4),
-              partialResults: true,
-              cancelOnError: false,
-              listenMode: stt.ListenMode.dictation,
-            ),
-          );
+              },
+              listenOptions: stt.SpeechListenOptions(
+                localeId: resolvedLocaleId,
+                listenFor: const Duration(seconds: 45),
+                pauseFor: const Duration(seconds: 4),
+                partialResults: true,
+                cancelOnError: false,
+                listenMode: stt.ListenMode.dictation,
+              ),
+            );
+          } catch (_) {}
         }
       } catch (_) {}
     }

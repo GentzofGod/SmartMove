@@ -177,40 +177,42 @@ class DetailedLocationResult {
     this.isGpsPrecision = true,
   });
 
-  /// Formatted detailed stall address suitable for turn-by-turn navigation
+  /// Formatted clean plain-text stall address for users, sellers, and admins.
+  /// Backend latitude and longitude are preserved in numeric fields, NOT glued to text.
   String formatStallAddress({String? prefix}) {
     final cleanPrefix = prefix?.trim() ?? '';
-    final hasPrefix = cleanPrefix.isNotEmpty;
-    final buffer = StringBuffer();
-    if (hasPrefix) {
-      buffer.write('$cleanPrefix, ');
+    final parts = <String>[];
+
+    if (cleanPrefix.isNotEmpty) {
+      parts.add(cleanPrefix);
     }
-    if (streetOrArea.isNotEmpty &&
-        !buffer.toString().toLowerCase().contains(streetOrArea.toLowerCase())) {
-      buffer.write('$streetOrArea, ');
+
+    if (streetOrArea.isNotEmpty) {
+      final existing = parts.join(' ').toLowerCase();
+      if (!existing.contains(streetOrArea.toLowerCase())) {
+        parts.add(streetOrArea);
+      }
     }
-    final cleanHub = closestHub
-        .replaceAll(RegExp(r'\s*Commercial Hub\s*(\([^)]*\))?', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s*Market Zone\s*', caseSensitive: false), ' Market')
-        .trim();
-    if (cleanHub.isNotEmpty &&
-        !buffer.toString().toLowerCase().contains(cleanHub.toLowerCase()) &&
-        !town.toLowerCase().contains(cleanHub.toLowerCase())) {
-      buffer.write('$cleanHub, ');
+
+    if (town.isNotEmpty) {
+      final existing = parts.join(' ').toLowerCase();
+      if (!existing.contains(town.toLowerCase())) {
+        parts.add(town);
+      }
     }
-    if (town.isNotEmpty &&
-        !buffer.toString().toLowerCase().contains(town.toLowerCase())) {
-      buffer.write('$town, ');
+
+    if (state.isNotEmpty && state.toLowerCase() != town.toLowerCase()) {
+      final existing = parts.join(' ').toLowerCase();
+      if (!existing.contains(state.toLowerCase())) {
+        parts.add(state);
+      }
     }
-    if (city.isNotEmpty &&
-        !buffer.toString().toLowerCase().contains(city.toLowerCase())) {
-      buffer.write(city);
+
+    if (parts.isEmpty && fullAddress.isNotEmpty) {
+      return LocationService.cleanDisplayAddress(fullAddress);
     }
-    var res = buffer.toString().trim();
-    if (res.endsWith(',')) {
-      res = res.substring(0, res.length - 1).trim();
-    }
-    return '$res (Lat: ${latitude.toStringAsFixed(4)}, Lon: ${longitude.toStringAsFixed(4)})';
+
+    return LocationService.cleanDisplayAddress(parts.join(', '));
   }
 }
 
@@ -234,6 +236,39 @@ class NigerianTown {
 
 class LocationService {
   static const String _storageKey = 'smartmove_saved_location_v1';
+
+  /// Strips any backend GPS coordinates e.g. (Lat: 7.1426, Lon: 3.3863),
+  /// deduplicates consecutive repetitive town/city tokens, and returns a clean
+  /// human-readable plain text address for users, sellers, and admins.
+  static String cleanDisplayAddress(String? address) {
+    if (address == null || address.trim().isEmpty) return '';
+    var text = address.trim();
+
+    // 1. Remove (Lat: ..., Lon: ...) or Lat: ..., Lon: ...
+    text = text.replaceAll(
+      RegExp(r'\s*\(?Lat:\s*[0-9.-]+\s*,?\s*Lon:\s*[0-9.-]+\)?', caseSensitive: false),
+      '',
+    );
+    text = text.replaceAll(
+      RegExp(r'\s*\(?Latitude:\s*[0-9.-]+\s*,?\s*Longitude:\s*[0-9.-]+\)?', caseSensitive: false),
+      '',
+    );
+
+    // 2. Remove trailing / leading commas and clean multiple spaces
+    text = text.replaceAll(RegExp(r',\s*,+'), ',');
+    text = text.replaceAll(RegExp(r'^\s*,\s*|\s*,\s*$'), '');
+    text = text.replaceAll(RegExp(r'\s+'), ' ');
+
+    // 3. Deduplicate consecutive identical segments (e.g. "Abeokuta, Abeokuta" -> "Abeokuta")
+    final segments = text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final uniqueSegments = <String>[];
+    for (final seg in segments) {
+      if (uniqueSegments.isEmpty || uniqueSegments.last.toLowerCase() != seg.toLowerCase()) {
+        uniqueSegments.add(seg);
+      }
+    }
+    return uniqueSegments.join(', ');
+  }
 
   // Common predefined commercial hubs in Nigeria for fast switching & fallbacks
   static const GeoPoint defaultHub = GeoPoint(
@@ -1263,30 +1298,13 @@ class LocationService {
     final state = geoDetails?['state'] ?? city;
     final displayName = geoDetails?['displayName'] ?? '$streetOrArea, $town, $city';
 
-    // Map to closest recognized market hub
-    final closestHubPoint = findClosestHub(lat, lon);
-    String closestHubName = closestHubPoint.label;
-    if (closestHubPoint.label.contains('Bodija')) {
-      closestHubName = 'Bodija Market';
-    } else if (closestHubPoint.label.contains('Dugbe')) {
-      closestHubName = 'Dugbe Market';
-    } else if (closestHubPoint.label.contains('Oje')) {
-      closestHubName = 'Oje Market';
-    } else if (closestHubPoint.label.contains('Oja Oba')) {
-      closestHubName = 'Oja Oba Market';
-    } else if (closestHubPoint.label.contains('Gbagi')) {
-      closestHubName = 'Gbagi Market';
-    } else if (closestHubPoint.label.contains('Wuse')) {
-      closestHubName = 'Wuse Market Zone';
-    } else if (closestHubPoint.label.contains('Ikeja')) {
-      closestHubName = 'Ikeja Market & Tech District';
-    } else if (closestHubPoint.label.contains('Yaba') || closestHubPoint.label.contains('Mainland')) {
-      closestHubName = 'Lagos Mainland (Yaba/Surulere)';
-    } else if (closestHubPoint.label.contains('Abeokuta') || closestHubPoint.label.contains('Kuto')) {
-      closestHubName = 'Kuto Market, Abeokuta';
-    } else {
-      closestHubName = closestHubPoint.label;
-    }
+    // Resolve clean locality / area directly from scanned address components
+    // (Never force artificial market hubs like "Kuto Market" or "Bodija Market" on unrelated addresses)
+    final closestHubName = (streetOrArea.isNotEmpty && town.isNotEmpty)
+        ? '$streetOrArea, $town'
+        : (town.isNotEmpty
+            ? town
+            : (streetOrArea.isNotEmpty ? streetOrArea : findClosestHub(lat, lon).label));
 
     return DetailedLocationResult(
       latitude: lat,

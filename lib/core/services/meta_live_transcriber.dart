@@ -100,6 +100,11 @@ class MetaLiveTranscriber {
         );
       }
 
+      if (_channel == null) {
+        debugPrint('[MetaLiveTranscriber] WebSocket not available, skipping live audio stream.');
+        return false;
+      }
+
       // Configure recorder for raw PCM 16-bit mono 24 kHz
       const config = RecordConfig(
         encoder: AudioEncoder.pcm16bits,

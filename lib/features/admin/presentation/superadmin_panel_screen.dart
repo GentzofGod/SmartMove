@@ -26,6 +26,12 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(categoriesProvider.notifier).fetchLive();
+      ref.read(sellerApplicationsProvider.notifier).fetchLive();
+      ref.read(storeEditRequestsProvider.notifier).fetchLive();
+      ref.read(communityProvider.notifier).fetchLive();
+    });
   }
 
   @override
@@ -2415,6 +2421,8 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
         duration: Duration(milliseconds: 900),
       ),
     );
+    await ref.read(categoriesProvider.notifier).fetchLive();
+    await ref.read(storeEditRequestsProvider.notifier).fetchLive();
     await ref.read(sellerApplicationsProvider.notifier).refreshFromCloud();
     await ref.read(communityProvider.notifier).refreshFromCloud();
     if (context.mounted) {
