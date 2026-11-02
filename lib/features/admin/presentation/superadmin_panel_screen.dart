@@ -25,7 +25,7 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(categoriesProvider.notifier).fetchLive();
       ref.read(sellerApplicationsProvider.notifier).fetchLive();
@@ -174,26 +174,6 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
           ],
         ),
         actions: [
-          // Role simulation switcher
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ActionChip(
-              key: const ValueKey('chip_superadmin_role_switcher'),
-              avatar: const Icon(Icons.switch_account_rounded,
-                  size: 14, color: Colors.white),
-              label: Text(
-                userSession.role,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              backgroundColor: const Color(0xFF4A148C),
-              side: const BorderSide(color: Color(0xFFAB47BC)),
-              onPressed: () => _showRoleSwitcherDialog(context, userSession),
-            ),
-          ),
           IconButton(
             key: const ValueKey('btn_superadmin_purge_demo'),
             tooltip: 'Purge Demo Records & Clean Sync',
@@ -282,15 +262,6 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                 ],
               ),
             ),
-            const Tab(
-              child: Row(
-                children: [
-                  Icon(Icons.admin_panel_settings_rounded, size: 16),
-                  SizedBox(width: 6),
-                  Text('Security & Audit'),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -313,9 +284,6 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
 
             // Tab 3: Categories & Markets Governance
             _buildCategoriesAndMarketsTab(),
-
-            // Tab 4: Security & Audit
-            _buildSecurityAndAuditTab(userSession),
           ],
         ),
       ),
@@ -1851,169 +1819,6 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
     );
   }
 
-  // --------------------------------------------------------------------------
-  // Tab 4: Security & Audit Governance
-  // --------------------------------------------------------------------------
-  Widget _buildSecurityAndAuditTab(UserSession userSession) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Icon(Icons.security_rounded,
-                      color: Color(0xFF673AB7), size: 22),
-                  SizedBox(width: 10),
-                  Text(
-                    'Active SuperAdmin Session',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildAuditRow('Display Name', userSession.displayName),
-              _buildAuditRow('Email Address', userSession.email),
-              _buildAuditRow('Active Platform Role', userSession.role),
-              _buildAuditRow('Authority Scope',
-                  'Full Governance (Seller Verification, Anomaly Audit, RLS SuperAdmin)'),
-              _buildAuditRow('Row-Level Security (RLS)',
-                  'Active & Verified on Cloud Supabase'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Role-Based Governance Matrix',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildRoleMatrixCard(
-                'Customer (Shopper)',
-                'Browses market prices, creates AI shopping plans, transcribes paper lists, submits seller verification application.',
-                Icons.person_outline,
-                const Color(0xFF0052CC),
-              ),
-              const SizedBox(height: 8),
-              _buildRoleMatrixCard(
-                'Trader (Verified Seller)',
-                'Granted upon administrative approval. Publishes live store price quotes, uploads catalog products, manages stall location.',
-                Icons.storefront_rounded,
-                const Color(0xFF2E7D32),
-              ),
-              const SizedBox(height: 8),
-              _buildRoleMatrixCard(
-                'SuperAdmin (Governance)',
-                'Unrestricted moderation. Approves/rejects seller applications, performs Meta AI price audits, flags anomalies, manages categories.',
-                Icons.admin_panel_settings_rounded,
-                const Color(0xFF673AB7),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAuditRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              '$label: ',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoleMatrixCard(
-      String title, String description, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  description,
-                  style: const TextStyle(
-                      fontSize: 11.5, color: AppColors.textSecondary, height: 1.3),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildKpiCard(String label, String value, Color color) {
     return Expanded(
       child: Container(
@@ -2052,89 +1857,6 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
   // --------------------------------------------------------------------------
   // Modals & Action Dialogs
   // --------------------------------------------------------------------------
-  void _showRoleSwitcherDialog(BuildContext context, UserSession userSession) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: Row(
-          children: const [
-            Icon(Icons.switch_account_rounded, color: Color(0xFF673AB7)),
-            SizedBox(width: 8),
-            Text('Switch Platform Persona',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Easily test role permissions across Shopper, Trader, and SuperAdmin flows:',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            _buildRoleOptionTile(
-              dialogCtx,
-              roleName: 'Customer',
-              desc: 'Shopper view: browse prices, paper note OCR, apply for seller',
-              icon: Icons.person_outline,
-              isSelected: userSession.role == 'Customer',
-            ),
-            _buildRoleOptionTile(
-              dialogCtx,
-              roleName: 'Trader',
-              desc: 'Seller view: publish prices, manage store profile and catalog',
-              icon: Icons.storefront_rounded,
-              isSelected: userSession.role == 'Trader',
-            ),
-            _buildRoleOptionTile(
-              dialogCtx,
-              roleName: 'SuperAdmin',
-              desc: 'SuperAdmin view: approve sellers, audit price anomalies',
-              icon: Icons.admin_panel_settings_rounded,
-              isSelected: userSession.role == 'SuperAdmin' ||
-                  userSession.role == 'Admin',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoleOptionTile(
-    BuildContext dialogCtx, {
-    required String roleName,
-    required String desc,
-    required IconData icon,
-    required bool isSelected,
-  }) {
-    return ListTile(
-      leading: Icon(icon,
-          color: isSelected ? const Color(0xFF673AB7) : AppColors.textSecondary),
-      title: Text(roleName,
-          style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13.5,
-              color: isSelected
-                  ? const Color(0xFF673AB7)
-                  : AppColors.textPrimary)),
-      subtitle: Text(desc, style: const TextStyle(fontSize: 11)),
-      trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: Color(0xFF673AB7))
-          : null,
-      onTap: () {
-        ref.read(authProvider.notifier).updateRole(roleName);
-        Navigator.pop(dialogCtx);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Switched to $roleName persona.'),
-            backgroundColor: const Color(0xFF673AB7),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      },
-    );
-  }
-
   void _showRejectDialog(BuildContext context, SellerApplication app) {
     final reasonController = TextEditingController(
         text: 'Physical stall could not be verified in market hub');

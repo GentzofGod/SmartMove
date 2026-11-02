@@ -167,13 +167,25 @@ class SupabaseDataService {
     }
   }
 
-  /// Delete a product listing
-  static Future<bool> deleteProduct(String productId) async {
+  /// Delete a product listing from Cloud Supabase
+  static Future<bool> deleteProduct(String productId, {String? name}) async {
     final client = _client;
     if (client == null) return false;
 
     try {
-      await client.from('products').delete().eq('id', productId);
+      final isUuid = RegExp(
+              r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+          .hasMatch(productId);
+
+      if (isUuid) {
+        await client.from('products').delete().eq('id', productId);
+        await client.from('price_observations').delete().eq('product_id', productId);
+      }
+      if (name != null && name.trim().isNotEmpty) {
+        final cleanName = name.trim();
+        await client.from('products').delete().ilike('name', cleanName);
+        await client.from('price_observations').delete().ilike('product_name', cleanName);
+      }
       return true;
     } catch (_) {
       return false;
@@ -384,8 +396,12 @@ class SupabaseDataService {
 
       if (isUuid) {
         await client.from('price_observations').delete().eq('id', id);
-      } else if (productName != null) {
-        await client.from('price_observations').delete().eq('product_name', productName);
+        await client.from('products').delete().eq('id', id);
+      }
+      if (productName != null && productName.trim().isNotEmpty) {
+        final cleanName = productName.trim();
+        await client.from('price_observations').delete().ilike('product_name', cleanName);
+        await client.from('products').delete().ilike('name', cleanName);
       }
       return true;
     } catch (_) {

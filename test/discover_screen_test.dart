@@ -24,7 +24,7 @@ void main() {
 
     // Verify 'All' category filter chip is visible
     expect(find.text('All'), findsOneWidget);
-    expect(find.text('Groceries'), findsOneWidget);
+    expect(find.text('Food'), findsOneWidget);
     expect(find.text('Electronics'), findsOneWidget);
     expect(find.text('Pharmacy'), findsOneWidget);
 

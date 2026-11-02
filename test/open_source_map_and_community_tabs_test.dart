@@ -239,7 +239,7 @@ void main() {
 
       // 2. Verify single-line category filter chips are present
       expect(find.widgetWithText(ChoiceChip, 'All'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Groceries'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Food'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'Electronics'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'Pharmacy'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'Others'), findsOneWidget);
@@ -260,8 +260,8 @@ void main() {
       expect(find.text('Digital Multimeter'), findsOneWidget);
       expect(find.text('Organic Honey 1L'), findsNothing);
 
-      // 6. Test category filtering: Tap Groceries while in Community tab
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Groceries'));
+      // 6. Test category filtering: Tap Food while in Community tab
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Food'));
       await tester.pumpAndSettle();
 
       // Digital Multimeter (Electronics) is filtered out

@@ -4549,7 +4549,7 @@ class MetaAiService {
     }
 
     // 3. Extract Category
-    String detectedCategory = currentCategory ?? 'Groceries';
+    String detectedCategory = currentCategory ?? 'Food';
     if (lower.contains('cooker') ||
         lower.contains('blender') ||
         lower.contains('fan') ||
@@ -4580,7 +4580,7 @@ class MetaAiService {
         lower.contains('tile')) {
       detectedCategory = 'Others';
     } else {
-      detectedCategory = 'Groceries';
+      detectedCategory = 'Food';
     }
 
     // 4. Extract Brand
@@ -4654,5 +4654,55 @@ class MetaAiService {
       'brand': detectedBrand,
       'notes': currentNotes ?? (detectedBrand != null ? 'Authentic, verified $detectedBrand stock' : 'Genuine market verified stock'),
     };
+  }
+
+  /// Generates a realistic, descriptive notes string for a seller listing
+  /// based on the provided product name, category, brand, unit, and price.
+  Future<String> generateProductDescription({
+    required String productName,
+    required String category,
+    String? brand,
+    String? unit,
+    double? price,
+    String? currentNotes,
+  }) async {
+    // If cloud Meta API / edge proxy is available:
+    if (hasValidAuth) {
+      try {
+        final prompt =
+            'Generate a concise, professional 1-2 sentence market product description for: $productName in category $category${brand != null ? ', brand $brand' : ''}${unit != null ? ', unit $unit' : ''}. Focus on quality, packaging, and freshness for retail buyers.';
+        final res = await _invokeEdgeProxy(
+          action: 'llm_generate',
+          payload: {
+            'model': 'meta/llama-3-70b-instruct',
+            'prompt': prompt,
+          },
+        );
+        if (res != null && res is Map) {
+          final raw = res['text'] ?? res['answer'] ?? res['content'];
+          if (raw != null) {
+            final text = raw.toString().trim();
+            if (text.isNotEmpty) {
+              return text;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // High quality deterministic context-aware generation based on category & product
+    final brandPrefix = brand != null && brand.isNotEmpty ? '$brand ' : '';
+    final unitSuffix = unit != null && unit.isNotEmpty ? ' ($unit)' : '';
+    final catLower = category.toLowerCase();
+
+    if (catLower.contains('food') || catLower.contains('grocer') || catLower.contains('grain') || catLower.contains('tuber') || catLower.contains('oil')) {
+      return 'Fresh, premium quality $brandPrefix$productName$unitSuffix. Sourced directly for optimal taste, clean processing, and standard market weight.';
+    } else if (catLower.contains('electron')) {
+      return 'Authentic, durable $brandPrefix$productName$unitSuffix. Tested for optimal performance, original specifications, and reliable everyday operation.';
+    } else if (catLower.contains('pharm')) {
+      return 'Genuine, properly stored $brandPrefix$productName$unitSuffix with clear batch identification and sealed manufacturer packaging.';
+    } else {
+      return 'High quality, genuine $brandPrefix$productName$unitSuffix available for immediate pickup or delivery. Verified store stock.';
+    }
   }
 }

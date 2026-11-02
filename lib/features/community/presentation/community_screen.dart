@@ -23,7 +23,7 @@ class CommunityScreen extends ConsumerStatefulWidget {
 
 class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   late int _selectedTab; // 0: Verified Seller Added Products, 1: Community Added Products
-  String _selectedCategory = 'All'; // 'All', 'Groceries', 'Electronics', 'Pharmacy', 'Others'
+  String _selectedCategory = 'All'; // 'All', 'Food', 'Electronics', 'Pharmacy', 'Others'
   bool _userExplicitlySelectedTab = false;
 
   @override
@@ -174,7 +174,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     final brandController = TextEditingController();
     final notesController = TextEditingController();
     String channel = 'Local Market';
-    String category = 'Groceries';
+    String category = 'Food';
     bool inStock = true;
 
     showModalBottomSheet(
@@ -457,7 +457,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       spacing: 8,
                       children: (ref.read(categoriesProvider).isNotEmpty
                               ? ref.read(categoriesProvider).map((c) => c.name).toList()
-                              : ['Groceries', 'Electronics', 'Pharmacy', 'Others'])
+                              : ['Food', 'Electronics', 'Pharmacy', 'Others'])
                           .map((cat) {
                         final isSel = category == cat;
                         return ChoiceChip(
@@ -693,9 +693,18 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     var activeList = effectiveTab == 0 ? verifiedSellerList : communityList;
 
     if (_selectedCategory != 'All') {
-      activeList = activeList
-          .where((o) => o.category.toLowerCase() == _selectedCategory.toLowerCase())
-          .toList();
+      activeList = activeList.where((o) {
+        final oCat = o.category.toLowerCase();
+        final sCat = _selectedCategory.toLowerCase();
+        if (sCat == 'food') {
+          return oCat == 'food' ||
+              oCat == 'groceries' ||
+              oCat.contains('grain') ||
+              oCat.contains('tuber') ||
+              oCat.contains('oil');
+        }
+        return oCat == sCat;
+      }).toList();
     }
 
     return Column(
@@ -824,8 +833,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   const SizedBox(width: 8),
                   _buildCategoryChip(
                     cat.name,
-                    cat.slug == 'groceries'
-                        ? Icons.shopping_basket_outlined
+                    (cat.slug == 'food' || cat.slug == 'groceries')
+                        ? Icons.restaurant_outlined
                         : (cat.slug == 'electronics'
                             ? Icons.devices_rounded
                             : (cat.slug == 'pharmacy'

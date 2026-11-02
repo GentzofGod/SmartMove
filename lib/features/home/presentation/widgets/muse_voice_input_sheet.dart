@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/meta_ai_service.dart';
 import '../../../../core/services/meta_live_transcriber.dart';
@@ -52,12 +51,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   double _soundLevel = 0.0;
   int _consecutiveQuietTicks = 0;
   String? _recordedFilePath;
-  String _capturedSpeechFromMic = '';
   MetaLiveTranscriber? _liveTranscriber;
 
   final AudioRecorder _audioRecorder = AudioRecorder();
-  final stt.SpeechToText _speechToText = stt.SpeechToText();
-  bool _speechInitialized = false;
 
   @override
   void initState() {
@@ -67,29 +63,6 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _initSpeechRecognizer();
-  }
-
-  Future<void> _initSpeechRecognizer() async {
-    final isTest = Platform.environment.containsKey('FLUTTER_TEST');
-    if (isTest) return;
-    try {
-      final available = await _speechToText.initialize(
-        onError: (err) {
-          // Keep silent, recording will continue via audioRecorder
-        },
-        onStatus: (status) {
-          // Status updates
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _speechInitialized = available;
-        });
-      }
-    } catch (_) {
-      _speechInitialized = false;
-    }
   }
 
   @override
@@ -100,11 +73,6 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     _transcriptController.dispose();
     AudioFeedbackService.stop();
     _liveTranscriber?.dispose();
-    if (_speechToText.isListening) {
-      try {
-        _speechToText.stop();
-      } catch (_) {}
-    }
     try {
       _audioRecorder.dispose();
     } catch (_) {}
@@ -114,7 +82,6 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
   Future<void> _startRecording() async {
     AudioFeedbackService.playFeedbackSound();
     _pulseController.repeat(reverse: true);
-    _capturedSpeechFromMic = '';
 
     setState(() {
       _isRecording = true;
@@ -124,7 +91,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       _transcriptController.text =
           'Listening to your request in ${_selectedDialect.label}...';
       _transcriptionStatus =
-          'Recording WAV audio (24 kHz Mono PCM) for Meta Transcribe...';
+          'Recording audio... Speak your commodities request.';
     });
 
     _recordingTimer?.cancel();
@@ -144,7 +111,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
     if (!isTest) {
       try {
-        // 2. Android requests microphone permission via permission_handler & record
+        // Request microphone permission via permission_handler & record
         final micPerm = await Permission.microphone.request();
         final hasPermission = micPerm.isGranted || await _audioRecorder.hasPermission();
         if (!hasPermission) {
@@ -158,43 +125,12 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
           return;
         }
 
-        // Connect real-time Meta WebSocket transcriber
-        _liveTranscriber = MetaLiveTranscriber(
-          onPartialTranscript: (partial) {
-            if (mounted && _isRecording && partial.isNotEmpty) {
-              _capturedSpeechFromMic = partial;
-              setState(() {
-                _transcriptController.text = partial;
-                _transcriptionStatus =
-                    'Live streaming words via Meta ASR (${_selectedDialect.label})...';
-              });
-            }
-          },
-          onFinalTranscript: (finalTxt) {
-            if (mounted && finalTxt.isNotEmpty) {
-              _capturedSpeechFromMic = finalTxt;
-              setState(() {
-                _transcriptController.text = finalTxt;
-              });
-            }
-          },
-          onSpeechComplete: () {
-            if (mounted && _isRecording) {
-              _stopRecording();
-            }
-          },
-          onError: (err) {
-            debugPrint('[MuseVoiceInputSheet] Live ASR note: $err');
-          },
-        );
-        _liveTranscriber!.start(dialect: _selectedDialect);
-
         final tempDir = await getTemporaryDirectory();
         final targetWavPath =
             '${tempDir.path}/smartmove_mic_${DateTime.now().millisecondsSinceEpoch}.wav';
         _recordedFilePath = targetWavPath;
 
-        // 3. Configure audio for WAV, mono, 24 kHz, 16-bit PCM
+        // Configure audio for WAV, mono, 24 kHz, 16-bit PCM for Meta Transcriber
         const recordConfig = RecordConfig(
           encoder: AudioEncoder.wav,
           sampleRate: 24000, // 24 kHz
@@ -203,7 +139,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
 
         await _audioRecorder.start(recordConfig, path: targetWavPath);
 
-        // 4. Live recording indicator & amplitude monitoring with pause detection
+        // Amplitude monitoring with pause detection
         _amplitudeSubscription?.cancel();
         _amplitudeSubscription = _audioRecorder
             .onAmplitudeChanged(const Duration(milliseconds: 100))
@@ -214,7 +150,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
               _soundLevel = normalized;
             });
 
-            // 5. Pause detection: detect suitable pause after user spoke
+            // Pause detection: detect suitable pause after user spoke
             if (normalized > 0.15) {
               _consecutiveQuietTicks = 0;
             } else {
@@ -226,66 +162,15 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
             }
           }
         });
-
-        // 5. Start on-device speech recognizer in parallel to capture user's spoken words
-        if (_speechInitialized) {
-          String? resolvedLocaleId;
-          try {
-            final systemLocales = await _speechToText.locales();
-            var targetPrefix = 'en';
-            if (_selectedDialect == VoiceDialect.yoruba) {
-              targetPrefix = 'yo';
-            } else if (_selectedDialect == VoiceDialect.hausa) {
-              targetPrefix = 'ha';
-            } else if (_selectedDialect == VoiceDialect.igbo) {
-              targetPrefix = 'ig';
-            } else if (_selectedDialect == VoiceDialect.nigerianPidgin) {
-              targetPrefix = 'pcm';
-            }
-
-            for (final loc in systemLocales) {
-              final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
-              if (locClean.startsWith(targetPrefix)) {
-                resolvedLocaleId = loc.localeId;
-                break;
-              }
-            }
-            if (resolvedLocaleId == null) {
-              for (final loc in systemLocales) {
-                final locClean = loc.localeId.toLowerCase().replaceAll('-', '_');
-                if (locClean.startsWith('en_ng')) {
-                  resolvedLocaleId = loc.localeId;
-                  break;
-                }
-              }
-            }
-          } catch (_) {}
-
-          try {
-            await _speechToText.listen(
-              onResult: (result) {
-                if (mounted && _isRecording) {
-                  final words = result.recognizedWords.trim();
-                  if (words.isNotEmpty) {
-                    _capturedSpeechFromMic = words;
-                    setState(() {
-                      _transcriptController.text = words;
-                    });
-                  }
-                }
-              },
-              listenOptions: stt.SpeechListenOptions(
-                localeId: resolvedLocaleId,
-                listenFor: const Duration(seconds: 45),
-                pauseFor: const Duration(seconds: 4),
-                partialResults: true,
-                cancelOnError: false,
-                listenMode: stt.ListenMode.dictation,
-              ),
-            );
-          } catch (_) {}
+      } catch (err) {
+        debugPrint('[MuseVoiceInputSheet] Record start error: $err');
+        if (mounted) {
+          setState(() {
+            _isRecording = false;
+            _transcriptionStatus = 'Could not access microphone: $err';
+          });
         }
-      } catch (_) {}
+      }
     }
   }
 
@@ -299,17 +184,6 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     final isTest = Platform.environment.containsKey('FLUTTER_TEST');
     String? audioPath;
     if (!isTest) {
-      if (_liveTranscriber != null) {
-        try {
-          await _liveTranscriber!.stop();
-        } catch (_) {}
-        _liveTranscriber = null;
-      }
-      if (_speechToText.isListening) {
-        try {
-          await _speechToText.stop();
-        } catch (_) {}
-      }
       try {
         audioPath = await _audioRecorder.stop();
       } catch (_) {}
@@ -319,9 +193,9 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       _isRecording = false;
       _isTranscribing = true;
       _transcriptController.text =
-          'Transcribing with AI Voice Assistant (${_selectedDialect.languageCode})...';
+          'Transcribing with Meta Muse AI (${_selectedDialect.label})...';
       _transcriptionStatus =
-          'Processing recording and transcribing speech...';
+          'Sending recording to Meta Muse Transcriber...';
     });
 
     List<int>? audioBytes;
@@ -339,13 +213,10 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
     // Low-latency async processing delay
     await Future.delayed(const Duration(milliseconds: 650));
 
-    // 7 & 8. Upload recording to backend & Meta transcription endpoint
+    // Upload recording to backend & Meta transcription endpoint
     final result = await aiService.transcribeAudio(
       audioBytes: audioBytes,
       audioFilePath: filePath,
-      spokenTextFromMic: _capturedSpeechFromMic.trim().isNotEmpty
-          ? _capturedSpeechFromMic.trim()
-          : null,
       dialect: _selectedDialect,
       audioFormat: 'audio/wav',
       sampleRate: 24000,
@@ -358,7 +229,7 @@ class _MuseVoiceInputSheetState extends State<MuseVoiceInputSheet>
       setState(() {
         _isTranscribing = false;
         _transcriptionResult = result;
-        // Clear fallback to empty string and display guidance
+        // Insert transcript into text field so user can edit before confirming
         _transcriptController.text = isUnavailable ? '' : result.text;
         _isFallback = isUnavailable;
         _transcriptionStatus = isUnavailable

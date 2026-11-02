@@ -19,9 +19,23 @@ void main() {
       expect(result['productName'], contains('Rice'));
       expect(result['price'], 85000.0);
       expect(result['unit'], '50kg bag');
-      expect(result['category'], 'Groceries');
+      expect(result['category'], 'Food');
       expect(result['brand'], 'Mama Gold');
       expect(result['notes'], isNotNull);
+    });
+
+    test('generateProductDescription produces contextual description from product name & category', () async {
+      final desc = await metaAi.generateProductDescription(
+        productName: 'Mama Gold Rice',
+        category: 'Food',
+        brand: 'Mama Gold',
+        unit: '50kg bag',
+        price: 85000,
+      );
+
+      expect(desc, isNotEmpty);
+      expect(desc, contains('Mama Gold Rice'));
+      expect(desc.toLowerCase(), anyOf(contains('fresh'), contains('quality')));
     });
 
     test('refineSellerListing detects Electronics category for appliances', () {
@@ -208,7 +222,7 @@ void main() {
         sellerName: 'Iya Moria Provisions',
         price: 4500.0,
         unit: 'paint rubber',
-        category: 'Groceries',
+        category: 'Food',
         submitterName: 'You (Verified Seller)',
         submitterRole: 'Trader',
         inStock: true,
@@ -226,7 +240,7 @@ void main() {
 
       // Verify listing card renders product name, category badge, stock switch, and edit/delete icons
       expect(find.text('Iya Moria Brown Beans'), findsOneWidget);
-      expect(find.text('Groceries'), findsWidgets);
+      expect(find.text('Food'), findsWidgets);
       expect(find.text('In Stock'), findsOneWidget);
       expect(find.byTooltip('Modify Listing'), findsOneWidget);
       expect(find.byTooltip('Delete Listing'), findsOneWidget);
@@ -243,7 +257,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Modify Price Listing'), findsOneWidget);
-      expect(find.text('AI Refine'), findsOneWidget);
+      expect(find.text('AI Generate Description'), findsOneWidget);
       expect(find.text('Save Changes'), findsOneWidget);
     });
   });

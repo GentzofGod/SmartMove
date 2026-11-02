@@ -182,15 +182,14 @@ void main() {
       expect(find.text('SuperAdmin Console'), findsOneWidget);
       expect(find.text('Platform Governance & Moderation'), findsOneWidget);
 
-      // Verify Role Switcher chip
-      expect(find.byKey(const ValueKey('chip_superadmin_role_switcher')), findsOneWidget);
-      expect(find.text('SuperAdmin'), findsWidgets);
+      // Verify Persona Switcher chip is removed
+      expect(find.byKey(const ValueKey('chip_superadmin_role_switcher')), findsNothing);
 
-      // Verify the 4 Administration Tabs
+      // Verify the 3 Administration Tabs (Security & Audit removed)
       expect(find.text('Seller Approvals'), findsOneWidget);
       expect(find.text('Price Quotes'), findsOneWidget);
       expect(find.text('Categories & Hubs'), findsOneWidget);
-      expect(find.text('Security & Audit'), findsOneWidget);
+      expect(find.text('Security & Audit'), findsNothing);
     });
 
     testWidgets('7. Approves pending seller application and updates state', (tester) async {
@@ -295,7 +294,7 @@ void main() {
       expect(find.text('Meta AI Price Anomaly Audit'), findsOneWidget);
     });
 
-    testWidgets('9. Switches to Security & Audit tab and verifies governance matrix', (tester) async {
+    testWidgets('9. Switches to Categories & Hubs tab and verifies governance controls', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1000, 1000));
 
       final container = ProviderContainer();
@@ -320,15 +319,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Scroll into view and tap Security & Audit Tab
-      await tester.ensureVisible(find.text('Security & Audit'));
-      await tester.tap(find.text('Security & Audit'));
+      // Tap Categories & Hubs Tab
+      await tester.tap(find.text('Categories & Hubs'));
       await tester.pumpAndSettle();
 
-      // Verify Session Audit and Governance Matrix
-      expect(find.text('Active SuperAdmin Session'), findsOneWidget);
-      expect(find.text('Role-Based Governance Matrix'), findsOneWidget);
-      expect(find.text('Full Governance (Seller Verification, Anomaly Audit, RLS SuperAdmin)'), findsOneWidget);
+      // Verify Categories & Hubs management view is present and Security & Audit is removed
+      expect(find.text('Security & Audit'), findsNothing);
+      expect(find.text('Managed Commodity Categories'), findsOneWidget);
     });
 
     testWidgets('10. /superadmin GoRoute mounts SuperAdminPanelScreen correctly', (tester) async {

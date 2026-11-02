@@ -23,19 +23,49 @@ import '../services/commodity_comparison_service.dart';
 
 // --- Products State ---
 class ProductsNotifier extends Notifier<List<Product>> {
+  static const _tombstoneNamesKey = 'smartmove_deleted_product_names_v1';
+  static const _tombstoneIdsKey = 'smartmove_deleted_product_ids_v1';
   List<Product> _allProducts = [];
+  final Set<String> _deletedProductNames = {};
+  final Set<String> _deletedProductIds = {};
 
   @override
   List<Product> build() {
-    _fetchLive();
+    _loadTombstonesAndLive();
     return [];
+  }
+
+  Future<void> _loadTombstonesAndLive() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final names = prefs.getStringList(_tombstoneNamesKey) ?? [];
+      final ids = prefs.getStringList(_tombstoneIdsKey) ?? [];
+      _deletedProductNames.addAll(names.map((s) => s.trim().toLowerCase()));
+      _deletedProductIds.addAll(ids);
+    } catch (_) {}
+    await _fetchLive();
+  }
+
+  Future<void> _persistTombstones() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_tombstoneNamesKey, _deletedProductNames.toList());
+      await prefs.setStringList(_tombstoneIdsKey, _deletedProductIds.toList());
+    } catch (_) {}
+  }
+
+  bool _isTombstoned(Product p) {
+    if (_deletedProductIds.contains(p.id)) return true;
+    final clean = p.name.trim().toLowerCase();
+    if (clean.isNotEmpty && _deletedProductNames.contains(clean)) return true;
+    return false;
   }
 
   Future<void> _fetchLive() async {
     final live = await SupabaseDataService.fetchProducts();
     if (live != null) {
-      _allProducts = live;
-      state = live;
+      _allProducts = live.where((p) => !_isTombstoned(p)).toList();
+      state = _allProducts;
     }
   }
 
@@ -47,8 +77,20 @@ class ProductsNotifier extends Notifier<List<Product>> {
     if (category == 'All') {
       state = _allProducts;
     } else {
+      final clean = category.toLowerCase();
       state = _allProducts
-          .where((p) => p.category.toLowerCase() == category.toLowerCase())
+          .where((p) {
+            final pCat = p.category.toLowerCase();
+            if (pCat == clean) return true;
+            if (clean == 'food' || clean == 'groceries') {
+              return pCat == 'food' ||
+                  pCat == 'groceries' ||
+                  pCat.contains('grain') ||
+                  pCat.contains('tuber') ||
+                  pCat.contains('oil');
+            }
+            return false;
+          })
           .toList();
     }
   }
@@ -64,7 +106,10 @@ class ProductsNotifier extends Notifier<List<Product>> {
   }
 
   void addProduct(Product product) {
-    _allProducts = [product, ..._allProducts];
+    _deletedProductIds.remove(product.id);
+    _deletedProductNames.remove(product.name.trim().toLowerCase());
+    _persistTombstones();
+    _allProducts = [product, ..._allProducts.where((p) => p.id != product.id)];
     state = _allProducts;
     SupabaseDataService.insertProduct(product);
   }
@@ -79,9 +124,27 @@ class ProductsNotifier extends Notifier<List<Product>> {
   }
 
   void deleteProduct(String productId) {
+    _deletedProductIds.add(productId);
+    final target = _allProducts.where((p) => p.id == productId).toList();
+    if (target.isNotEmpty) {
+      _deletedProductNames.add(target.first.name.trim().toLowerCase());
+    }
+    _persistTombstones();
     _allProducts = _allProducts.where((p) => p.id != productId).toList();
     state = _allProducts;
-    SupabaseDataService.deleteProduct(productId);
+    SupabaseDataService.deleteProduct(
+      productId,
+      name: target.isNotEmpty ? target.first.name : null,
+    );
+  }
+
+  void deleteProductByName(String name) {
+    final clean = name.trim().toLowerCase();
+    _deletedProductNames.add(clean);
+    _persistTombstones();
+    _allProducts = _allProducts.where((p) => p.name.trim().toLowerCase() != clean).toList();
+    state = _allProducts;
+    SupabaseDataService.deleteProduct('', name: name);
   }
 }
 
@@ -503,11 +566,11 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
 
   static const List<CommodityCategory> _defaultCategories = [
     CommodityCategory(
-      id: 'cat-groceries',
-      name: 'Groceries',
-      slug: 'groceries',
-      iconName: 'shopping_basket_outlined',
-      description: 'Foodstuffs, staples, grains, and provisions',
+      id: 'cat-food',
+      name: 'Food',
+      slug: 'food',
+      iconName: 'restaurant_outlined',
+      description: 'Groceries, grains, tubers, oils, seasonings, and cooking items',
       displayOrder: 1,
     ),
     CommodityCategory(
@@ -543,25 +606,81 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
       if (cachedJson != null && cachedJson.isNotEmpty) {
         final decoded = jsonDecode(cachedJson) as List<dynamic>;
         if (decoded.isNotEmpty) {
-          state = decoded
+          final loaded = decoded
               .map((j) => CommodityCategory.fromJson(j as Map<String, dynamic>))
+              .map((c) {
+                final lower = c.name.toLowerCase();
+                if (lower == 'groceries' ||
+                    lower.contains('grain') ||
+                    lower.contains('tuber') ||
+                    lower.contains('oil')) {
+                  return c.copyWith(
+                    name: 'Food',
+                    slug: 'food',
+                    description:
+                        'Groceries, grains, tubers, oils, seasonings, and cooking items',
+                    iconName: 'restaurant_outlined',
+                  );
+                }
+                return c;
+              })
               .toList();
+          final seen = <String>{};
+          state = loaded.where((c) => seen.add(c.name.toLowerCase())).toList();
         }
       }
     } catch (_) {}
 
     final live = await SupabaseDataService.fetchCategories();
     if (live != null && live.isNotEmpty) {
-      state = live;
-      _persist(live);
+      final consolidated = live.map((c) {
+        final lower = c.name.toLowerCase();
+        if (lower == 'groceries' ||
+            lower.contains('grain') ||
+            lower.contains('tuber') ||
+            lower.contains('oil')) {
+          return c.copyWith(
+            name: 'Food',
+            slug: 'food',
+            description:
+                'Groceries, grains, tubers, oils, seasonings, and cooking items',
+            iconName: 'restaurant_outlined',
+          );
+        }
+        return c;
+      }).toList();
+      final seen = <String>{};
+      final cleanLive =
+          consolidated.where((c) => seen.add(c.name.toLowerCase())).toList();
+      state = cleanLive;
+      _persist(cleanLive);
     }
   }
 
   Future<void> fetchLive() async {
     final live = await SupabaseDataService.fetchCategories();
     if (live != null && live.isNotEmpty) {
-      state = live;
-      _persist(live);
+      final consolidated = live.map((c) {
+        final lower = c.name.toLowerCase();
+        if (lower == 'groceries' ||
+            lower.contains('grain') ||
+            lower.contains('tuber') ||
+            lower.contains('oil')) {
+          return c.copyWith(
+            name: 'Food',
+            slug: 'food',
+            description:
+                'Groceries, grains, tubers, oils, seasonings, and cooking items',
+            iconName: 'restaurant_outlined',
+          );
+        }
+        return c;
+      }).toList();
+      final seen = <String>{};
+      final cleanLive =
+          consolidated.where((c) => seen.add(c.name.toLowerCase())).toList();
+      state = cleanLive;
+      _persist(cleanLive);
     }
   }
 
@@ -828,6 +947,10 @@ final traderChatProvider =
 // --- Community Observations State ---
 class CommunityNotifier extends Notifier<List<PriceObservation>> {
   static const _obsCacheKey = 'smartmove_observations_cache_v2';
+  static const _tombstonesKey = 'smartmove_deleted_observation_ids_v1';
+  static const _tombstoneNamesKey = 'smartmove_deleted_product_names_v1';
+  final Set<String> _deletedTombstoneIds = {};
+  final Set<String> _deletedProductNames = {};
 
   @override
   List<PriceObservation> build() {
@@ -835,7 +958,33 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     return [];
   }
 
+  Future<void> _loadTombstones() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = prefs.getStringList(_tombstonesKey) ?? [];
+      final names = prefs.getStringList(_tombstoneNamesKey) ?? [];
+      _deletedTombstoneIds.addAll(ids);
+      _deletedProductNames.addAll(names.map((n) => n.trim().toLowerCase()));
+    } catch (_) {}
+  }
+
+  Future<void> _persistTombstones() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_tombstonesKey, _deletedTombstoneIds.toList());
+      await prefs.setStringList(_tombstoneNamesKey, _deletedProductNames.toList());
+    } catch (_) {}
+  }
+
+  bool _isTombstoned(PriceObservation obs) {
+    if (_deletedTombstoneIds.contains(obs.id)) return true;
+    final clean = obs.productName.trim().toLowerCase();
+    if (clean.isNotEmpty && _deletedProductNames.contains(clean)) return true;
+    return false;
+  }
+
   Future<void> _loadFromCacheAndLive() async {
+    await _loadTombstones();
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedJson = prefs.getString(_obsCacheKey);
@@ -845,6 +994,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
           final items = decoded
               .map((j) => PriceObservation.fromJson(j as Map<String, dynamic>))
               .where((o) =>
+                  !_isTombstoned(o) &&
                   !o.id.startsWith('obs-seed') &&
                   !o.sellerName.toLowerCase().contains('kudirat') &&
                   !o.sellerName.toLowerCase().contains('demo') &&
@@ -860,57 +1010,64 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
 
     final live = await SupabaseDataService.fetchObservations();
     if (live != null) {
-      if (live.isEmpty) {
-        // Authoritative live database has 0 records; wipe cached mock/stale entries
+      final filteredLive = live.where((o) => !_isTombstoned(o)).toList();
+      if (filteredLive.isEmpty && live.isNotEmpty) {
+        state = state.where((o) => !_isTombstoned(o)).toList();
+        _persist(state);
+      } else if (filteredLive.isEmpty) {
         state = [];
         _persist(state);
       } else {
-        final liveIds = live.map((o) => o.id).toSet();
+        final liveIds = filteredLive.map((o) => o.id).toSet();
         final localOnly = state
             .where((o) =>
                 !liveIds.contains(o.id) &&
+                !_isTombstoned(o) &&
                 !o.id.startsWith('obs-seed') &&
                 !o.sellerName.toLowerCase().contains('demo') &&
                 !o.sellerName.toLowerCase().contains('seed'))
             .toList();
-        state = [...localOnly, ...live];
+        state = [...localOnly, ...filteredLive];
         _persist(state);
       }
     }
   }
 
   Future<void> fetchLive() async {
+    await _loadTombstones();
     final live = await SupabaseDataService.fetchObservations();
     if (live != null) {
-      if (live.isEmpty) {
-        state = [];
-      } else {
-        state = live;
-      }
+      final filteredLive = live.where((o) => !_isTombstoned(o)).toList();
+      state = filteredLive;
       _persist(state);
     }
   }
 
   Future<void> refreshFromCloud({bool purgeLocalMock = false}) async {
+    await _loadTombstones();
     if (purgeLocalMock) {
       await purgeDemoObservations();
     }
     final live = await SupabaseDataService.fetchObservations();
     if (live != null) {
-      if (live.isEmpty) {
+      final filteredLive = live.where((o) => !_isTombstoned(o)).toList();
+      if (filteredLive.isEmpty && live.isNotEmpty) {
+        state = state.where((o) => !_isTombstoned(o)).toList();
+      } else if (filteredLive.isEmpty) {
         state = [];
       } else {
-        final liveIds = live.map((o) => o.id).toSet();
+        final liveIds = filteredLive.map((o) => o.id).toSet();
         final localOnly = purgeLocalMock
             ? <PriceObservation>[]
             : state
                 .where((o) =>
                     !liveIds.contains(o.id) &&
+                    !_isTombstoned(o) &&
                     !o.id.startsWith('obs-seed') &&
                     !o.sellerName.toLowerCase().contains('demo') &&
                     !o.sellerName.toLowerCase().contains('seed'))
                 .toList();
-        state = [...localOnly, ...live];
+        state = [...localOnly, ...filteredLive];
       }
       await _persist(state);
     }
@@ -919,6 +1076,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
   Future<void> purgeDemoObservations() async {
     state = state
         .where((o) =>
+            !_isTombstoned(o) &&
             !o.id.startsWith('obs-seed') &&
             !o.sellerName.toLowerCase().contains('kudirat') &&
             !o.sellerName.toLowerCase().contains('demo') &&
@@ -948,11 +1106,15 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     bool inStock = true,
     String? marketLocation,
     String? notes,
-    String category = 'Groceries',
+    String category = 'Food',
     String? imageUrl,
     double? latitude,
     double? longitude,
   }) {
+    final cleanName = productName.trim().toLowerCase();
+    _deletedProductNames.remove(cleanName);
+    _persistTombstones();
+
     final multiplier = CommodityComparisonService.calculateUnitMultiplier(
       unit,
       commodityName: productName,
@@ -1142,11 +1304,36 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
 
   void deleteListing(String id) {
     final deleted = state.where((o) => o.id == id).toList();
-    state = state.where((o) => o.id != id).toList();
+    _deletedTombstoneIds.add(id);
+    String? productName;
+    if (deleted.isNotEmpty) {
+      productName = deleted.first.productName;
+      final clean = productName.trim().toLowerCase();
+      if (clean.isNotEmpty) {
+        _deletedProductNames.add(clean);
+      }
+    }
+    _persistTombstones();
+
+    state = state.where((o) => o.id != id && !_isTombstoned(o)).toList();
     _persist(state);
+
+    if (productName != null && productName.trim().isNotEmpty) {
+      try {
+        ref.read(productsProvider.notifier).deleteProductByName(productName);
+      } catch (_) {}
+    }
+    if (deleted.isNotEmpty &&
+        deleted.first.productId.isNotEmpty &&
+        deleted.first.productId != 'p-custom') {
+      try {
+        ref.read(productsProvider.notifier).deleteProduct(deleted.first.productId);
+      } catch (_) {}
+    }
+
     SupabaseDataService.deleteObservation(
       id,
-      productName: deleted.isNotEmpty ? deleted.first.productName : null,
+      productName: productName,
     );
   }
 

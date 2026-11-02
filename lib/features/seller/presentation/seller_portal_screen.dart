@@ -46,10 +46,12 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     String channel = userSession.sellerChannel ?? 'Local Market';
     final categories = ref.read(categoriesProvider).map((c) => c.name).toList();
     if (categories.isEmpty) {
-      categories.addAll(['Groceries', 'Electronics', 'Pharmacy', 'Others']);
+      categories.addAll(['Food', 'Electronics', 'Pharmacy', 'Others']);
     }
     String selectedCategory = categories.first;
     bool inStock = true;
+    String? modalErrorMessage;
+    bool isGeneratingDescription = false;
 
     showModalBottomSheet(
       context: context,
@@ -131,101 +133,21 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Commodity / Product Name *',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                            ),
-                            icon: const Icon(Icons.auto_awesome,
-                                size: 14, color: Color(0xFF673AB7)),
-                            label: const Text(
-                              'AI Auto-Fill / Refine',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF673AB7),
-                              ),
-                            ),
-                            onPressed: () {
-                              final raw =
-                                  '${productController.text} ${notesController.text}'
-                                      .trim();
-                              final input = raw.isNotEmpty
-                                  ? raw
-                                  : 'Mama Gold Rice 50kg bag 85000 fresh stock';
-                              final res =
-                                  const MetaAiService().refineSellerListing(
-                                rawInput: input,
-                                currentProductName: productController
-                                        .text.trim().isNotEmpty
-                                    ? productController.text.trim()
-                                    : null,
-                                currentPrice: double.tryParse(
-                                    priceController.text.trim()),
-                                currentUnit: unitController.text.trim().isNotEmpty
-                                    ? unitController.text.trim()
-                                    : null,
-                                currentCategory: selectedCategory,
-                                currentBrand:
-                                    brandController.text.trim().isNotEmpty
-                                        ? brandController.text.trim()
-                                        : null,
-                                currentNotes:
-                                    notesController.text.trim().isNotEmpty
-                                        ? notesController.text.trim()
-                                        : null,
-                              );
-                              setModalState(() {
-                                if (res['productName'] != null) {
-                                  productController.text =
-                                      res['productName'] as String;
-                                }
-                                if (res['price'] != null) {
-                                  priceController.text =
-                                      (res['price'] as double)
-                                          .toStringAsFixed(0);
-                                }
-                                if (res['unit'] != null) {
-                                  unitController.text = res['unit'] as String;
-                                }
-                                if (res['category'] != null &&
-                                    categories.contains(res['category'])) {
-                                  selectedCategory = res['category'] as String;
-                                }
-                                if (res['brand'] != null) {
-                                  brandController.text =
-                                      res['brand'] as String;
-                                }
-                                if (res['notes'] != null) {
-                                  notesController.text =
-                                      res['notes'] as String;
-                                }
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'AI Assistant refined and standardized listing fields!'),
-                                  duration: Duration(seconds: 2),
-                                  backgroundColor: Color(0xFF673AB7),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                      const Text(
+                        'Commodity / Product Name *',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: productController,
-                        onChanged: (_) => setModalState(() {}),
+                        onChanged: (_) {
+                          if (modalErrorMessage != null) {
+                            setModalState(() => modalErrorMessage = null);
+                          } else {
+                            setModalState(() {});
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'e.g. White Garri, Brown Beans, Palm Oil',
                           border: OutlineInputBorder(
@@ -383,9 +305,90 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      const Text('Notes / Description',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Notes / Description',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          TextButton.icon(
+                            key: const ValueKey('btn_ai_generate_description'),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                            ),
+                            icon: isGeneratingDescription
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF673AB7),
+                                    ),
+                                  )
+                                : const Icon(Icons.auto_awesome,
+                                    size: 14, color: Color(0xFF673AB7)),
+                            label: Text(
+                              isGeneratingDescription
+                                  ? 'Generating...'
+                                  : 'AI Generate Description',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF673AB7),
+                              ),
+                            ),
+                            onPressed: isGeneratingDescription
+                                ? null
+                                : () async {
+                                    final prodName = productController.text.trim();
+                                    if (prodName.isEmpty) {
+                                      setModalState(() {
+                                        modalErrorMessage =
+                                            'Please enter a Commodity / Product Name first so AI has context to generate the description.';
+                                      });
+                                      return;
+                                    }
+                                    if (selectedCategory.trim().isEmpty) {
+                                      setModalState(() {
+                                        modalErrorMessage =
+                                            'Please select a Category first so AI has context to generate the description.';
+                                      });
+                                      return;
+                                    }
+
+                                    setModalState(() {
+                                      modalErrorMessage = null;
+                                      isGeneratingDescription = true;
+                                    });
+
+                                    final desc = await const MetaAiService()
+                                        .generateProductDescription(
+                                      productName: prodName,
+                                      category: selectedCategory,
+                                      brand: brandController.text.trim().isNotEmpty
+                                          ? brandController.text.trim()
+                                          : null,
+                                      unit: unitController.text.trim().isNotEmpty
+                                          ? unitController.text.trim()
+                                          : null,
+                                      price: double.tryParse(priceController.text.trim()),
+                                      currentNotes: notesController.text.trim().isNotEmpty
+                                          ? notesController.text.trim()
+                                          : null,
+                                    );
+
+                                    setModalState(() {
+                                      isGeneratingDescription = false;
+                                      notesController.text = desc;
+                                    });
+                                  },
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
@@ -398,6 +401,40 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           ),
                         ),
                       ),
+                      if (modalErrorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          key: const ValueKey('dialog_error_banner'),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFEF9A9A)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.error_outline_rounded,
+                                  size: 16, color: Color(0xFFC62828)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  modalErrorMessage!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFC62828),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => setModalState(() => modalErrorMessage = null),
+                                child: const Icon(Icons.close, size: 14, color: Color(0xFFC62828)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       SizedBox(
                         width: double.infinity,
@@ -412,25 +449,33 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           onPressed: () {
                             final name = productController.text.trim();
                             final pStr = priceController.text.trim();
-                            if (name.isEmpty || pStr.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Please provide product name and price.'),
-                                  backgroundColor: AppColors.badgeErrorText,
-                                ),
-                              );
+                            if (name.isEmpty) {
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Product name is required. Please enter a commodity or product name.';
+                              });
+                              return;
+                            }
+                            if (pStr.isEmpty) {
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Price is required. Please enter the listing price in ₦.';
+                              });
                               return;
                             }
                             final price = double.tryParse(pStr) ?? 0.0;
                             if (price <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Please enter a valid price amount.'),
-                                  backgroundColor: AppColors.badgeErrorText,
-                                ),
-                              );
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Please enter a valid price amount greater than ₦0.';
+                              });
+                              return;
+                            }
+                            if (unitController.text.trim().isEmpty) {
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Unit is required (e.g. 1kg, paint rubber, bag).';
+                              });
                               return;
                             }
 
@@ -539,12 +584,14 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     final notesController = TextEditingController(text: obs.notes ?? '');
     final categories = ref.read(categoriesProvider).map((c) => c.name).toList();
     if (categories.isEmpty) {
-      categories.addAll(['Groceries', 'Electronics', 'Pharmacy', 'Others']);
+      categories.addAll(['Food', 'Electronics', 'Pharmacy', 'Others']);
     }
     String selectedCategory = categories.contains(obs.category)
         ? obs.category
-        : (categories.isNotEmpty ? categories.first : 'Groceries');
+        : (categories.isNotEmpty ? categories.first : 'Food');
     bool inStock = obs.inStock;
+    String? modalErrorMessage;
+    bool isGeneratingDescription = false;
 
     showModalBottomSheet(
       context: context,
@@ -601,100 +648,21 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Commodity / Product Name *',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                            ),
-                            icon: const Icon(Icons.auto_awesome,
-                                size: 14, color: Color(0xFF673AB7)),
-                            label: const Text(
-                              'AI Refine',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF673AB7),
-                              ),
-                            ),
-                            onPressed: () {
-                              final raw =
-                                  '${productController.text} ${notesController.text}'
-                                      .trim();
-                              final input =
-                                  raw.isNotEmpty ? raw : obs.productName;
-                              final res =
-                                  const MetaAiService().refineSellerListing(
-                                rawInput: input,
-                                currentProductName: productController
-                                        .text.trim().isNotEmpty
-                                    ? productController.text.trim()
-                                    : null,
-                                currentPrice: double.tryParse(
-                                    priceController.text.trim()),
-                                currentUnit: unitController.text.trim().isNotEmpty
-                                    ? unitController.text.trim()
-                                    : null,
-                                currentCategory: selectedCategory,
-                                currentBrand:
-                                    brandController.text.trim().isNotEmpty
-                                        ? brandController.text.trim()
-                                        : null,
-                                currentNotes:
-                                    notesController.text.trim().isNotEmpty
-                                        ? notesController.text.trim()
-                                        : null,
-                              );
-                              setModalState(() {
-                                if (res['productName'] != null) {
-                                  productController.text =
-                                      res['productName'] as String;
-                                }
-                                if (res['price'] != null) {
-                                  priceController.text =
-                                      (res['price'] as double)
-                                          .toStringAsFixed(0);
-                                }
-                                if (res['unit'] != null) {
-                                  unitController.text = res['unit'] as String;
-                                }
-                                if (res['category'] != null &&
-                                    categories.contains(res['category'])) {
-                                  selectedCategory = res['category'] as String;
-                                }
-                                if (res['brand'] != null) {
-                                  brandController.text =
-                                      res['brand'] as String;
-                                }
-                                if (res['notes'] != null) {
-                                  notesController.text =
-                                      res['notes'] as String;
-                                }
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'AI Assistant refined listing fields!'),
-                                  duration: Duration(seconds: 2),
-                                  backgroundColor: Color(0xFF673AB7),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                      const Text(
+                        'Commodity / Product Name *',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: productController,
-                        onChanged: (_) => setModalState(() {}),
+                        onChanged: (_) {
+                          if (modalErrorMessage != null) {
+                            setModalState(() => modalErrorMessage = null);
+                          } else {
+                            setModalState(() {});
+                          }
+                        },
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -848,9 +816,90 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      const Text('Notes / Description',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Notes / Description',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          TextButton.icon(
+                            key: const ValueKey('btn_ai_generate_description_edit'),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                            ),
+                            icon: isGeneratingDescription
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF673AB7),
+                                    ),
+                                  )
+                                : const Icon(Icons.auto_awesome,
+                                    size: 14, color: Color(0xFF673AB7)),
+                            label: Text(
+                              isGeneratingDescription
+                                  ? 'Generating...'
+                                  : 'AI Generate Description',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF673AB7),
+                              ),
+                            ),
+                            onPressed: isGeneratingDescription
+                                ? null
+                                : () async {
+                                    final prodName = productController.text.trim();
+                                    if (prodName.isEmpty) {
+                                      setModalState(() {
+                                        modalErrorMessage =
+                                            'Please enter a Commodity / Product Name first so AI has context to generate the description.';
+                                      });
+                                      return;
+                                    }
+                                    if (selectedCategory.trim().isEmpty) {
+                                      setModalState(() {
+                                        modalErrorMessage =
+                                            'Please select a Category first so AI has context to generate the description.';
+                                      });
+                                      return;
+                                    }
+
+                                    setModalState(() {
+                                      modalErrorMessage = null;
+                                      isGeneratingDescription = true;
+                                    });
+
+                                    final desc = await const MetaAiService()
+                                        .generateProductDescription(
+                                      productName: prodName,
+                                      category: selectedCategory,
+                                      brand: brandController.text.trim().isNotEmpty
+                                          ? brandController.text.trim()
+                                          : null,
+                                      unit: unitController.text.trim().isNotEmpty
+                                          ? unitController.text.trim()
+                                          : null,
+                                      price: double.tryParse(priceController.text.trim()),
+                                      currentNotes: notesController.text.trim().isNotEmpty
+                                          ? notesController.text.trim()
+                                          : null,
+                                    );
+
+                                    setModalState(() {
+                                      isGeneratingDescription = false;
+                                      notesController.text = desc;
+                                    });
+                                  },
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: notesController,
@@ -861,6 +910,40 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           ),
                         ),
                       ),
+                      if (modalErrorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          key: const ValueKey('dialog_error_banner_edit'),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFEF9A9A)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.error_outline_rounded,
+                                  size: 16, color: Color(0xFFC62828)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  modalErrorMessage!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFC62828),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => setModalState(() => modalErrorMessage = null),
+                                child: const Icon(Icons.close, size: 14, color: Color(0xFFC62828)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       SizedBox(
                         width: double.infinity,
@@ -875,25 +958,33 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           onPressed: () {
                             final name = productController.text.trim();
                             final pStr = priceController.text.trim();
-                            if (name.isEmpty || pStr.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Please provide product name and price.'),
-                                  backgroundColor: AppColors.badgeErrorText,
-                                ),
-                              );
+                            if (name.isEmpty) {
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Product name is required. Please enter a commodity or product name.';
+                              });
+                              return;
+                            }
+                            if (pStr.isEmpty) {
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Price is required. Please enter the listing price in ₦.';
+                              });
                               return;
                             }
                             final price = double.tryParse(pStr) ?? 0.0;
                             if (price <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Please enter a valid price amount.'),
-                                  backgroundColor: AppColors.badgeErrorText,
-                                ),
-                              );
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Please enter a valid price amount greater than ₦0.';
+                              });
+                              return;
+                            }
+                            if (unitController.text.trim().isNotEmpty == false) {
+                              setModalState(() {
+                                modalErrorMessage =
+                                    'Unit is required (e.g. 1kg, paint rubber, bag).';
+                              });
                               return;
                             }
 
