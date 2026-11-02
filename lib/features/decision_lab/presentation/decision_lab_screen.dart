@@ -9,7 +9,9 @@ import '../../../core/models/commodity_item.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
+import '../../../core/services/web_search_grounding_service.dart';
 import '../../../core/localization/app_language.dart';
+import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
 import 'widgets/trader_negotiation_sheet.dart';
 
 class DecisionLabScreen extends ConsumerStatefulWidget {
@@ -24,6 +26,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
   late TabController _tabController;
   final TextEditingController _followUpController = TextEditingController();
   FollowUpInterpretation? _activeInterpretation;
+  bool _isRefiningWithAi = false;
 
   @override
   void initState() {
@@ -178,33 +181,31 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
 
     if (items.isNotEmpty) {
       final first = items.first;
-      suggestions.add('Find cheaper alternative for ${first.productName}');
+      suggestions.add('Which plan has the closest verified sellers?');
+      suggestions.add('Compare physical sellers vs online e-commerce for ${first.productName}');
 
       if (items.length > 1) {
-        final second = items[1];
-        suggestions.add('Compare nearby market price for ${second.productName}');
-        suggestions.add('Find single-hub seller with both ${first.productName} and ${second.productName}');
-      } else {
-        suggestions.add('Find verified platform traders for ${first.productName}');
+        suggestions.add('I want to spend less on transport across options');
+        suggestions.add('Which option gets me everything in a single stop?');
       }
 
       if (state.budget > 0) {
-        suggestions.add('Adjust quantities to stay under ₦${state.budget.toStringAsFixed(0)}');
+        suggestions.add('Keep total basket cost strictly within ₦${state.budget.toStringAsFixed(0)}');
+      } else {
+        suggestions.add('Find the cheapest overall option');
       }
-
-      suggestions.add('I want to spend less on transport across options');
     } else {
-      suggestions.add('Compare prices for Local Rice and Cooking Oil');
-      suggestions.add('Find nearest verified wholesale market');
+      suggestions.add('Which option has the closest sellers?');
+      suggestions.add('Compare prices between local market and online stores');
       suggestions.add('I want to spend less on transport');
     }
 
     return suggestions;
   }
 
-  void _submitFollowUp(List<PlanCandidate> candidates, DecisionLabState state) {
+  Future<void> _submitFollowUp(List<PlanCandidate> candidates, DecisionLabState state) async {
     final text = _followUpController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isRefiningWithAi) return;
 
     const aiService = MetaAiService();
 
@@ -226,6 +227,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         cmdResult.updatedMaxStops != null) {
       ref.read(decisionLabProvider.notifier).applyAiCommand(cmdResult);
       _followUpController.clear();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.primary,
@@ -246,16 +248,48 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
       return;
     }
 
-    final result = aiService.interpretFollowUp(
-      userFollowUp: text,
-      currentPlans: candidates,
-      currentBudget: state.budget,
-      currentTransport: state.transportCost,
-    );
-
     setState(() {
-      _activeInterpretation = result;
+      _isRefiningWithAi = true;
     });
+
+    try {
+      final userLocation = ref.read(locationProvider);
+      final registeredTraders = ref.read(sellerApplicationsProvider);
+      final result = await aiService.refineOptionsWithAi(
+        userQuery: text,
+        currentPlans: candidates,
+        items: state.activeItems,
+        currentBudget: state.budget,
+        currentTransport: state.transportCost,
+        userLocation: userLocation,
+        registeredTraders: registeredTraders,
+      );
+
+      if (mounted) {
+        setState(() {
+          _activeInterpretation = result;
+        });
+      }
+    } catch (_) {
+      final result = aiService.interpretFollowUp(
+        userFollowUp: text,
+        currentPlans: candidates,
+        currentBudget: state.budget,
+        currentTransport: state.transportCost,
+      );
+
+      if (mounted) {
+        setState(() {
+          _activeInterpretation = result;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefiningWithAi = false;
+        });
+      }
+    }
   }
 
   void _applyInterpretation(FollowUpInterpretation interpretation) {
@@ -1000,10 +1034,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
 
         const SizedBox(height: 16),
 
-        // Proactive Optimization Tips generated by Meta AI
-        _buildOptimizationTips(state.optimizationTips),
-
-        // Interactive "Ask Muse Spark" Follow-Up Section
+        // Interactive "Ask AI Assistant" Follow-Up Section
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1047,10 +1078,12 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       style: const TextStyle(fontSize: 11),
                     ),
                     backgroundColor: AppColors.surface,
-                    onPressed: () {
-                      _followUpController.text = suggestion;
-                      _submitFollowUp(candidates, state);
-                    },
+                    onPressed: _isRefiningWithAi
+                        ? null
+                        : () {
+                            _followUpController.text = suggestion;
+                            _submitFollowUp(candidates, state);
+                          },
                   );
                 }).toList(),
               ),
@@ -1063,8 +1096,9 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     child: TextField(
                       controller: _followUpController,
                       style: const TextStyle(fontSize: 13),
+                      enabled: !_isRefiningWithAi,
                       decoration: InputDecoration(
-                        hintText: 'e.g. "I want to spend less on transport..."',
+                        hintText: 'e.g. "Which has closest sellers?" or "Spend less on transport"...',
                         hintStyle: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         border: OutlineInputBorder(
@@ -1080,20 +1114,44 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   IconButton(
                     icon: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
+                      decoration: BoxDecoration(
+                        color: _isRefiningWithAi ? AppColors.textSecondary : AppColors.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
+                      child: _isRefiningWithAi
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                     ),
-                    onPressed: () => _submitFollowUp(candidates, state),
+                    onPressed: _isRefiningWithAi ? null : () => _submitFollowUp(candidates, state),
                   ),
                 ],
               ),
+
+              if (_isRefiningWithAi) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: const [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'AI Assistant is analyzing seller catalog trade-offs...',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              ],
 
               // Active Interpretation Display with Confirmation Button
               if (_activeInterpretation != null) ...[
@@ -1243,6 +1301,32 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
             ],
           ),
           const SizedBox(height: 12),
+
+          if (selectedPlan.id == 'plan-a' &&
+              selectedPlan.acquisitionSources.any((s) => !s.isPlatformRegisteredTrader)) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E5F5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFCE93D8)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.info_outline, size: 16, color: Color(0xFF6A1B9A)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Some items are not yet listed by verified platform traders. You can explore online catalogs (Option B) or search third-party catalogs on the web.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF4A148C), height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -1382,6 +1466,23 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                               ),
                             ),
                           ),
+                        ] else if (!source.inStock || source.outletName.toLowerCase().contains('not listed')) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Not in Platform Catalog',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFE65100),
+                              ),
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -1389,7 +1490,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     if (source.marketHubOrLocation.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        source.marketHubOrLocation,
+                        source.marketHubOrLocation.replaceAll(RegExp(r'\(Lat:[^)]*\)'), '').trim(),
                         style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1403,9 +1504,35 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       runSpacing: 6,
                       children: [
                         if (isTrader) ...[
+                          // In-app Map tracking exclusively for verified sellers
                           ElevatedButton.icon(
-                            icon: const Icon(Icons.handshake_outlined, size: 14),
-                            label: const Text('Negotiate (In-App Chat)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            icon: const Icon(Icons.map_outlined, size: 14),
+                            label: const Text('Locate on Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              foregroundColor: Colors.white,
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () => SellerLocationMapSheet.show(
+                              context,
+                              sellerName: source.outletName,
+                              marketLocation: source.marketHubOrLocation,
+                              sellerLat: source.latitude,
+                              sellerLng: source.longitude,
+                              productName: source.commodityName,
+                              price: source.unitPrice,
+                              unit: source.unit,
+                              brandOrGrade: source.brandOrGrade,
+                              inStock: source.inStock,
+                              contactPhone: source.contactPhone,
+                            ),
+                          ),
+                          // In-app Direct Chat with registered seller
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
+                            label: const Text('Chat with Seller', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -1436,10 +1563,14 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                                 }
                               },
                             ),
-                        ] else if (isEcommerce && source.webUrl != null) ...[
+                        ] else if (isEcommerce || source.webUrl != null || !source.inStock) ...[
+                          // External E-Commerce / Web Search
                           ElevatedButton.icon(
                             icon: const Icon(Icons.open_in_browser, size: 14),
-                            label: const Text('Visit Online Store', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            label: Text(
+                              isEcommerce ? 'Visit Online Store' : 'Search on the Web',
+                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF673AB7),
                               foregroundColor: Colors.white,
@@ -1447,17 +1578,44 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            onPressed: () => SafeOutletLauncher.openExternalWebUrl(
-                              context,
-                              url: source.webUrl!,
-                              outletName: source.outletName,
-                            ),
+                            onPressed: () {
+                              final targetUrl = source.webUrl ??
+                                  WebSearchGroundingService.buildJumiaSearchUrl(source.commodityName);
+                              SafeOutletLauncher.openExternalWebUrl(
+                                context,
+                                url: targetUrl,
+                                outletName: source.outletName,
+                              );
+                            },
                           ),
+                          if (source.latitude != null && source.longitude != null && !isEcommerce)
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.map_outlined, size: 14),
+                              label: const Text('Locate on Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => SellerLocationMapSheet.show(
+                                context,
+                                sellerName: source.outletName,
+                                marketLocation: source.marketHubOrLocation,
+                                sellerLat: source.latitude,
+                                sellerLng: source.longitude,
+                                productName: source.commodityName,
+                                price: source.unitPrice,
+                                unit: source.unit,
+                                brandOrGrade: source.brandOrGrade,
+                                inStock: source.inStock,
+                                contactPhone: source.contactPhone,
+                              ),
+                            ),
                         ] else ...[
-                          if (source.webUrl != null)
+                          if (source.latitude != null && source.longitude != null)
                             ElevatedButton.icon(
                               icon: const Icon(Icons.map_outlined, size: 14),
-                              label: const Text('Locate on Maps', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                              label: const Text('Locate on Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2E7D32),
                                 foregroundColor: Colors.white,
@@ -1465,27 +1623,37 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              onPressed: () => SafeOutletLauncher.openExternalWebUrl(
+                              onPressed: () => SellerLocationMapSheet.show(
                                 context,
-                                url: source.webUrl!,
-                                outletName: source.outletName,
+                                sellerName: source.outletName,
+                                marketLocation: source.marketHubOrLocation,
+                                sellerLat: source.latitude,
+                                sellerLng: source.longitude,
+                                productName: source.commodityName,
+                                price: source.unitPrice,
+                                unit: source.unit,
+                                brandOrGrade: source.brandOrGrade,
+                                inStock: source.inStock,
+                                contactPhone: source.contactPhone,
                               ),
                             )
                           else
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.directions_outlined, size: 14),
-                              label: const Text('Directions / Stall Info', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.open_in_browser, size: 14),
+                              label: const Text('Search on the Web', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF673AB7),
+                                foregroundColor: Colors.white,
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Locating ${source.outletName} at ${source.marketHubOrLocation}...'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
+                                final searchUrl = WebSearchGroundingService.buildJumiaSearchUrl(source.commodityName);
+                                SafeOutletLauncher.openExternalWebUrl(
+                                  context,
+                                  url: searchUrl,
+                                  outletName: source.outletName,
                                 );
                               },
                             ),
@@ -2137,113 +2305,6 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildOptimizationTips(List<AiOptimizationTip> tips) {
-    if (tips.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: const [
-            Icon(Icons.tips_and_updates_outlined, color: Color(0xFFE65100), size: 18),
-            SizedBox(width: 8),
-            Text(
-              'SmartMove AI Optimizations',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        for (final tip in tips)
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFFE082)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.auto_awesome, color: Color(0xFFE65100), size: 16),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tip.title,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        tip.message,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.textSecondary,
-                          height: 1.3,
-                        ),
-                      ),
-                      if (tip.actionLabel != null) ...[
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 32,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              if (tip.targetPlanId != null) {
-                                ref.read(decisionLabProvider.notifier).selectPlan(tip.targetPlanId!);
-                              }
-                              if (tip.delayNonUrgent != null) {
-                                ref.read(decisionLabProvider.notifier).toggleDelayNonUrgent(tip.delayNonUrgent!);
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: AppColors.primary,
-                                  content: Text('Applied "${tip.actionLabel}"!'),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(
-                              tip.actionLabel!,
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 12),
-      ],
     );
   }
 }

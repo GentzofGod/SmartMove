@@ -350,6 +350,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     GeoPoint? userLocation,
     List<SellerApplication>? registeredTraders,
     List<PriceObservation>? observations,
+    List<Product>? products,
   }) {
     return _calculateState(
       budget: budget ?? state.budget,
@@ -364,6 +365,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       userLocation: userLocation ?? ref.read(locationProvider),
       registeredTraders: registeredTraders ?? ref.read(sellerApplicationsProvider),
       observations: observations ?? ref.read(communityProvider),
+      products: products ?? ref.read(productsProvider),
     );
   }
 
@@ -380,6 +382,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     GeoPoint? userLocation,
     List<SellerApplication>? registeredTraders,
     List<PriceObservation>? observations,
+    List<Product>? products,
   }) {
     final candidatePlans = DecisionEngine.calculateCandidatePlans(
       userBudget: budget,
@@ -393,6 +396,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       userLocation: userLocation,
       registeredTraders: registeredTraders,
       observations: observations,
+      products: products,
     );
 
     final insight = DecisionEngine.generateRecommendationInsight(

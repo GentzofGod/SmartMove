@@ -4,6 +4,7 @@ import '../models/itinerary_stop.dart';
 import '../models/item_acquisition_source.dart';
 import '../models/seller_application.dart';
 import '../models/price_observation.dart';
+import '../models/product.dart';
 import '../services/location_service.dart';
 import '../services/web_search_grounding_service.dart';
 import '../data/demo_seed_data.dart';
@@ -24,6 +25,7 @@ class DecisionEngine {
     GeoPoint? userLocation,
     List<SellerApplication>? registeredTraders,
     List<PriceObservation>? observations,
+    List<Product>? products,
   }) {
     final hasCustomItems = items != null && items.isNotEmpty;
     final defaultStops = DemoSeedData.getBenchmarkStops();
@@ -75,6 +77,7 @@ class DecisionEngine {
       userLocation: userLocation,
       registeredTraders: registeredTraders,
       observations: observations,
+      products: products,
     );
 
     final planBSources = _resolveAcquisitionSources(
@@ -85,6 +88,7 @@ class DecisionEngine {
       userLocation: userLocation,
       registeredTraders: registeredTraders,
       observations: observations,
+      products: products,
     );
 
     final planCSources = _resolveAcquisitionSources(
@@ -96,6 +100,7 @@ class DecisionEngine {
       userLocation: userLocation,
       registeredTraders: registeredTraders,
       observations: observations,
+      products: products,
     );
 
     final planDSources = _resolveAcquisitionSources(
@@ -106,6 +111,7 @@ class DecisionEngine {
       userLocation: userLocation,
       registeredTraders: registeredTraders,
       observations: observations,
+      products: products,
     );
 
     // Build dynamic itinerary stops if custom errands or items are provided
@@ -401,6 +407,7 @@ class DecisionEngine {
     GeoPoint? userLocation,
     List<SellerApplication>? registeredTraders,
     List<PriceObservation>? observations,
+    List<Product>? products,
   }) {
     if (items.isEmpty) return const [];
 
@@ -579,26 +586,97 @@ class DecisionEngine {
           lowerName.contains('stationery') ||
           lowerName.contains('paper'));
 
-      // Legitimate registered trader matching by domain (ONLY if trader exists)
+      // Legitimate registered trader matching by catalog or domain (ONLY if trader exists)
+      Product? matchedProduct;
       SellerApplication? matchedTrader;
-      for (final trader in effectiveTraders) {
-        final biz = trader.businessName.toLowerCase();
-        if (isFoodStaple && (biz.contains('grain') || biz.contains('oil') || biz.contains('food') || biz.contains('staple') || biz.contains('farm'))) {
-          matchedTrader = trader;
-          break;
-        } else if (isElectronicsOrAppliances && (biz.contains('electronics') || biz.contains('appliance') || biz.contains('electrical') || biz.contains('tech') || biz.contains('gadget'))) {
-          matchedTrader = trader;
-          break;
-        } else if (isHardwareOrSpares && (biz.contains('hardware') || biz.contains('tool') || biz.contains('spare') || biz.contains('machine') || biz.contains('eng'))) {
-          matchedTrader = trader;
-          break;
-        } else if (isPharmacy && (biz.contains('pharm') || biz.contains('med') || biz.contains('chemist'))) {
-          matchedTrader = trader;
-          break;
-        } else if (isStationeryOrElectronics && (biz.contains('tech') || biz.contains('stationer') || biz.contains('book') || biz.contains('gadget'))) {
-          matchedTrader = trader;
-          break;
+
+      if (products != null && products.isNotEmpty) {
+        for (final p in products) {
+          final pName = p.name.toLowerCase();
+          if (pName.contains(lowerName) || lowerName.contains(pName)) {
+            matchedProduct = p;
+            if (p.sellerId != null && p.sellerId!.isNotEmpty) {
+              for (final t in effectiveTraders) {
+                if (t.userId == p.sellerId || t.id == p.sellerId) {
+                  matchedTrader = t;
+                  break;
+                }
+              }
+            }
+            if (matchedTrader == null && p.bestSeller.isNotEmpty) {
+              for (final t in effectiveTraders) {
+                if (t.businessName.toLowerCase() == p.bestSeller.toLowerCase()) {
+                  matchedTrader = t;
+                  break;
+                }
+              }
+            }
+            break;
+          }
         }
+      }
+
+      if (matchedTrader == null) {
+        for (final trader in effectiveTraders) {
+          final biz = trader.businessName.toLowerCase();
+          if (isFoodStaple && (biz.contains('grain') || biz.contains('oil') || biz.contains('food') || biz.contains('staple') || biz.contains('farm') || biz.contains('bello'))) {
+            matchedTrader = trader;
+            break;
+          } else if (isElectronicsOrAppliances && (biz.contains('electronics') || biz.contains('appliance') || biz.contains('electrical') || biz.contains('tech') || biz.contains('gadget'))) {
+            matchedTrader = trader;
+            break;
+          } else if (isHardwareOrSpares && (biz.contains('hardware') || biz.contains('tool') || biz.contains('spare') || biz.contains('machine') || biz.contains('eng'))) {
+            matchedTrader = trader;
+            break;
+          } else if (isPharmacy && (biz.contains('pharm') || biz.contains('med') || biz.contains('chemist'))) {
+            matchedTrader = trader;
+            break;
+          } else if (isStationeryOrElectronics && (biz.contains('tech') || biz.contains('stationer') || biz.contains('book') || biz.contains('gadget'))) {
+            matchedTrader = trader;
+            break;
+          }
+        }
+      }
+
+      // Option B: Online E-Commerce Catalogs
+      if (planId == 'plan-b') {
+        final outlet = isHardwareOrSpares
+            ? (userCity.contains('lagos')
+                ? 'Coker Engineering & Tooling Hub'
+                : 'Precision Engineering & Machine Spares Hub')
+            : (isElectronicsOrAppliances
+                ? 'Jumia Official Electronics & Appliance Store'
+                : 'Jumia / Verified Online Store');
+        final location = isHardwareOrSpares
+            ? (userCity.contains('lagos')
+                ? 'Coker Commercial Equipment Zone'
+                : '$displayCity Central Engineering District')
+            : 'Online E-Commerce (1-2 Day Express Delivery)';
+
+        sources.add(
+          ItemAcquisitionSource(
+            id: '$planId-src-$i',
+            itemId: item.id,
+            commodityName: item.productName,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: (item.estimatedUnitPrice * 1.03).roundToDouble(),
+            totalCost: (item.totalEstimatedCost * 1.03).roundToDouble(),
+            outletName: outlet,
+            channel: AcquisitionChannel.ecommercePlatform,
+            marketHubOrLocation: location,
+            latitude: defaultMarketALat,
+            longitude: defaultMarketALon,
+            dynamicDistanceKm: 0.0,
+            isPlatformRegisteredTrader: false,
+            contactPhone: null,
+            whatsappNumber: null,
+            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
+            inStock: true,
+            brandOrGrade: item.brandOrGrade ?? 'Verified Online Spec',
+          ),
+        );
+        continue;
       }
 
       if (isHardwareOrSpares) {
@@ -874,44 +952,78 @@ class DecisionEngine {
             brandOrGrade: item.brandOrGrade ?? 'Supermarket Stock',
           ),
         );
-      } else if (isFoodStaple && matchedTrader != null) {
-        // Platform Registered Food Trader Prioritized!
-        final outletName = matchedTrader.businessName;
-        final stallLocation = matchedTrader.stallLocation ?? (matchedTrader.marketHub.isNotEmpty ? matchedTrader.marketHub : '$displayCity Central Market');
-        final phone = matchedTrader.phone.isNotEmpty ? matchedTrader.phone : null;
-        final traderLat = matchedTrader.latitude ?? defaultMarketBLat;
-        final traderLon = matchedTrader.longitude ?? defaultMarketBLon;
-        final traderDistance = (userLocation != null && userLocation.isSet && matchedTrader.latitude != null && matchedTrader.longitude != null)
-            ? LocationService.calculateDistanceKm(
-                lat1: userLocation.latitude,
-                lon1: userLocation.longitude,
-                lat2: traderLat,
-                lon2: traderLon,
-              )
-            : (isMultiMarket && i % 2 == 0 ? distanceHubB : distanceHubA);
+      } else if (isFoodStaple) {
+        if (matchedTrader != null) {
+          // Platform Registered Food Trader Prioritized!
+          final outletName = matchedTrader.businessName;
+          final stallLocation = matchedTrader.stallLocation ?? (matchedTrader.marketHub.isNotEmpty ? matchedTrader.marketHub : '$displayCity Central Market');
+          final phone = matchedTrader.phone.isNotEmpty ? matchedTrader.phone : null;
+          final traderLat = matchedTrader.latitude ?? defaultMarketBLat;
+          final traderLon = matchedTrader.longitude ?? defaultMarketBLon;
+          final traderDistance = (userLocation != null && userLocation.isSet && matchedTrader.latitude != null && matchedTrader.longitude != null)
+              ? LocationService.calculateDistanceKm(
+                  lat1: userLocation.latitude,
+                  lon1: userLocation.longitude,
+                  lat2: traderLat,
+                  lon2: traderLon,
+                )
+              : (isMultiMarket && i % 2 == 0 ? distanceHubB : distanceHubA);
 
-        sources.add(
-          ItemAcquisitionSource(
-            id: '$planId-src-$i',
-            itemId: item.id,
-            commodityName: item.productName,
-            quantity: item.quantity,
-            unit: item.unit,
-            unitPrice: (item.estimatedUnitPrice * (planId == 'plan-a' ? 0.95 : 1.0)).roundToDouble(),
-            totalCost: (item.totalEstimatedCost * (planId == 'plan-a' ? 0.95 : 1.0)).roundToDouble(),
-            outletName: outletName,
-            channel: AcquisitionChannel.registeredTrader,
-            marketHubOrLocation: stallLocation,
-            latitude: traderLat,
-            longitude: traderLon,
-            dynamicDistanceKm: traderDistance,
-            isPlatformRegisteredTrader: true,
-            traderId: matchedTrader.userId,
-            contactPhone: phone,
-            whatsappNumber: phone,
-            brandOrGrade: item.brandOrGrade ?? 'Grade A Verified',
-          ),
-        );
+          final actualUnitPrice = (matchedProduct != null && matchedProduct.lowestPrice > 0)
+              ? matchedProduct.lowestPrice
+              : (item.estimatedUnitPrice * (planId == 'plan-a' ? 0.95 : 1.0)).roundToDouble();
+          final actualTotalCost = (actualUnitPrice * item.quantity).roundToDouble();
+
+          sources.add(
+            ItemAcquisitionSource(
+              id: '$planId-src-$i',
+              itemId: item.id,
+              commodityName: item.productName,
+              quantity: item.quantity,
+              unit: item.unit,
+              unitPrice: actualUnitPrice,
+              totalCost: actualTotalCost,
+              outletName: outletName,
+              channel: AcquisitionChannel.registeredTrader,
+              marketHubOrLocation: stallLocation,
+              latitude: traderLat,
+              longitude: traderLon,
+              dynamicDistanceKm: traderDistance,
+              isPlatformRegisteredTrader: true,
+              traderId: matchedTrader.userId,
+              contactPhone: phone,
+              whatsappNumber: phone,
+              brandOrGrade: matchedProduct?.category ?? item.brandOrGrade ?? 'Grade A Verified',
+            ),
+          );
+        } else {
+          // Physical market vendor (staple food)
+          final outlet = '${item.productName} Market Vendor';
+          final location = '$displayCity Central Wholesale Market';
+          sources.add(
+            ItemAcquisitionSource(
+              id: '$planId-src-$i',
+              itemId: item.id,
+              commodityName: item.productName,
+              quantity: item.quantity,
+              unit: item.unit,
+              unitPrice: (item.estimatedUnitPrice * (planId == 'plan-a' ? 0.95 : 1.0)).roundToDouble(),
+              totalCost: (item.totalEstimatedCost * (planId == 'plan-a' ? 0.95 : 1.0)).roundToDouble(),
+              outletName: outlet,
+              channel: AcquisitionChannel.physicalMarketHub,
+              marketHubOrLocation: location,
+              latitude: defaultMarketBLat,
+              longitude: defaultMarketBLon,
+              dynamicDistanceKm: isMultiMarket && i % 2 == 0 ? distanceHubB : distanceHubA,
+              isPlatformRegisteredTrader: false,
+              inStock: true,
+              contactPhone: null,
+              whatsappNumber: null,
+              webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
+              brandOrGrade: item.brandOrGrade ?? 'Wholesale Staple Stock',
+            ),
+          );
+        }
       } else if (isAgroProduce) {
         // Fresh produce stalls / Agro Stalls
         sources.add(
@@ -988,7 +1100,7 @@ class DecisionEngine {
           ),
         );
       } else {
-        // Default physical market hub
+        // Default: If no platform seller exists, clearly indicate not listed in platform catalog
         sources.add(
           ItemAcquisitionSource(
             id: '$planId-src-$i',
@@ -998,16 +1110,17 @@ class DecisionEngine {
             unit: item.unit,
             unitPrice: item.estimatedUnitPrice,
             totalCost: item.totalEstimatedCost,
-            outletName: '${item.productName} Market Vendor',
-            channel: AcquisitionChannel.physicalMarketHub,
-            marketHubOrLocation: '$displayCity Central Wholesale Market',
+            outletName: 'Not listed by platform sellers',
+            channel: AcquisitionChannel.retailStore,
+            marketHubOrLocation: 'Not yet available in local seller catalog (Explore Option B for online sourcing)',
             latitude: defaultMarketALat,
             longitude: defaultMarketALon,
-            dynamicDistanceKm: distanceHubA,
+            dynamicDistanceKm: 0.0,
             isPlatformRegisteredTrader: false,
+            inStock: false,
             contactPhone: null,
             whatsappNumber: null,
-            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildGoogleMapsVendorSearchUrl(item.productName, city: displayCity),
+            webUrl: item.webReferenceUrl ?? WebSearchGroundingService.buildJumiaSearchUrl(item.productName),
             brandOrGrade: item.brandOrGrade,
           ),
         );

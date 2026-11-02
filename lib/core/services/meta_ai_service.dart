@@ -10,6 +10,7 @@ import '../models/errand.dart';
 import '../models/plan_candidate.dart';
 import '../models/ai_proposal.dart';
 import '../models/product.dart';
+import '../models/seller_application.dart';
 import '../models/price_observation.dart';
 import 'commodity_comparison_service.dart';
 import 'location_service.dart';
@@ -3511,13 +3512,55 @@ class MetaAiService {
     required PlanCandidate planD,
     required double budget,
   }) {
-    final diffSavings = planB.totalCost - planA.totalCost;
+    final diffSavings = (planB.totalCost - planA.totalCost).abs();
+    final traderSources = planA.acquisitionSources.where((s) => s.isPlatformRegisteredTrader).toList();
+    final totalSources = planA.acquisitionSources.length;
+    final traderCount = traderSources.length;
 
-    if (budget < 12000) {
+    // Check if budget is exceeded
+    if (budget > 0 && budget < 12000 && planD.totalCost <= budget && planA.totalCost > budget) {
       return 'SmartMove AI Insight: With your ₦${budget.toStringAsFixed(0)} budget, Option D is the safest choice (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while prioritizing essential commodities (no price-drop claim made).';
     }
 
-    return 'SmartMove AI Insight: Option A has the lowest total outlay (${planA.formattedTotalCost}) by splitting purchases across open wholesale markets, saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B. Conversely, Option B provides consolidated single-hub sourcing with verified platform traders for ₦${planB.formattedTotalCost}.';
+    final StringBuffer sb = StringBuffer();
+    sb.write('SmartMove AI Insight: ');
+
+    if (totalSources > 0 && traderCount == totalSources) {
+      // All items available locally from verified platform traders
+      final closestDist = traderSources.fold<double>(
+        999.0,
+        (min, s) => s.dynamicDistanceKm > 0 && s.dynamicDistanceKm < min ? s.dynamicDistanceKm : min,
+      );
+      final distText = closestDist < 900.0 ? ' (closest seller is ~${closestDist.toStringAsFixed(1)} km away)' : '';
+      sb.write(
+        'All $totalSources items in your basket are available from verified platform traders$distText. '
+        'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
+        'You can locate verified sellers on the map and chat directly to negotiate. '
+        'Alternatively, Option B provides convenient online e-commerce doorstep delivery without travel.'
+      );
+    } else if (totalSources > 0 && traderCount > 0) {
+      // Partial availability in platform catalog
+      final availableNames = traderSources.map((s) => s.commodityName).toSet().join(', ');
+      sb.write(
+        'Platform traders currently have $traderCount of $totalSources items in catalog ($availableNames). '
+        'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
+        'Option A enables direct pickup and chat for available staples, while Option B covers online e-commerce ordering for unlisted items.'
+      );
+    } else {
+      // General / benchmark fallback
+      sb.write(
+        'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
+        'Option A focuses on local procurement and trader negotiation, while Option B sources directly from online e-commerce platforms with doorstep delivery. '
+        'Option C balances proximity and speed.'
+      );
+    }
+
+    if (budget > 0 && planA.totalCost > budget) {
+      final deficit = planA.totalCost - budget;
+      sb.write(' Note: Your basket total exceeds your budget by ₦${deficit.toStringAsFixed(0)}; consider Option D to protect immediate cashflow.');
+    }
+
+    return sb.toString();
   }
 
   // --- 5. Muse Spark Proactive Optimization Assistant ---
@@ -3809,6 +3852,188 @@ class MetaAiService {
       interpretationExplanation:
           'Could not interpret this adjustment. Please specify if you want to lower budget, find cheaper alternatives, or choose a specific option (e.g. Option A, Option B).',
       targetPlanId: '',
+    );
+  }
+
+  /// Comprehensively refines options using Meta AI reasoning or grounded trade-off analysis
+  Future<FollowUpInterpretation> refineOptionsWithAi({
+    required String userQuery,
+    required List<PlanCandidate> currentPlans,
+    required List<ShoppingItem> items,
+    required double currentBudget,
+    required double currentTransport,
+    GeoPoint? userLocation,
+    List<SellerApplication>? registeredTraders,
+  }) async {
+    if (currentPlans.isEmpty) {
+      return FollowUpInterpretation(
+        userMessage: userQuery,
+        interpretationExplanation:
+            'No candidate options are currently generated. Please add commodities to your cart first in the Cart Menu tab.',
+        targetPlanId: '',
+      );
+    }
+
+    final lower = userQuery.toLowerCase().trim();
+
+    // 1. Fast-path check for existing test phrase patterns
+    final quickInterpretation = interpretFollowUp(
+      userFollowUp: userQuery,
+      currentPlans: currentPlans,
+      currentBudget: currentBudget,
+      currentTransport: currentTransport,
+    );
+    if (quickInterpretation.targetPlanId.isNotEmpty) {
+      return quickInterpretation;
+    }
+
+    final planA = currentPlans.firstWhere((p) => p.id == 'plan-a', orElse: () => currentPlans.first);
+    final planB = currentPlans.firstWhere((p) => p.id == 'plan-b', orElse: () => currentPlans.length > 1 ? currentPlans[1] : currentPlans.first);
+    final planC = currentPlans.firstWhere((p) => p.id == 'plan-c', orElse: () => currentPlans.first);
+    final planD = currentPlans.firstWhere((p) => p.id == 'plan-d', orElse: () => currentPlans.first);
+
+    // 2. Proximity & Closeness inquiries ("closest", "nearest", "closer", "near me", "distance")
+    if (lower.contains('closest') ||
+        lower.contains('nearest') ||
+        lower.contains('closer') ||
+        lower.contains('near me') ||
+        lower.contains('closeness') ||
+        lower.contains('distance') ||
+        lower.contains('how far')) {
+      final traderSources = planA.acquisitionSources
+          .where((s) => s.isPlatformRegisteredTrader && s.dynamicDistanceKm > 0)
+          .toList();
+      traderSources.sort((a, b) => a.dynamicDistanceKm.compareTo(b.dynamicDistanceKm));
+
+      if (traderSources.isNotEmpty) {
+        final closest = traderSources.first;
+        return FollowUpInterpretation(
+          userMessage: userQuery,
+          interpretationExplanation:
+              'AI Proximity Analysis: Your closest verified seller is ${closest.outletName} located ${closest.dynamicDistanceKm.toStringAsFixed(1)} km away at ${closest.marketHubOrLocation}. Option A minimizes your transit distance for ${closest.commodityName}. You can track their stall on the in-app map or chat with them directly.',
+          targetPlanId: 'plan-a',
+          suggestedTransport: planA.transportCost,
+        );
+      } else {
+        return FollowUpInterpretation(
+          userMessage: userQuery,
+          interpretationExplanation:
+              'AI Proximity Analysis: No local platform sellers are currently registered within immediate walking distance for these items. Option B (${planB.formattedTotalCost}) is your best route, delivering items to your doorstep via verified e-commerce platforms.',
+          targetPlanId: 'plan-b',
+          suggestedTransport: planB.transportCost,
+        );
+      }
+    }
+
+    // 3. Online vs Physical delivery inquiries ("online", "e-commerce", "jumia", "deliver", "doorstep", "home delivery")
+    if (lower.contains('online') ||
+        lower.contains('e-commerce') ||
+        lower.contains('ecommerce') ||
+        lower.contains('jumia') ||
+        lower.contains('konga') ||
+        lower.contains('deliver') ||
+        lower.contains('doorstep')) {
+      return FollowUpInterpretation(
+        userMessage: userQuery,
+        interpretationExplanation:
+            'AI Channel Recommendation: Option B (${planB.formattedTotalCost}) routes your entire basket to verified online e-commerce platforms with doorstep delivery, removing any need to visit local markets physically.',
+        targetPlanId: 'plan-b',
+        suggestedTransport: planB.transportCost,
+      );
+    }
+
+    // 4. Cheaper / Budget / Savings inquiries ("cheap", "cheaper", "lowest price", "save", "cut cost", "less money")
+    if (lower.contains('cheap') ||
+        lower.contains('lowest') ||
+        lower.contains('save') ||
+        lower.contains('cut cost') ||
+        lower.contains('less money') ||
+        lower.contains('under')) {
+      final cheapest = currentPlans.reduce((a, b) => a.totalCost < b.totalCost ? a : b);
+      final highest = currentPlans.reduce((a, b) => a.totalCost > b.totalCost ? a : b);
+      final savings = (highest.totalCost - cheapest.totalCost).abs();
+
+      final numMatch = RegExp(r'(\d+)(k|\b)').firstMatch(lower);
+      double? targetBudget;
+      if (numMatch != null) {
+        final raw = numMatch.group(1);
+        final isK = lower.contains('${raw}k');
+        if (raw != null) {
+          final val = double.tryParse(raw);
+          if (val != null) {
+            targetBudget = isK ? val * 1000 : val;
+          }
+        }
+      }
+
+      return FollowUpInterpretation(
+        userMessage: userQuery,
+        interpretationExplanation:
+            'AI Cost Optimization: ${cheapest.name} offers the lowest total outlay at ${cheapest.formattedTotalCost}, saving ₦${savings.toStringAsFixed(0)} compared to ${highest.name}. Sourcing is prioritized by platform verified value.',
+        targetPlanId: cheapest.id,
+        suggestedBudget: targetBudget ?? currentBudget,
+      );
+    }
+
+    // 5. Single seller / consolidated hub inquiries ("single", "one seller", "same seller", "one stop", "consolidate")
+    if (lower.contains('single') ||
+        lower.contains('one seller') ||
+        lower.contains('same seller') ||
+        lower.contains('one stop') ||
+        lower.contains('consolidate')) {
+      return FollowUpInterpretation(
+        userMessage: userQuery,
+        interpretationExplanation:
+            'AI Consolidation Advice: Option B consolidates commodity purchases to a single verified trading channel, reducing transport expenses to ${planB.formattedTransportCost} and cutting unnecessary transit stops.',
+        targetPlanId: 'plan-b',
+        suggestedTransport: planB.transportCost,
+        suggestedMaxStops: 1,
+      );
+    }
+
+    // 6. Dynamic Meta AI Reasoning via Edge Proxy (if connected)
+    if (SupabaseDataService.isConnected) {
+      try {
+        final aiPrompt =
+            'User asks: "$userQuery" regarding shopping items ${items.map((i) => i.productName).join(', ')}. '
+            'Current options: Option A (${planA.formattedTotalCost}), Option B (${planB.formattedTotalCost}), '
+            'Option C (${planC.formattedTotalCost}), Option D (${planD.formattedTotalCost}). Budget: ₦$currentBudget. '
+            'Give a 2-sentence helpful, grounded recommendation on whether to pick Option A, B, C, or D.';
+
+        final proxyRes = await _invokeEdgeProxy(
+          action: 'parse_request',
+          payload: {
+            'prompt': aiPrompt,
+          },
+        );
+
+        if (proxyRes.isSuccess && proxyRes.data is Map) {
+          final text = proxyRes.data['notes'] ??
+              proxyRes.data['explanation'] ??
+              proxyRes.data['reply']?.toString();
+          if (text != null && text.toString().isNotEmpty) {
+            return FollowUpInterpretation(
+              userMessage: userQuery,
+              interpretationExplanation: 'AI Assistant Advice: $text',
+              targetPlanId: text.toString().toLowerCase().contains('option b')
+                  ? 'plan-b'
+                  : (text.toString().toLowerCase().contains('option d')
+                      ? 'plan-d'
+                      : 'plan-a'),
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 7. Grounded informative summary fallback
+    final traderCount = planA.acquisitionSources.where((s) => s.isPlatformRegisteredTrader).length;
+    final totalCount = planA.acquisitionSources.length;
+    return FollowUpInterpretation(
+      userMessage: userQuery,
+      interpretationExplanation:
+          'AI Assistant Analysis: For your current basket ($totalCount items), Option A (${planA.formattedTotalCost}) provides local seller pickup with $traderCount verified platform listings. Option B (${planB.formattedTotalCost}) provides full online e-commerce ordering with doorstep delivery. Select the option that best matches your schedule and transport preference.',
+      targetPlanId: traderCount > 0 ? 'plan-a' : 'plan-b',
     );
   }
 
