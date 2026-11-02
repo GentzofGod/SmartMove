@@ -227,6 +227,7 @@ class LiveAiMultiVendorComparison {
   final String priceSpreadDisplay;
   final String aiRecommendation;
   final List<LiveWebVendorResult> vendors;
+  final bool metaSearchUsed;
 
   const LiveAiMultiVendorComparison({
     required this.commodityName,
@@ -236,6 +237,7 @@ class LiveAiMultiVendorComparison {
     required this.priceSpreadDisplay,
     required this.aiRecommendation,
     required this.vendors,
+    this.metaSearchUsed = false,
   });
 }
 
@@ -1776,7 +1778,7 @@ class MetaAiService {
                     detectedPrice: detectedPrice,
                     priceDisplay: detectedPrice != null
                         ? '₦${detectedPrice.toStringAsFixed(0)}'
-                        : 'Live Online Quote',
+                        : 'Price not shown',
                     channel: url.contains('jumia') || url.contains('konga')
                         ? 'E-Commerce Marketplace'
                         : 'Online Vendor',
@@ -1829,7 +1831,7 @@ class MetaAiService {
                       detectedPrice: detectedPrice,
                       priceDisplay: detectedPrice != null
                           ? '₦${detectedPrice.toStringAsFixed(0)}'
-                          : 'Live Verified Quote',
+                          : 'Price not shown',
                       channel: citation.url.contains('jumia') || citation.url.contains('konga')
                           ? 'E-Commerce Platform'
                           : 'Live Catalog Source',
@@ -4473,6 +4475,7 @@ class MetaAiService {
     if (inAppObservations != null && inAppObservations.isNotEmpty) {
       final cleanTokens = cleanLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
       final matchingObs = inAppObservations.where((obs) {
+        if (obs.isSimulatedDemo) return false;
         final pLower = obs.productName.toLowerCase();
         if (pLower.contains(cleanLower) || cleanLower.contains(pLower)) return true;
         final obsTokens = pLower.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
@@ -4484,7 +4487,7 @@ class MetaAiService {
       for (final obs in matchingObs) {
         inAppVendors.add(
           LiveWebVendorResult(
-            vendorName: '${obs.sellerName} (In-App Verified)',
+            vendorName: '${obs.sellerName} (SmartMove Catalog)',
             title: '${obs.productName} • ${obs.formattedPrice}/${obs.unit}',
             snippet:
                 '${obs.marketLocation} • ${obs.inStock ? "In Stock" : "Out of Stock"}${obs.brandOrGrade != null ? " • Brand: ${obs.brandOrGrade}" : ""} (Direct In-App Contact)',
@@ -4493,7 +4496,7 @@ class MetaAiService {
             detectedPrice: obs.price,
             priceDisplay: obs.formattedPrice,
             channel: obs.channel,
-            badge: 'SmartMove Verified Seller',
+            badge: 'SmartMove Catalog',
             isPhysicalLocation: true,
             isDelivery: obs.channel.toLowerCase().contains('online') ||
                 obs.channel.toLowerCase().contains('smb'),
@@ -4502,24 +4505,21 @@ class MetaAiService {
       }
     }
 
-    final basePlan = coordinatePriceResearch(clean);
-    final benchmarkPrice =
-        (basePlan.estimatedBenchmarkMin + basePlan.estimatedBenchmarkMax) / 2;
     final webVendors = await WebSearchGroundingService.fetchLiveWebVendors(
       clean,
       city: city,
-      benchmarkPrice: benchmarkPrice,
     );
 
-    // If commodity is uncataloged among local sellers, invoke Meta Search Grounding
+    // Search online stores for every comparison so catalog and web results remain comparable.
     final groundedVendors = <LiveWebVendorResult>[];
-    if (inAppVendors.isEmpty && (hasValidAuth || SupabaseDataService.isConnected)) {
+    var metaSearchUsed = false;
+    if (hasValidAuth || SupabaseDataService.isConnected) {
       try {
         final groundingRes = await executeSearchGrounding(
-          prompt: 'Current retail price and vendors for $clean in ${city ?? "Nigeria"}',
+          prompt: 'Search online stores for current listings and prices for $clean in ${city ?? "Nigeria"}. Return product links, seller names, and prices only when shown by the source.',
           city: city,
-          uncatalogedCommodities: [clean],
         );
+        metaSearchUsed = groundingRes?.isSearchTriggered ?? false;
         if (groundingRes != null && groundingRes.discoveredVendors.isNotEmpty) {
           groundedVendors.addAll(groundingRes.discoveredVendors);
         }
@@ -4545,60 +4545,39 @@ class MetaAiService {
       minPrice = pricesWithVal.reduce((a, b) => a < b ? a : b);
       maxPrice = pricesWithVal.reduce((a, b) => a > b ? a : b);
     } else {
-      minPrice = basePlan.estimatedBenchmarkMin;
-      maxPrice = basePlan.estimatedBenchmarkMax;
+      minPrice = 0;
+      maxPrice = 0;
     }
 
-    final spreadDisplay =
-        '₦${minPrice.toStringAsFixed(0)} - ₦${maxPrice.toStringAsFixed(0)}';
-
-    final lower = clean.toLowerCase();
-    final isHardware = lower.contains('lathe') ||
-        lower.contains('spare') ||
-        lower.contains('tool') ||
-        lower.contains('machine') ||
-        lower.contains('cutter') ||
-        lower.contains('bearing') ||
-        lower.contains('hardware');
-    final isElectronics = lower.contains('cooker') ||
-        lower.contains('kettle') ||
-        lower.contains('iron') ||
-        lower.contains('blender') ||
-        lower.contains('appliance') ||
-        lower.contains('electronics') ||
-        lower.contains('microwave');
+    final spreadDisplay = pricesWithVal.isEmpty
+        ? 'No current prices found'
+        : '₦${minPrice.toStringAsFixed(0)} - ₦${maxPrice.toStringAsFixed(0)}';
 
     String recommendation;
     if (inAppVendors.isNotEmpty) {
       recommendation =
-          'Meta AI Verified Local Inventory Priority: Found ${inAppVendors.length} active in-app seller quote(s) for "$clean" in local physical hubs (${inAppVendors.first.vendorName} at ${inAppVendors.first.priceDisplay}). Online stores (Jumia, Konga) are ranked below as secondary alternatives.';
+          'Found ${inAppVendors.length} matching app catalog quote(s). Compare these with the separately listed online search results and confirm availability with the seller.';
     } else if (groundedVendors.isNotEmpty) {
       final top = groundedVendors.first;
       recommendation =
-          'Meta AI Search Grounding: "$clean" is not currently listed by local registered sellers. Real-time web search discovered live quotes from ${top.vendorName} (${top.priceDisplay}) and verified online vendors. View citation links to inspect full specifications.';
-    } else if (isElectronics) {
+          'Meta AI search returned ${groundedVendors.length} online result(s), including ${top.vendorName}. Confirm the displayed price and availability on the retailer listing.';
+    } else if (webVendors.isNotEmpty) {
       recommendation =
-          'Meta AI Price Intelligence: For $clean, Konga and Jiji offer competitive merchant listings, while Jumia provides verified manufacturer warranty with door-to-door delivery. For immediate inspection, local electronics dealers in ${city ?? 'your local area'} allow in-person testing before payment.';
-    } else if (isHardware) {
-      recommendation =
-          'Meta AI Industrial Intelligence: For $clean, Jiji and specialized engineering importers provide direct machine-shop pricing, while Jumia offers standardized tool sets. Verify OEM chuck and spindle specifications with local machinists in ${city ?? 'your local area'}.';
+          'Online listings are live search results and may not show a current price. Confirm price, availability, and delivery with the store before buying.';
     } else {
       recommendation =
-          'Meta AI Commodity Intelligence: For $clean, open wholesale markets offer the lowest bulk cash prices (~5-8% savings), whereas online platforms like Jumia and Supermart provide convenient delivery with pre-packaged quality assurance.';
+          'No live online listings were returned. Check your connection or try the comparison again. App catalog quotes, when present, are shown separately.';
     }
 
     return LiveAiMultiVendorComparison(
       commodityName: clean,
-      summary: inAppVendors.isNotEmpty
-          ? 'Meta AI prioritized ${inAppVendors.length} verified in-app market seller(s) ahead of web alternatives.'
-          : (groundedVendors.isNotEmpty
-              ? 'Meta AI Search Grounding discovered ${groundedVendors.length} verified web vendor quote(s) for uncataloged product "$clean".'
-              : 'Meta AI discovered ${webVendors.length} live vendor alternatives across online ecommerce and local physical hubs.'),
+      summary: '${inAppVendors.length} app catalog quote(s), ${groundedVendors.length + webVendors.length} online search result(s).',
       lowestPrice: minPrice,
       highestPrice: maxPrice,
       priceSpreadDisplay: spreadDisplay,
       aiRecommendation: recommendation,
       vendors: allVendors,
+      metaSearchUsed: metaSearchUsed,
     );
   }
 

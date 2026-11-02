@@ -1498,16 +1498,15 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
 
                     const SizedBox(height: 10),
 
-                    // Action buttons
+                    // App catalog sellers map in the interactive app map; online sources open their store.
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
                       children: [
                         if (isTrader) ...[
-                          // In-app Map tracking exclusively for verified sellers
                           ElevatedButton.icon(
                             icon: const Icon(Icons.map_outlined, size: 14),
-                            label: const Text('Locate on Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            label: const Text('Locate Seller on Maps', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2E7D32),
                               foregroundColor: Colors.white,
@@ -1529,146 +1528,43 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                               contactPhone: source.contactPhone,
                             ),
                           ),
-                          // In-app Direct Chat with registered seller
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
-                            label: const Text('Chat with Seller', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          if (isTrader)
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
+                              label: const Text('Chat with Seller', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, visualDensity: VisualDensity.compact),
+                              onPressed: () => TraderNegotiationSheet.show(context, source: source),
                             ),
-                            onPressed: () => TraderNegotiationSheet.show(context, source: source),
-                          ),
                           if ((source.whatsappNumber != null && SafeOutletLauncher.isValidPhoneNumber(source.whatsappNumber)) ||
                               (source.contactPhone != null && SafeOutletLauncher.isValidPhoneNumber(source.contactPhone)))
                             OutlinedButton.icon(
                               icon: const Icon(Icons.call_outlined, size: 14),
                               label: const Text('Call / WhatsApp', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
                               onPressed: () {
                                 if (source.whatsappNumber != null && SafeOutletLauncher.isValidPhoneNumber(source.whatsappNumber)) {
-                                  SafeOutletLauncher.openWhatsApp(
-                                    source.whatsappNumber!,
-                                    prefilledMessage: 'Hello ${source.outletName}, I am contacting you from SmartMove regarding ${source.commodityName}.',
-                                  );
+                                  SafeOutletLauncher.openWhatsApp(source.whatsappNumber!, prefilledMessage: 'Hello ${source.outletName}, I am contacting you from SmartMove regarding ${source.commodityName}.');
                                 } else if (source.contactPhone != null && SafeOutletLauncher.isValidPhoneNumber(source.contactPhone)) {
                                   SafeOutletLauncher.callTraderPhone(source.contactPhone!);
                                 }
                               },
                             ),
-                        ] else if (isEcommerce || source.webUrl != null || !source.inStock) ...[
-                          // External E-Commerce / Web Search
+                        ] else
                           ElevatedButton.icon(
                             icon: const Icon(Icons.open_in_browser, size: 14),
-                            label: Text(
-                              isEcommerce ? 'Visit Online Store' : 'Search on the Web',
-                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF673AB7),
-                              foregroundColor: Colors.white,
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
+                            label: const Text('Visit Online Store', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7), foregroundColor: Colors.white, visualDensity: VisualDensity.compact),
                             onPressed: () {
-                              final targetUrl = source.webUrl ??
-                                  WebSearchGroundingService.buildJumiaSearchUrl(source.commodityName);
+                              final sourceUrl = source.webUrl;
+                              final isMapSearch = sourceUrl?.contains('google.com/maps') ?? false;
                               SafeOutletLauncher.openExternalWebUrl(
                                 context,
-                                url: targetUrl,
+                                url: sourceUrl != null && !isMapSearch
+                                    ? sourceUrl
+                                    : WebSearchGroundingService.buildJumiaSearchUrl(source.commodityName),
                                 outletName: source.outletName,
                               );
                             },
                           ),
-                          if (source.latitude != null && source.longitude != null && !isEcommerce)
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.map_outlined, size: 14),
-                              label: const Text('Locate on Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => SellerLocationMapSheet.show(
-                                context,
-                                sellerName: source.outletName,
-                                marketLocation: source.marketHubOrLocation,
-                                sellerLat: source.latitude,
-                                sellerLng: source.longitude,
-                                productName: source.commodityName,
-                                price: source.unitPrice,
-                                unit: source.unit,
-                                brandOrGrade: source.brandOrGrade,
-                                inStock: source.inStock,
-                                contactPhone: source.contactPhone,
-                              ),
-                            ),
-                        ] else ...[
-                          if (source.latitude != null && source.longitude != null)
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.map_outlined, size: 14),
-                              label: const Text('Locate on Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E7D32),
-                                foregroundColor: Colors.white,
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => SellerLocationMapSheet.show(
-                                context,
-                                sellerName: source.outletName,
-                                marketLocation: source.marketHubOrLocation,
-                                sellerLat: source.latitude,
-                                sellerLng: source.longitude,
-                                productName: source.commodityName,
-                                price: source.unitPrice,
-                                unit: source.unit,
-                                brandOrGrade: source.brandOrGrade,
-                                inStock: source.inStock,
-                                contactPhone: source.contactPhone,
-                              ),
-                            )
-                          else
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.open_in_browser, size: 14),
-                              label: const Text('Search on the Web', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF673AB7),
-                                foregroundColor: Colors.white,
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () {
-                                final searchUrl = WebSearchGroundingService.buildJumiaSearchUrl(source.commodityName);
-                                SafeOutletLauncher.openExternalWebUrl(
-                                  context,
-                                  url: searchUrl,
-                                  outletName: source.outletName,
-                                );
-                              },
-                            ),
-                          if (source.contactPhone != null && SafeOutletLauncher.isValidPhoneNumber(source.contactPhone))
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.phone_outlined, size: 14),
-                              label: const Text('Call', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => SafeOutletLauncher.callTraderPhone(source.contactPhone!),
-                            ),
-                        ],
                         OutlinedButton.icon(
                           icon: const Icon(Icons.auto_awesome, size: 13, color: AppColors.primary),
                           label: const Text('Compare Alternatives', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),

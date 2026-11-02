@@ -14,6 +14,7 @@ class SafeOutletLauncher {
     BuildContext context, {
     required LiveAiMultiVendorComparison comparison,
   }) async {
+    final catalogCount = comparison.vendors.where((v) => v.targetUrl.startsWith('smartmove://')).length;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -75,9 +76,11 @@ class SafeOutletLauncher {
                                   color: AppColors.primaryLight.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Text(
-                                  'Meta AI Grounded',
-                                  style: TextStyle(
+                                child: Text(
+                                  comparison.metaSearchUsed
+                                      ? 'Meta AI Search'
+                                      : 'Live Web Search',
+                                  style: const TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.primary,
@@ -87,9 +90,9 @@ class SafeOutletLauncher {
                             ],
                           ),
                           const SizedBox(height: 2),
-                          const Text(
-                            'Live Multi-Vendor Price Comparison Matrix',
-                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          Text(
+                            comparison.summary,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                           ),
                         ],
                       ),
@@ -202,16 +205,42 @@ class SafeOutletLauncher {
                     ),
                     const SizedBox(height: 16),
 
-                    const Text(
-                      'Discovered Vendor Alternatives',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                    ),
-                    const SizedBox(height: 10),
+                    if (catalogCount == 0)
+                      const Text('In-App Catalog', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    if (catalogCount == 0)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8, bottom: 12),
+                        child: Text('No matching non-demo catalog listings.', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                      ),
+                    if (catalogCount > 0)
+                      const Text('In-App Catalog', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    if (catalogCount > 0) const SizedBox(height: 10),
+                    if (catalogCount == comparison.vendors.length)
+                      const Text('Online Search Results', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    if (catalogCount == comparison.vendors.length)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8, bottom: 12),
+                        child: Text('No live online results were returned. Check the connection and try again.', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                      ),
 
-                    // Vendor Cards
-                    ...comparison.vendors.map((vendor) {
+                    // Catalog and online results are rendered in separate consecutive groups.
+                    ...comparison.vendors.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final vendor = entry.value;
                       final isMaps = vendor.isPhysicalLocation;
-                      return Container(
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (index == catalogCount && catalogCount > 0) ...[
+                            const SizedBox(height: 4),
+                            const Text('Online Search Results', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                            const SizedBox(height: 10),
+                          ],
+                          if (index == 0 && catalogCount == 0) ...[
+                            const Text('Online Search Results', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                            const SizedBox(height: 10),
+                          ],
+                          Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -305,7 +334,7 @@ class SafeOutletLauncher {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'Price / Est.',
+                                      'Price',
                                       style: TextStyle(
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.w500,
@@ -324,7 +353,7 @@ class SafeOutletLauncher {
                                     ),
                                   ],
                                 ),
-                                if (vendor.badge == 'SmartMove Verified Seller' || vendor.targetUrl.startsWith('smartmove://'))
+                                if (vendor.targetUrl.startsWith('smartmove://'))
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -341,7 +370,7 @@ class SafeOutletLauncher {
                                         onPressed: () {
                                           SellerLocationMapSheet.show(
                                             context,
-                                            sellerName: vendor.vendorName.replaceAll(' (In-App Verified)', ''),
+                                            sellerName: vendor.vendorName.replaceAll(' (SmartMove Catalog)', ''),
                                             marketLocation: vendor.snippet.split('•').first.trim(),
                                             productName: comparison.commodityName,
                                             price: vendor.detectedPrice,
@@ -368,7 +397,7 @@ class SafeOutletLauncher {
                                             unit: '1kg',
                                             unitPrice: vendor.detectedPrice ?? 0.0,
                                             totalCost: vendor.detectedPrice ?? 0.0,
-                                            outletName: vendor.vendorName.replaceAll(' (In-App Verified)', ''),
+                                            outletName: vendor.vendorName.replaceAll(' (SmartMove Catalog)', ''),
                                             channel: AcquisitionChannel.registeredTrader,
                                             marketHubOrLocation: vendor.snippet.split('•').first.trim(),
                                             dynamicDistanceKm: 1.5,
@@ -387,7 +416,7 @@ class SafeOutletLauncher {
                                       size: 13,
                                     ),
                                     label: Text(
-                                      isMaps ? 'Locate on Maps' : 'Open Listing',
+                                      isMaps ? 'Locate Seller on Maps' : 'Visit Online Store',
                                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                                     ),
                                     style: ElevatedButton.styleFrom(
@@ -408,8 +437,17 @@ class SafeOutletLauncher {
                             ),
                           ],
                         ),
+                          ),
+                        ],
                       );
                     }),
+                    if (comparison.vendors.isEmpty)
+                      const Text('Online Search Results', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    if (comparison.vendors.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8, bottom: 12),
+                        child: Text('No live online results were returned. Check the connection and try again.', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                      ),
                     const SizedBox(height: 10),
                     Center(
                       child: Text(
