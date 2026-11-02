@@ -4485,6 +4485,7 @@ class MetaAiService {
       }).toList();
 
       for (final obs in matchingObs) {
+        final isVerifiedTrader = obs.isVerified || obs.sourceType == ObservationSource.traderConfirmed;
         inAppVendors.add(
           LiveWebVendorResult(
             vendorName: '${obs.sellerName} (SmartMove Catalog)',
@@ -4496,7 +4497,7 @@ class MetaAiService {
             detectedPrice: obs.price,
             priceDisplay: obs.formattedPrice,
             channel: obs.channel,
-            badge: 'SmartMove Catalog',
+            badge: isVerifiedTrader ? 'SmartMove Verified Seller' : 'SmartMove Catalog',
             isPhysicalLocation: true,
             isDelivery: obs.channel.toLowerCase().contains('online') ||
                 obs.channel.toLowerCase().contains('smb'),
@@ -4556,22 +4557,22 @@ class MetaAiService {
     String recommendation;
     if (inAppVendors.isNotEmpty) {
       recommendation =
-          'Found ${inAppVendors.length} matching app catalog quote(s). Compare these with the separately listed online search results and confirm availability with the seller.';
+          'Found ${inAppVendors.length} matching app catalog quote(s) and active in-app seller quote(s). In-app verified sellers are prioritized for lowest pickup distance and instant seller contact. Online stores (Jumia, Konga) are ranked below as secondary alternatives. Compare these with the separately listed online search results and confirm availability with the seller.';
     } else if (groundedVendors.isNotEmpty) {
       final top = groundedVendors.first;
       recommendation =
           'Meta AI search returned ${groundedVendors.length} online result(s), including ${top.vendorName}. Confirm the displayed price and availability on the retailer listing.';
     } else if (webVendors.isNotEmpty) {
       recommendation =
-          'Online listings are live search results and may not show a current price. Confirm price, availability, and delivery with the store before buying.';
+          'Meta AI Market Intelligence: Online listings are live search results and may not show a current price. Confirm price, availability, and delivery with the store before buying.';
     } else {
       recommendation =
-          'No live online listings were returned. Check your connection or try the comparison again. App catalog quotes, when present, are shown separately.';
+          'Meta AI Intelligence: No live online listings were returned. Check your connection or try the comparison again. App catalog quotes, when present, are shown separately.';
     }
 
     return LiveAiMultiVendorComparison(
       commodityName: clean,
-      summary: '${inAppVendors.length} app catalog quote(s), ${groundedVendors.length + webVendors.length} online search result(s).',
+      summary: '${inAppVendors.length} app catalog quote(s), ${groundedVendors.length + webVendors.length} online vendor alternatives search result(s).',
       lowestPrice: minPrice,
       highestPrice: maxPrice,
       priceSpreadDisplay: spreadDisplay,

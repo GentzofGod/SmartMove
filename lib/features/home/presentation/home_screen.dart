@@ -392,7 +392,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: () => context.go('/discover'),
+                      onTap: () => context.go('/products'),
                       child: const Text(
                         'View all',
                         style: TextStyle(
@@ -540,7 +540,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: () => context.go('/discover'),
+                      onTap: () => context.go('/products'),
                       child: const Text(
                         'Explore',
                         style: TextStyle(
@@ -655,7 +655,7 @@ class HomeScreen extends ConsumerWidget {
                     SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: () => context.go('/discover'),
+                        onPressed: () => context.go('/products'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           shape: RoundedRectangleBorder(

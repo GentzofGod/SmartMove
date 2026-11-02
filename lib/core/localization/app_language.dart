@@ -203,6 +203,7 @@ class AppStrings {
       'publishPrice': 'Publish Price Observation',
 
       'navHome': 'Home',
+      'navProducts': 'Products',
       'navDiscover': 'Discover',
       'navPriceLab': 'Price Lab',
       'navCommunity': 'Community',
@@ -266,6 +267,7 @@ class AppStrings {
       'publishPrice': 'Put Market Price',
 
       'navHome': 'House',
+      'navProducts': 'Market Tings',
       'navDiscover': 'Find Market',
       'navPriceLab': 'Price Lab',
       'navCommunity': 'People',
@@ -329,6 +331,7 @@ class AppStrings {
       'publishPrice': 'Fi Iye Owó Ọjà Sílẹ̀',
 
       'navHome': 'Ilé',
+      'navProducts': 'Àwọn Ọjà',
       'navDiscover': 'Ṣawari',
       'navPriceLab': 'Yàrá Iye Owó',
       'navCommunity': 'Àwùjọ',
@@ -392,6 +395,7 @@ class AppStrings {
       'publishPrice': 'Rubuta Farashin Kasuwa',
 
       'navHome': 'Gida',
+      'navProducts': 'Kayayyaki',
       'navDiscover': 'Bincike',
       'navPriceLab': 'Dakin Farashi',
       'navCommunity': 'Al\'umma',
@@ -455,6 +459,7 @@ class AppStrings {
       'publishPrice': 'Bipụta Ọnụahịa Ahịa',
 
       'navHome': 'Ụlọ',
+      'navProducts': 'Ngwa Ahịa',
       'navDiscover': 'Chọpụta',
       'navPriceLab': 'Ụlọ Ọnụahịa',
       'navCommunity': 'Obodo',
@@ -518,6 +523,7 @@ class AppStrings {
       'publishPrice': 'Waddu Coggu Lummo',
 
       'navHome': 'Wuro',
+      'navProducts': 'Kujje',
       'navDiscover': 'Yiytu',
       'navPriceLab': 'Suudu Coggu',
       'navCommunity': 'Ummatore',
@@ -581,6 +587,7 @@ class AppStrings {
       'publishPrice': 'Bargi Kasuwa Yewata',
 
       'navHome': 'Fato',
+      'navProducts': 'Karewa',
       'navDiscover': 'Gowata',
       'navPriceLab': 'Bargi',
       'navCommunity': 'Jama\'a',
@@ -644,6 +651,7 @@ class AppStrings {
       'publishPrice': 'Tọt Urue Mfịn',
 
       'navHome': 'Ufọk',
+      'navProducts': 'Nkpo',
       'navDiscover': 'Kut',
       'navPriceLab': 'Ufọk Urue',
       'navCommunity': 'Mbon',
@@ -707,6 +715,7 @@ class AppStrings {
       'publishPrice': 'Nger Ayautu Kasuwa',
 
       'navHome': 'Ya',
+      'navProducts': 'Akyuma',
       'navDiscover': 'Kav',
       'navPriceLab': 'Ayautu',
       'navCommunity': 'Ijiir',
@@ -770,6 +779,7 @@ class AppStrings {
       'publishPrice': 'Gbẹ Igho Ẹki',
 
       'navHome': 'Owa',
+      'navProducts': 'Emwi',
       'navDiscover': 'Gualo',
       'navPriceLab': 'Owa Igho',
       'navCommunity': 'Egbè',
@@ -833,6 +843,7 @@ class AppStrings {
       'publishPrice': 'Dẹrẹ Igho Ẹki',
 
       'navHome': 'Uvwie',
+      'navProducts': 'Emu',
       'navDiscover': 'Mrhọ',
       'navPriceLab': 'Price Lab',
       'navCommunity': 'Ihwun',
@@ -896,6 +907,7 @@ class AppStrings {
       'publishPrice': 'Nya Iye Dazan',
 
       'navHome': 'Emi',
+      'navProducts': 'Egan',
       'navDiscover': 'Ewa',
       'navPriceLab': 'Eko',
       'navCommunity': 'Jama\'a',
@@ -959,6 +971,7 @@ class AppStrings {
       'publishPrice': 'Gba Fiyai Iki',
 
       'navHome': 'Wari',
+      'navProducts': 'Kẹnẹ',
       'navDiscover': 'Gbana',
       'navPriceLab': 'Price Lab',
       'navCommunity': 'Amayanabo',
@@ -1022,6 +1035,7 @@ class AppStrings {
       'publishPrice': 'Nya Iye Ahia',
 
       'navHome': 'Ihima',
+      'navProducts': 'Ihe',
       'navDiscover': 'Ozo',
       'navPriceLab': 'Price Lab',
       'navCommunity': 'Ohinoyi',
@@ -1085,6 +1099,7 @@ class AppStrings {
       'publishPrice': 'Kọ Iye Ẹlẹ Efu Kasuwa',
 
       'navHome': 'Ene',
+      'navProducts': 'Eneji',
       'navDiscover': 'Ene',
       'navPriceLab': 'Price Lab',
       'navCommunity': 'Ane',

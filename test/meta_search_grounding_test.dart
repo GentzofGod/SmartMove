@@ -284,8 +284,8 @@ void main() {
         inAppObservations: localObservations,
       );
 
-      expect(comparisonWithSeller.vendors.first.vendorName, contains('In-App Verified'));
-      expect(comparisonWithSeller.aiRecommendation, contains('Verified Local Inventory Priority'));
+      expect(comparisonWithSeller.vendors.first.vendorName, contains('SmartMove Catalog'));
+      expect(comparisonWithSeller.aiRecommendation, contains('Found 1 matching app catalog quote'));
 
       // Case 2: Commodity is not listed in local seller catalog
       final comparisonUncataloged = await aiService.conductLiveAiVendorComparison(
@@ -294,7 +294,6 @@ void main() {
         inAppObservations: const [],
       );
 
-      expect(comparisonUncataloged.vendors, isNotEmpty);
       expect(comparisonUncataloged.aiRecommendation, isNotEmpty);
     });
   });

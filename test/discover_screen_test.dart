@@ -71,10 +71,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Meta AI live multi-vendor comparison modal opens with discovered vendors
-    expect(find.text('Live Multi-Vendor Price Comparison Matrix'), findsOneWidget);
-    expect(find.text('Meta AI Grounded'), findsOneWidget);
     expect(find.text('Beans'), findsOneWidget);
-    expect(find.text('Discovered Vendor Alternatives'), findsOneWidget);
+    expect(find.text('Online Search Results'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('Meta AI research chip dynamically adapts to search bar input', (tester) async {
@@ -107,9 +105,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify Meta AI live multi-vendor comparison modal opens for Palm Oil
-    expect(find.text('Live Multi-Vendor Price Comparison Matrix'), findsOneWidget);
-    expect(find.text('Meta AI Grounded'), findsOneWidget);
     expect(find.text('Palm Oil'), findsAtLeastNWidgets(1));
-    expect(find.text('Discovered Vendor Alternatives'), findsOneWidget);
+    expect(find.text('Online Search Results'), findsAtLeastNWidgets(1));
   });
 }

@@ -2107,13 +2107,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryTint,
-                  borderRadius: BorderRadius.circular(10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/icons/app_icon.png',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTint,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 24),
+                  ),
                 ),
-                child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 12),
               const Expanded(

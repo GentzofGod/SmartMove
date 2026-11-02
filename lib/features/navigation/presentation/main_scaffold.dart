@@ -10,11 +10,16 @@ class MainScaffold extends ConsumerWidget {
   const MainScaffold({super.key, required this.child});
 
   int _calculateSelectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/home')) return 0;
-    if (location.startsWith('/discover')) return 1;
-    if (location.startsWith('/decision-lab')) return 2;
-    if (location.startsWith('/community')) return 3;
+    try {
+      final location = GoRouterState.of(context).uri.toString();
+      if (location.startsWith('/home')) return 0;
+      if (location.startsWith('/products') ||
+          location.startsWith('/discover') ||
+          location.startsWith('/community')) {
+        return 1;
+      }
+      if (location.startsWith('/decision-lab')) return 2;
+    } catch (_) {}
     return 0;
   }
 
@@ -24,13 +29,10 @@ class MainScaffold extends ConsumerWidget {
         context.go('/home');
         break;
       case 1:
-        context.go('/discover');
+        context.go('/products');
         break;
       case 2:
         context.go('/decision-lab');
-        break;
-      case 3:
-        context.go('/community');
         break;
     }
   }
@@ -39,9 +41,8 @@ class MainScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = _calculateSelectedIndex(context);
     final homeLabel = AppStrings.tr(ref, 'navHome');
-    final discoverLabel = AppStrings.tr(ref, 'navDiscover');
+    final productsLabel = AppStrings.tr(ref, 'navProducts');
     final priceLabLabel = AppStrings.tr(ref, 'navPriceLab');
-    final communityLabel = AppStrings.tr(ref, 'navCommunity');
 
     return Scaffold(
       body: child,
@@ -67,32 +68,27 @@ class MainScaffold extends ConsumerWidget {
             backgroundColor: Colors.white,
             selectedItemColor: AppColors.primary,
             unselectedItemColor: AppColors.textTertiary,
-            selectedFontSize: 10.5,
-            unselectedFontSize: 10.5,
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 10.5),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10.5),
+            selectedFontSize: 11,
+            unselectedFontSize: 11,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
             type: BottomNavigationBarType.fixed,
             elevation: 0,
             items: [
               BottomNavigationBarItem(
                 icon: const Icon(Icons.home_outlined),
-                activeIcon: const Icon(Icons.home),
+                activeIcon: const Icon(Icons.home_rounded),
                 label: homeLabel,
               ),
               BottomNavigationBarItem(
-                icon: const Icon(Icons.explore_outlined),
-                activeIcon: const Icon(Icons.explore),
-                label: discoverLabel,
+                icon: const Icon(Icons.storefront_outlined),
+                activeIcon: const Icon(Icons.storefront_rounded),
+                label: productsLabel,
               ),
               BottomNavigationBarItem(
                 icon: const Icon(Icons.analytics_outlined),
-                activeIcon: const Icon(Icons.analytics),
+                activeIcon: const Icon(Icons.analytics_rounded),
                 label: priceLabLabel,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.storefront_outlined),
-                activeIcon: const Icon(Icons.storefront),
-                label: communityLabel,
               ),
             ],
           ),

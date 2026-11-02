@@ -64,9 +64,8 @@ void main() {
 
       // Starts in English
       expect(find.text('Home'), findsOneWidget);
-      expect(find.text('Discover'), findsOneWidget);
+      expect(find.text('Products'), findsOneWidget);
       expect(find.text('Price Lab'), findsOneWidget);
-      expect(find.text('Community'), findsOneWidget);
 
       // Programmatically trigger language switch to Yorùbá
       final element = tester.element(find.byType(MainScaffold));
@@ -77,9 +76,8 @@ void main() {
 
       // UI immediately updates in real-time to Yorùbá without app restart!
       expect(find.text('Ilé'), findsOneWidget);
-      expect(find.text('Ṣawari'), findsOneWidget);
+      expect(find.text('Àwọn Ọjà'), findsOneWidget);
       expect(find.text('Yàrá Iye Owó'), findsOneWidget);
-      expect(find.text('Àwùjọ'), findsOneWidget);
       expect(find.text('Home'), findsNothing);
 
       // Now switch to Hausa
@@ -88,9 +86,8 @@ void main() {
 
       // UI immediately updates in real-time to Hausa!
       expect(find.text('Gida'), findsOneWidget);
-      expect(find.text('Bincike'), findsOneWidget);
+      expect(find.text('Kayayyaki'), findsOneWidget);
       expect(find.text('Dakin Farashi'), findsOneWidget);
-      expect(find.text('Al\'umma'), findsOneWidget);
       expect(find.text('Ilé'), findsNothing);
 
       // Now switch to Nigerian Pidgin
@@ -99,8 +96,7 @@ void main() {
 
       // UI immediately updates in real-time to Nigerian Pidgin!
       expect(find.text('House'), findsOneWidget);
-      expect(find.text('Find Market'), findsOneWidget);
-      expect(find.text('People'), findsOneWidget);
+      expect(find.text('Market Tings'), findsOneWidget);
 
       // Now switch to Asụsụ Igbo
       await container.read(appLanguageProvider.notifier).setLanguage('Asụsụ Igbo');
@@ -108,8 +104,8 @@ void main() {
 
       // UI immediately updates in real-time to Asụsụ Igbo!
       expect(find.text('Ụlọ'), findsOneWidget);
-      expect(find.text('Chọpụta'), findsOneWidget);
-      expect(find.text('Obodo'), findsOneWidget);
+      expect(find.text('Ngwa Ahịa'), findsOneWidget);
+      expect(find.text('Ụlọ Ọnụahịa'), findsOneWidget);
 
       // Verify persistent storage
       final prefs = await SharedPreferences.getInstance();
