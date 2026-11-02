@@ -36,7 +36,25 @@ serve(async (req) => {
 
     // 1. Muse Voice Transcribe Gateway (dev.meta.ai/docs asr transcribe)
     if (action === "transcribe") {
-      const { audioBase64, language = "en", mode = "PUSH_TO_TALK", prompt, audioFormat = "audio/wav" } = payload || {};
+      const {
+        audioBase64,
+        language = "en",
+        mode = "PUSH_TO_TALK",
+        prompt,
+        audioFormat = "audio/wav",
+        audioEncoding = "PCM_16BIT",
+        encoding = "PCM_16BIT",
+        sampleRate = 24000,
+        channels = 1,
+      } = payload || {};
+
+      const effectiveAudioEncoding =
+        payload?.audioEncoding ||
+        payload?.audio_encoding ||
+        payload?.encoding ||
+        audioEncoding ||
+        encoding ||
+        "PCM_16BIT";
 
       // Convert base64 audio to binary Blob for multipart/form-data
       let audioBlob: Blob;
@@ -58,6 +76,12 @@ serve(async (req) => {
           [
             JSON.stringify({
               model: "muse-voice-transcribe-1.0",
+              audioEncoding: effectiveAudioEncoding,
+              audio_encoding: effectiveAudioEncoding.toLowerCase(),
+              encoding: effectiveAudioEncoding,
+              audioFormat,
+              sampleRate,
+              channels,
               language,
               mode,
               task: "transcribe",
@@ -69,6 +93,11 @@ serve(async (req) => {
           { type: "application/json" }
         )
       );
+
+      // Also append audioEncoding as top-level form fields for gateways requiring standalone parameters
+      formData.append("audioEncoding", effectiveAudioEncoding);
+      formData.append("audio_encoding", effectiveAudioEncoding.toLowerCase());
+      formData.append("encoding", effectiveAudioEncoding);
       formData.append("audio", audioBlob, "recording.wav");
 
       const metaResponse = await fetch("https://api.meta.ai/v1/asr/transcribe", {

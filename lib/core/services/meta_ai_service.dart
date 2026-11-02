@@ -791,12 +791,26 @@ class MetaAiService {
 
           request.fields['request'] = jsonEncode({
             'model': 'muse-voice-transcribe-1.0',
+            'audioEncoding': 'PCM_16BIT',
+            'audio_encoding': 'pcm_16bit',
+            'encoding': 'PCM_16BIT',
+            'audioFormat': audioFormat,
+            'sampleRate': sampleRate,
+            'channels': numChannels,
             'language': dialect.languageCode,
             'mode': 'PUSH_TO_TALK',
             'task': 'transcribe',
             'prompt':
                 'West African commodity trade: garri, rice, eggs, oil, yam, tomatoes, Bodija market',
           });
+
+          // Top-level multipart fields for compatibility with various Meta ASR gateways
+          request.fields['audioEncoding'] = 'PCM_16BIT';
+          request.fields['encoding'] = 'PCM_16BIT';
+          request.fields['audio_encoding'] = 'pcm_16bit';
+          request.fields['sampleRate'] = sampleRate.toString();
+          request.fields['channels'] = numChannels.toString();
+          request.fields['audioFormat'] = audioFormat;
 
           if (audioBytes != null && audioBytes.isNotEmpty) {
             request.files.add(http.MultipartFile.fromBytes(
@@ -839,9 +853,11 @@ class MetaAiService {
           payload: {
             if (audioBytes != null) 'audioBase64': base64Encode(audioBytes),
             'audioFormat': audioFormat,
+            'audioEncoding': 'PCM_16BIT',
+            'audio_encoding': 'pcm_16bit',
+            'encoding': 'PCM_16BIT',
             'sampleRate': sampleRate,
             'channels': numChannels,
-            'encoding': 'PCM_16BIT',
             'language': dialect.languageCode,
             'mode': 'PUSH_TO_TALK',
             'prompt':
