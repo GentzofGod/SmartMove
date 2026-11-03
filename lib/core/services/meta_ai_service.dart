@@ -4060,55 +4060,59 @@ class MetaAiService {
     required PlanCandidate planD,
     required double budget,
   }) {
-    final diffSavings = (planB.totalCost - planA.totalCost).abs();
-    final traderSources = planA.acquisitionSources.where((s) => s.isPlatformRegisteredTrader).toList();
-    final totalSources = planA.acquisitionSources.length;
-    final traderCount = traderSources.length;
+    try {
+      final diffSavings = (planB.totalCost - planA.totalCost).abs();
+      final traderSources = planA.acquisitionSources.where((s) => s.isPlatformRegisteredTrader).toList();
+      final totalSources = planA.acquisitionSources.length;
+      final traderCount = traderSources.length;
 
-    // Check if budget is exceeded
-    if (budget > 0 && budget < 12000 && planD.totalCost <= budget && planA.totalCost > budget) {
-      return 'SmartMove AI Insight: With your ₦${budget.toStringAsFixed(0)} budget, Option D is the safest choice (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while prioritizing essential commodities (no price-drop claim made).';
+      // Check if budget is exceeded
+      if (budget > 0 && budget < 12000 && planD.totalCost <= budget && planA.totalCost > budget) {
+        return 'SmartMove AI Insight: With your ₦${budget.toStringAsFixed(0)} budget, Option D is the safest choice (${planD.formattedTotalCost}). It delays non-urgent purchases to protect immediate cash flow while prioritizing essential commodities (no price-drop claim made).';
+      }
+
+      final StringBuffer sb = StringBuffer();
+      sb.write('SmartMove AI Insight: ');
+
+      if (totalSources > 0 && traderCount == totalSources) {
+        // All items available locally from verified platform traders
+        final closestDist = traderSources.fold<double>(
+          999.0,
+          (min, s) => s.dynamicDistanceKm > 0 && s.dynamicDistanceKm < min ? s.dynamicDistanceKm : min,
+        );
+        final distText = closestDist < 900.0 ? ' (closest seller is ~${closestDist.toStringAsFixed(1)} km away)' : '';
+        sb.write(
+          'All $totalSources items in your basket are available from verified platform traders$distText. '
+          'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
+          'You can locate verified sellers on the map and chat directly to negotiate. '
+          'Alternatively, Option B provides convenient online e-commerce doorstep delivery without travel.'
+        );
+      } else if (totalSources > 0 && traderCount > 0) {
+        // Partial availability in platform catalog
+        final availableNames = traderSources.map((s) => s.commodityName).toSet().join(', ');
+        sb.write(
+          'Platform traders currently have $traderCount of $totalSources items in catalog ($availableNames). '
+          'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
+          'Option A enables direct pickup and chat for available staples, while Option B covers online e-commerce ordering for unlisted items.'
+        );
+      } else {
+        // General / benchmark fallback
+        sb.write(
+          'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
+          'Option A focuses on local procurement and trader negotiation, while Option B sources directly from online e-commerce platforms with doorstep delivery. '
+          'Option C balances proximity and speed.'
+        );
+      }
+
+      if (budget > 0 && planA.totalCost > budget) {
+        final deficit = planA.totalCost - budget;
+        sb.write(' Note: Your basket total exceeds your budget by ₦${deficit.toStringAsFixed(0)}; consider Option D to protect immediate cashflow.');
+      }
+
+      return sb.toString();
+    } catch (e) {
+      return 'SmartMove AI Insight: Option A offers the lowest total cost (${planA.formattedTotalCost}) and Option B provides online delivery (${planB.formattedTotalCost}). (Reported calculation notice: $e)';
     }
-
-    final StringBuffer sb = StringBuffer();
-    sb.write('SmartMove AI Insight: ');
-
-    if (totalSources > 0 && traderCount == totalSources) {
-      // All items available locally from verified platform traders
-      final closestDist = traderSources.fold<double>(
-        999.0,
-        (min, s) => s.dynamicDistanceKm > 0 && s.dynamicDistanceKm < min ? s.dynamicDistanceKm : min,
-      );
-      final distText = closestDist < 900.0 ? ' (closest seller is ~${closestDist.toStringAsFixed(1)} km away)' : '';
-      sb.write(
-        'All $totalSources items in your basket are available from verified platform traders$distText. '
-        'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
-        'You can locate verified sellers on the map and chat directly to negotiate. '
-        'Alternatively, Option B provides convenient online e-commerce doorstep delivery without travel.'
-      );
-    } else if (totalSources > 0 && traderCount > 0) {
-      // Partial availability in platform catalog
-      final availableNames = traderSources.map((s) => s.commodityName).toSet().join(', ');
-      sb.write(
-        'Platform traders currently have $traderCount of $totalSources items in catalog ($availableNames). '
-        'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
-        'Option A enables direct pickup and chat for available staples, while Option B covers online e-commerce ordering for unlisted items.'
-      );
-    } else {
-      // General / benchmark fallback
-      sb.write(
-        'Option A has the lowest total outlay (${planA.formattedTotalCost}), saving ₦${diffSavings.toStringAsFixed(0)} compared to Option B (${planB.formattedTotalCost}). '
-        'Option A focuses on local procurement and trader negotiation, while Option B sources directly from online e-commerce platforms with doorstep delivery. '
-        'Option C balances proximity and speed.'
-      );
-    }
-
-    if (budget > 0 && planA.totalCost > budget) {
-      final deficit = planA.totalCost - budget;
-      sb.write(' Note: Your basket total exceeds your budget by ₦${deficit.toStringAsFixed(0)}; consider Option D to protect immediate cashflow.');
-    }
-
-    return sb.toString();
   }
 
   // --- 5. Muse Spark Proactive Optimization Assistant ---
@@ -4556,9 +4560,13 @@ class MetaAiService {
         );
 
         if (proxyRes.isSuccess && proxyRes.data is Map) {
-          final text = proxyRes.data['notes'] ??
-              proxyRes.data['explanation'] ??
-              proxyRes.data['reply']?.toString();
+          final dataMap = proxyRes.data as Map;
+          final text = dataMap['notes'] ??
+              dataMap['explanation'] ??
+              dataMap['reply']?.toString() ??
+              dataMap['text'] ??
+              dataMap['content'] ??
+              dataMap['choices']?[0]?['message']?['content'];
           if (text != null && text.toString().isNotEmpty) {
             return FollowUpInterpretation(
               userMessage: userQuery,
@@ -4570,8 +4578,13 @@ class MetaAiService {
                       : 'plan-a'),
             );
           }
+        } else if (!proxyRes.isSuccess) {
+          throw Exception(proxyRes.errorMessage ?? 'Edge Proxy returned HTTP ${proxyRes.statusCode}');
         }
-      } catch (_) {}
+      } catch (e) {
+        // Log or rethrow so the UI can report the error to the user
+        rethrow;
+      }
     }
 
     // 7. Grounded informative summary fallback

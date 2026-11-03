@@ -230,7 +230,27 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           _activeInterpretation = result;
         });
       }
-    } catch (_) {
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFC62828),
+            content: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'AI Cloud Insight Notice: $err (resolved using local trade-off engine).',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
       final result = aiService.interpretFollowUp(
         userFollowUp: text,
         currentPlans: candidates,
@@ -949,6 +969,32 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       ],
                     ),
                   ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () {
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('AI Trade-off calculations refreshed.'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_rounded, size: 13, color: AppColors.primary),
+                          SizedBox(width: 3),
+                          Text(
+                            'Refresh',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -964,28 +1010,51 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       ),
                     );
                   }
-                  const aiService = MetaAiService();
-                  final planA = candidates.firstWhere((p) => p.id == 'plan-a', orElse: () => candidates.first);
-                  final planB = candidates.firstWhere((p) => p.id == 'plan-b', orElse: () => candidates.length > 1 ? candidates[1] : candidates.first);
-                  final planC = candidates.firstWhere((p) => p.id == 'plan-c', orElse: () => candidates.first);
-                  final planD = candidates.firstWhere((p) => p.id == 'plan-d', orElse: () => candidates.first);
+                  try {
+                    const aiService = MetaAiService();
+                    final planA = candidates.firstWhere((p) => p.id == 'plan-a', orElse: () => candidates.first);
+                    final planB = candidates.firstWhere((p) => p.id == 'plan-b', orElse: () => candidates.length > 1 ? candidates[1] : candidates.first);
+                    final planC = candidates.firstWhere((p) => p.id == 'plan-c', orElse: () => candidates.first);
+                    final planD = candidates.firstWhere((p) => p.id == 'plan-d', orElse: () => candidates.first);
 
-                  final sparkExplanation = aiService.explainTradeOffs(
-                    planA: planA,
-                    planB: planB,
-                    planC: planC,
-                    planD: planD,
-                    budget: state.budget,
-                  );
+                    final sparkExplanation = aiService.explainTradeOffs(
+                      planA: planA,
+                      planB: planB,
+                      planC: planC,
+                      planD: planD,
+                      budget: state.budget,
+                    );
 
-                  return Text(
-                    sparkExplanation,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textPrimary,
-                      height: 1.35,
-                    ),
-                  );
+                    return Text(
+                      sparkExplanation,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        height: 1.35,
+                      ),
+                    );
+                  } catch (err) {
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFEF9A9A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFC62828)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Trade-Off Insight Notice: $err',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFC62828)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                 },
               ),
             ],
