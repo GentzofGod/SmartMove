@@ -140,13 +140,10 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
     final List<String> suggestions = [];
 
     if (items.isNotEmpty) {
-      final first = items.first;
       suggestions.add('Which plan has the closest verified sellers?');
-      suggestions.add('Compare physical sellers vs online e-commerce for ${first.productName}');
 
       if (items.length > 1) {
         suggestions.add('I want to spend less on transport across options');
-        suggestions.add('Which option gets me everything in a single stop?');
       }
 
       if (state.budget > 0) {
@@ -155,8 +152,6 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
         suggestions.add('Find the cheapest overall option');
       }
     } else {
-      suggestions.add('Which option has the closest sellers?');
-      suggestions.add('Compare prices between local market and online stores');
       suggestions.add('I want to spend less on transport');
     }
 
@@ -1080,7 +1075,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       color: AppColors.primary, size: 18),
                   SizedBox(width: 8),
                   Text(
-                    'Ask AI Shopping Assistant to Refine Options',
+                    'Ask AI to Refine Options',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,

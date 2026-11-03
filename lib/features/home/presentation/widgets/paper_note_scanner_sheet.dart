@@ -96,13 +96,34 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
       setState(() {
         _isAnalyzing = false;
         _scanResult = result;
-        if (result.detectedProductName != null && result.detectedProductName!.isNotEmpty) {
-          _transcriptController.text = result.detectedProductName!;
-        } else if (!result.hasError && result.rawTranscribedText.isNotEmpty) {
-          _transcriptController.text = result.rawTranscribedText;
+        if (!result.hasError) {
+          if (result.detectedProductName != null && result.detectedProductName!.isNotEmpty) {
+            _transcriptController.text = result.detectedProductName!;
+          } else if (result.rawTranscribedText.isNotEmpty) {
+            _transcriptController.text = result.rawTranscribedText;
+          }
         }
       });
     }
+  }
+
+  String _formatDisplayImageName(String? rawName) {
+    if (rawName == null || rawName.isEmpty) return 'Captured Photo';
+    final lower = rawName.toLowerCase();
+    if (lower.startsWith('scaled') ||
+        lower.contains('scaled_') ||
+        lower.contains('image_picker') ||
+        lower.contains('picker') ||
+        lower.startsWith('img_') ||
+        lower.startsWith('pxl_') ||
+        lower.startsWith('cap_') ||
+        lower.startsWith('cam_') ||
+        lower.startsWith('photo_') ||
+        lower.startsWith('screenshot') ||
+        lower.contains('cache')) {
+      return 'Camera Photo';
+    }
+    return rawName;
   }
 
   @override
@@ -302,7 +323,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _capturedImageName ?? 'Photographed Note',
+                            _formatDisplayImageName(_capturedImageName),
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
