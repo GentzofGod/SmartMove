@@ -1,4 +1,4 @@
-# SmartMove 🛒⏱️
+# SmartMove 
 
 > **A local market price intelligence, multi-channel shopping assistant, and deterministic decision platform for transparent everyday commerce in Nigeria.**  
 > *Built for the Meta AI Hackathon with Flutter, Riverpod, Cloud Supabase, and Meta AI Models.*
@@ -12,7 +12,7 @@
 
 ---
 
-## ⚡ What is SmartMove?
+## What is SmartMove?
 
 In emerging markets like Lagos, Ibadan, and Abeokuta, the cheapest sticker price across town often ends up being the most expensive option once transport fares, transit hours, and packaging variances (*mudu, paint rubber, derica, bag*) are accounted for.
 
@@ -25,72 +25,8 @@ In emerging markets like Lagos, Ibadan, and Abeokuta, the cheapest sticker price
 
 ---
 
-## 🛡️ Core Safeguards & Architecture
 
-```
-User Input (Text / Voice / Image)
-       │
-       ▼
-Secure Supabase Edge Function (meta-ai-proxy)
-  • Zero embedded client secrets
-  • Automated PII scrubbing (phone / email)
-       │
-       ▼
-Meta AI Models (muse-voice-transcribe, muse-spark, vision)
-       │
-       ▼
-Flutter Client Application
-  • Editable Proposal Review (no unconfirmed state changes)
-  • Deterministic DecisionEngine arithmetic (pure Dart calculations)
-  • Resilient offline NLP fallback when cloud services are unreachable
-```
-
----
-
-## 📱 Split APK Downloads & Quick Install
-
-SmartMove produces lightweight **split APKs per ABI** (~20 MB vs ~60 MB universal build) to minimize download costs:
-
-| Architecture | Target Devices | APK File |
-| :--- | :--- | :--- |
-| **`arm64-v8a`** | **Modern Android Phones (TECNO, Infinix, Samsung, Xiaomi, Pixel)** | `app-arm64-v8a-release.apk` |
-| **`armeabi-v7a`** | Older 32-bit Android phones | `app-armeabi-v7a-release.apk` |
-| **`x86_64`** | PC Android Emulators & ChromeOS | `app-x86_64-release.apk` |
-
-```bash
-# Build split APKs locally
-./build_apk.sh --split
-
-# Install on connected device
-adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-```
-
----
-
-## 💻 Local Development Setup
-
-```bash
-# 1. Clone & enter repository
-git clone https://github.com/GentzofGod/SmartMove.git && cd SmartMove
-
-# 2. Configure .env with Supabase & Meta keys
-echo "SUPABASE_URL=https://your-project.supabase.co" >> .env
-echo "SUPABASE_ANON_KEY=your-anon-key" >> .env
-echo "META_APP_ID=your-meta-app-id" >> .env
-echo "META_CLIENT_TOKEN=your-meta-client-token" >> .env
-
-# 3. Get dependencies and verify
-flutter pub get
-flutter analyze
-flutter test
-
-# 4. Launch app
-flutter run
-```
-
----
-
-## 👥 Roles & Permissions
+## Roles & Permissions
 
 - **Guest:** Browse unified catalog, view price benchmarks, rehearse plans in Inference Lab.
 - **Customer:** Report community prices, chat and bargain with sellers, apply for trader verification.
