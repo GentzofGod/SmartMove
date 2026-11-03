@@ -15,6 +15,7 @@ import '../../../core/presentation/widgets/community_assistance_sheet.dart';
 import '../../../core/presentation/widgets/report_modal_sheet.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
+import '../../../core/presentation/widgets/seller_catalog_sheet.dart';
 
 class ProductDetailSheet extends ConsumerStatefulWidget {
   final Product product;
@@ -973,6 +974,22 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                       );
                                       TraderNegotiationSheet.show(context, source: source);
                                     },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton.outlined(
+                                  style: IconButton.styleFrom(
+                                    side: const BorderSide(color: AppColors.primary),
+                                    visualDensity: VisualDensity.compact,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.storefront_outlined, size: 16, color: AppColors.primary),
+                                  tooltip: 'Check Seller Catalog',
+                                  onPressed: () => SellerCatalogSheet.show(
+                                    context,
+                                    sellerName: obs.sellerName,
+                                    currentCommodityName: obs.productName,
+                                    initialMarketLocation: obs.marketLocation,
                                   ),
                                 ),
                               ],
@@ -1991,6 +2008,18 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               ),
               const SizedBox(width: 4),
               IconButton(
+                icon: const Icon(Icons.storefront_outlined, size: 16, color: AppColors.primary),
+                tooltip: 'Check Seller Catalog',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => SellerCatalogSheet.show(
+                  context,
+                  sellerName: opt.observation.sellerName,
+                  currentCommodityName: opt.observation.productName,
+                  initialMarketLocation: opt.observation.marketLocation,
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
                 icon: Icon(
                   opt.observation.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
                   size: 16,
@@ -2129,6 +2158,18 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                     );
                     TraderNegotiationSheet.show(context, source: source);
                   },
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.storefront_outlined, size: 16, color: AppColors.primary),
+                tooltip: 'Check Seller Catalog',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => SellerCatalogSheet.show(
+                  context,
+                  sellerName: opt.observation.sellerName,
+                  currentCommodityName: opt.observation.productName,
+                  initialMarketLocation: opt.observation.marketLocation,
                 ),
               ),
               const SizedBox(width: 4),

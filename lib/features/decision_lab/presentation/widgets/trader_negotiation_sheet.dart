@@ -5,6 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/item_acquisition_source.dart';
 import '../../../../core/services/safe_outlet_launcher.dart';
 import '../../../../core/state/app_state.dart';
+import '../../../messages/presentation/chat_thread_screen.dart';
+import '../../../../core/presentation/widgets/seller_catalog_sheet.dart';
 
 class TraderNegotiationSheet extends ConsumerStatefulWidget {
   final ItemAcquisitionSource source;
@@ -303,6 +305,33 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
                   ),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  padding: const EdgeInsets.all(4),
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18, color: AppColors.primary),
+                  tooltip: 'Open Full Chat Thread',
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatThreadScreen(
+                          conversationKey: widget.source.outletName,
+                          initialPartnerName: widget.source.outletName,
+                          initialCommodityName: widget.source.commodityName,
+                          initialPrice: widget.source.unitPrice,
+                          initialUnit: widget.source.unit,
+                          outletLocation: widget.source.marketHubOrLocation,
+                          outletDistance: widget.source.dynamicDistanceKm,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  padding: const EdgeInsets.all(4),
+                  visualDensity: VisualDensity.compact,
                   icon: const Icon(Icons.close, size: 20, color: AppColors.textSecondary),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -367,17 +396,34 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
             ),
           ),
 
-          // Quick Negotiation Chips
+          // Quick Negotiation Chips & Seller Catalog
           Container(
             height: 42,
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               scrollDirection: Axis.horizontal,
-              itemCount: _quickNegotiationChips.length,
+              itemCount: _quickNegotiationChips.length + 1,
               separatorBuilder: (context, index) => const SizedBox(width: 6),
               itemBuilder: (ctx, idx) {
-                final chipText = _quickNegotiationChips[idx];
+                if (idx == 0) {
+                  return ActionChip(
+                    avatar: const Icon(Icons.storefront_outlined, size: 14, color: AppColors.primary),
+                    label: const Text(
+                      'Check Seller Catalog',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    ),
+                    backgroundColor: AppColors.primaryTint,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    onPressed: () => SellerCatalogSheet.show(
+                      context,
+                      sellerName: widget.source.outletName,
+                      currentCommodityName: widget.source.commodityName,
+                      initialMarketLocation: widget.source.marketHubOrLocation,
+                    ),
+                  );
+                }
+                final chipText = _quickNegotiationChips[idx - 1];
                 return ActionChip(
                   label: Text(chipText, style: const TextStyle(fontSize: 11)),
                   backgroundColor: AppColors.background,
@@ -458,6 +504,44 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
                             crossAxisAlignment:
                                 isCustomer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
+                              if (msg.commodityName != null && msg.commodityName!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isCustomer
+                                          ? Colors.white.withValues(alpha: 0.2)
+                                          : AppColors.primaryTint,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          (msg.commodityName?.toLowerCase().contains('camry') ?? false) ||
+                                                  (msg.commodityName?.toLowerCase().contains('car') ?? false)
+                                              ? Icons.directions_car_rounded
+                                              : Icons.shopping_bag_outlined,
+                                          size: 10,
+                                          color: isCustomer ? Colors.white : AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            'Inquiry: ${msg.commodityName}',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: isCustomer ? Colors.white : AppColors.primary,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               Text(
                                 msg.text,
                                 style: TextStyle(

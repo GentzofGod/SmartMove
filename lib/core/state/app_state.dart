@@ -674,10 +674,10 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
     ),
     CommodityCategory(
       id: 'cat-auto',
-      name: 'Auto Spares',
+      name: 'Vehicles & Auto Spares',
       slug: 'auto-spares',
       iconName: 'directions_car_outlined',
-      description: 'Automobile parts, engine oil, tires, batteries, and accessories',
+      description: 'Vehicles, cars, automobile parts, engine oil, tires, batteries, and accessories',
       displayOrder: 11,
     ),
     CommodityCategory(
@@ -711,6 +711,14 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
                     description:
                         'Groceries, grains, tubers, oils, seasonings, and cooking items',
                     iconName: 'restaurant_outlined',
+                  );
+                } else if (lower == 'auto spares' || lower == 'auto-spares') {
+                  return c.copyWith(
+                    name: 'Vehicles & Auto Spares',
+                    slug: 'auto-spares',
+                    description:
+                        'Vehicles, cars, automobile parts, engine oil, tires, batteries, and accessories',
+                    iconName: 'directions_car_outlined',
                   );
                 }
                 return c;
@@ -987,6 +995,16 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
       final userSession = ref.read(authProvider);
       final isUserTrader = (userSession.businessName?.trim().toLowerCase() == traderName.trim().toLowerCase());
 
+      String? effectiveCommodity = commodityName;
+      if (effectiveCommodity == null || effectiveCommodity.isEmpty) {
+        for (final m in currentHistory.reversed) {
+          if (m.commodityName != null && m.commodityName!.isNotEmpty) {
+            effectiveCommodity = m.commodityName;
+            break;
+          }
+        }
+      }
+
       final traderMsg = TraderChatMessage(
         id: 'trader-${now.millisecondsSinceEpoch}',
         senderName: traderName,
@@ -994,7 +1012,7 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
         text: replyText,
         timestamp: now,
         conversationKey: traderName,
-        commodityName: commodityName,
+        commodityName: effectiveCommodity,
         isRead: isUserTrader, // Unread for customer unless current user is trader
         recipientName: customerName,
         proposedPrice: proposedPrice,
@@ -1246,6 +1264,8 @@ class ConversationSummary {
   final double? outletDistance;
   final int totalMessages;
   final DateTime lastTimestamp;
+  final double? unitPrice;
+  final String? unit;
 
   const ConversationSummary({
     required this.conversationKey,
@@ -1259,6 +1279,8 @@ class ConversationSummary {
     this.outletDistance,
     required this.totalMessages,
     required this.lastTimestamp,
+    this.unitPrice,
+    this.unit,
   });
 }
 
@@ -1311,12 +1333,37 @@ final activeConversationsProvider = Provider<List<ConversationSummary>>((ref) {
       }
     }
 
+    if (commodity == null || commodity.isEmpty) {
+      try {
+        final observations = ref.read(communityProvider);
+        final match = observations.cast<PriceObservation?>().firstWhere(
+              (o) => o != null && o.sellerName.toLowerCase() == key.toLowerCase(),
+              orElse: () => null,
+            );
+        if (match != null) {
+          commodity = match.productName;
+        }
+      } catch (_) {}
+    }
+
     double? latestOffer;
     for (final m in sorted.reversed) {
       if (m.proposedPrice != null && m.proposedPrice! > 0) {
         latestOffer = m.proposedPrice;
         break;
       }
+    }
+
+    double? resolvedUnitPrice = lastMsg.unitPrice;
+    String? resolvedUnit = lastMsg.unit;
+    for (final m in sorted.reversed) {
+      if (resolvedUnitPrice == null && m.unitPrice != null && m.unitPrice! > 0) {
+        resolvedUnitPrice = m.unitPrice;
+      }
+      if (resolvedUnit == null && m.unit != null && m.unit!.isNotEmpty) {
+        resolvedUnit = m.unit;
+      }
+      if (resolvedUnitPrice != null && resolvedUnit != null) break;
     }
 
     String? outletLoc;
@@ -1338,6 +1385,8 @@ final activeConversationsProvider = Provider<List<ConversationSummary>>((ref) {
       outletDistance: outletDist,
       totalMessages: sorted.length,
       lastTimestamp: lastMsg.timestamp,
+      unitPrice: resolvedUnitPrice,
+      unit: resolvedUnit,
     ));
   });
 

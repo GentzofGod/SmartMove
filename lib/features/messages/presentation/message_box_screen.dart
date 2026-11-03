@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
+import '../../../core/presentation/widgets/seller_catalog_sheet.dart';
 import 'chat_thread_screen.dart';
 
 class MessageBoxScreen extends ConsumerStatefulWidget {
@@ -51,7 +52,8 @@ class _MessageBoxScreenState extends ConsumerState<MessageBoxScreen> {
           conversationKey: conv.conversationKey,
           initialPartnerName: conv.partnerName,
           initialCommodityName: conv.commodityName,
-          initialPrice: conv.lastProposedPrice,
+          initialPrice: conv.lastProposedPrice ?? conv.unitPrice ?? conv.lastMessage.unitPrice,
+          initialUnit: conv.unit ?? conv.lastMessage.unit,
           outletLocation: conv.outletLocation,
           outletDistance: conv.outletDistance,
         ),
@@ -61,11 +63,22 @@ class _MessageBoxScreenState extends ConsumerState<MessageBoxScreen> {
 
   void _openThreadByKey(String conversationKey) {
     ref.read(traderChatProvider.notifier).markConversationAsRead(conversationKey);
+    final allConv = ref.read(activeConversationsProvider);
+    final matching = allConv.cast<ConversationSummary?>().firstWhere(
+          (c) => c?.conversationKey == conversationKey,
+          orElse: () => null,
+        );
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatThreadScreen(
           conversationKey: conversationKey,
+          initialPartnerName: matching?.partnerName,
+          initialCommodityName: matching?.commodityName,
+          initialPrice: matching?.lastProposedPrice ?? matching?.unitPrice ?? matching?.lastMessage.unitPrice,
+          initialUnit: matching?.unit ?? matching?.lastMessage.unit,
+          outletLocation: matching?.outletLocation,
+          outletDistance: matching?.outletDistance,
         ),
       ),
     );
@@ -419,14 +432,25 @@ class _MessageBoxScreenState extends ConsumerState<MessageBoxScreen> {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor:
-                          conv.isTraderPartner ? AppColors.primaryTint : const Color(0xFFEFF6FF),
-                      child: Icon(
-                        conv.isTraderPartner ? Icons.storefront_rounded : Icons.person_rounded,
-                        color: conv.isTraderPartner ? AppColors.primary : AppColors.blue,
-                        size: 24,
+                    InkWell(
+                      onTap: conv.isTraderPartner
+                          ? () => SellerCatalogSheet.show(
+                                context,
+                                sellerName: conv.partnerName,
+                                currentCommodityName: conv.commodityName,
+                                initialMarketLocation: conv.outletLocation,
+                              )
+                          : null,
+                      borderRadius: BorderRadius.circular(24),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor:
+                            conv.isTraderPartner ? AppColors.primaryTint : const Color(0xFFEFF6FF),
+                        child: Icon(
+                          conv.isTraderPartner ? Icons.storefront_rounded : Icons.person_rounded,
+                          color: conv.isTraderPartner ? AppColors.primary : AppColors.blue,
+                          size: 24,
+                        ),
                       ),
                     ),
                     if (hasUnread)
@@ -490,31 +514,53 @@ class _MessageBoxScreenState extends ConsumerState<MessageBoxScreen> {
                       ),
                       const SizedBox(height: 3),
 
-                      // Commodity badge if present
+                      // Commodity product badge if present
                       if (conv.commodityName != null && conv.commodityName!.isNotEmpty) ...[
                         Container(
-                          margin: const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          margin: const EdgeInsets.only(top: 2, bottom: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
+                            color: conv.isTraderPartner ? const Color(0xFFF0FDF4) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: conv.isTraderPartner
+                                  ? const Color(0xFFBBF7D0)
+                                  : const Color(0xFFBFDBFE),
+                            ),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.shopping_bag_outlined, size: 11, color: AppColors.textSecondary),
-                              const SizedBox(width: 3),
-                              Flexible(
+                              Icon(
+                                (conv.commodityName?.toLowerCase().contains('camry') ?? false) ||
+                                        (conv.commodityName?.toLowerCase().contains('car') ?? false)
+                                    ? Icons.directions_car_rounded
+                                    : Icons.shopping_bag_outlined,
+                                size: 12,
+                                color: conv.isTraderPartner ? AppColors.primary : AppColors.blue,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
                                 child: Text(
                                   conv.commodityName!,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: conv.isTraderPartner ? const Color(0xFF166534) : AppColors.blueDark,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (conv.unitPrice != null && conv.unitPrice! > 0) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  '₦${conv.unitPrice!.toStringAsFixed(0)}${conv.unit != null ? "/${conv.unit}" : ""}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: conv.isTraderPartner ? AppColors.primary : AppColors.blueDark,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

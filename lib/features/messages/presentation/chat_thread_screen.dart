@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
+import '../../../core/models/price_observation.dart';
+import '../../../core/presentation/widgets/seller_catalog_sheet.dart';
 
 class ChatThreadScreen extends ConsumerStatefulWidget {
   final String conversationKey;
@@ -175,6 +177,21 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
         price = m.unitPrice ?? price;
         break;
       }
+    }
+
+    if (commName == 'Commodity') {
+      try {
+        final observations = ref.read(communityProvider);
+        final match = observations.cast<PriceObservation?>().firstWhere(
+              (o) => o != null && o.sellerName.toLowerCase() == widget.conversationKey.toLowerCase(),
+              orElse: () => null,
+            );
+        if (match != null) {
+          commName = match.productName;
+          unit = match.unit;
+          price = match.price;
+        }
+      } catch (_) {}
     }
 
     if (isSellingThread) {
@@ -447,6 +464,22 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
       if (commodityName != null && basePrice != null && latestOffer != null) break;
     }
 
+    if (commodityName == null || commodityName.isEmpty) {
+      try {
+        final observations = ref.watch(communityProvider);
+        final match = observations.cast<PriceObservation?>().firstWhere(
+              (o) => o != null && o.sellerName.toLowerCase() == widget.conversationKey.toLowerCase(),
+              orElse: () => null,
+            );
+        if (match != null) {
+          commodityName = match.productName;
+          basePrice ??= match.price;
+          unit = match.unit;
+          location ??= match.marketLocation;
+        }
+      } catch (_) {}
+    }
+
     final hasCommodityContext = commodityName != null && commodityName.isNotEmpty;
     final quickChips = isSellingThread ? _sellerQuickChips : _buyerQuickChips;
 
@@ -513,6 +546,16 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
         ),
         actions: [
           if (partnerIsTrader) ...[
+            IconButton(
+              icon: const Icon(Icons.storefront_outlined, color: AppColors.primary, size: 21),
+              tooltip: 'Check Seller Catalog',
+              onPressed: () => SellerCatalogSheet.show(
+                context,
+                sellerName: partnerName,
+                currentCommodityName: commodityName,
+                initialMarketLocation: location,
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.phone_outlined, color: AppColors.primary, size: 21),
               tooltip: 'Call Trader',
@@ -618,6 +661,20 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                       ),
                     ),
                   ],
+                  const SizedBox(width: 6),
+                  IconButton(
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    padding: const EdgeInsets.all(4),
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.storefront_outlined, size: 18, color: AppColors.primary),
+                    tooltip: 'Check Seller Catalog',
+                    onPressed: () => SellerCatalogSheet.show(
+                      context,
+                      sellerName: partnerName,
+                      currentCommodityName: commodityName,
+                      initialMarketLocation: location,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -845,6 +902,42 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
               style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
               textAlign: TextAlign.center,
             ),
+            if (commodity != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelling ? const Color(0xFFFEF3C7) : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelling ? const Color(0xFFFDE68A) : const Color(0xFFBFDBFE),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      (commodity.toLowerCase().contains('camry') ||
+                              commodity.toLowerCase().contains('car') ||
+                              commodity.toLowerCase().contains('corolla'))
+                          ? Icons.directions_car_rounded
+                          : Icons.shopping_bag_outlined,
+                      size: 15,
+                      color: isSelling ? const Color(0xFF92400E) : AppColors.blueDark,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Product Inquiry: $commodity',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isSelling ? const Color(0xFF92400E) : AppColors.blueDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1153,6 +1246,51 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Explicit Product Context Tag on message
+                      if (msg.commodityName != null && msg.commodityName!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? Colors.white.withValues(alpha: 0.18)
+                                  : const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isMe
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : const Color(0xFFBFDBFE),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  (msg.commodityName?.toLowerCase().contains('camry') ?? false) ||
+                                          (msg.commodityName?.toLowerCase().contains('car') ?? false)
+                                      ? Icons.directions_car_rounded
+                                      : Icons.shopping_bag_outlined,
+                                  size: 11,
+                                  color: isMe ? Colors.white : AppColors.blueDark,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Inquiry: ${msg.commodityName}${msg.unitPrice != null && msg.unitPrice! > 0 ? " • ₦${msg.unitPrice!.toStringAsFixed(0)}${msg.unit != null ? "/${msg.unit}" : ""}" : ""}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: isMe ? Colors.white : AppColors.blueDark,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
                       // Counter-Offer Box if attached to this message
                       if (hasOffer)
                         _buildOfferBox(

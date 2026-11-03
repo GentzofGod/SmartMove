@@ -38,6 +38,25 @@ void main() {
       expect(desc.toLowerCase(), anyOf(contains('fresh'), contains('quality')));
     });
 
+    test('generateProductDescription generates realistic vehicle description without food or carton tropes', () async {
+      final desc = await metaAi.generateProductDescription(
+        productName: 'Toyota Camry',
+        category: 'Vehicles & Auto Spares',
+        brand: 'Toyota',
+        unit: 'vehicle',
+        price: 9988600,
+        currentNotes: 'V6, leather seats, Tokunbo',
+      );
+
+      expect(desc, isNotEmpty);
+      expect(desc, contains('Toyota Camry'));
+      expect(desc.toLowerCase(), anyOf(contains('mechanical'), contains('condition'), contains('transmission'), contains('road-ready'), contains('sound')));
+      // Must NEVER claim a car is sold in carton packaging or fresh arrival
+      expect(desc.toLowerCase().contains('carton'), isFalse);
+      expect(desc.toLowerCase().contains('freshness'), isFalse);
+      expect(desc.toLowerCase().contains('fresh arrival'), isFalse);
+    });
+
     test('refineSellerListing detects Electronics category for appliances', () {
       final result = metaAi.refineSellerListing(
         rawInput: 'Binatone 1.5L electric blender with grinder 32000 naira warranty included',

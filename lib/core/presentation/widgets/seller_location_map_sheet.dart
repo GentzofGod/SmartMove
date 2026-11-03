@@ -10,6 +10,7 @@ import '../../models/price_observation.dart';
 import '../../models/item_acquisition_source.dart';
 import '../../services/location_service.dart';
 import '../../state/app_state.dart';
+import 'seller_catalog_sheet.dart';
 import '../../../features/decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 
 class SellerLocationMapSheet extends ConsumerStatefulWidget {
@@ -848,6 +849,22 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
                             onPressed: () => _callSeller(_resolveContactPhone()!),
                           ),
                         ],
+                        const SizedBox(width: 8),
+                        IconButton.outlined(
+                          style: IconButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primary),
+                            padding: const EdgeInsets.all(12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          tooltip: 'Check Seller Catalog',
+                          icon: const Icon(Icons.storefront_outlined, size: 20, color: AppColors.primary),
+                          onPressed: () => SellerCatalogSheet.show(
+                            context,
+                            sellerName: widget.sellerName,
+                            currentCommodityName: widget.productName,
+                            initialMarketLocation: widget.marketLocation,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         // Chat & Buy
                         Expanded(

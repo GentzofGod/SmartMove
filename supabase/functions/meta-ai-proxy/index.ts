@@ -203,7 +203,7 @@ serve(async (req) => {
           {
             role: "system",
             content: isDescriptionGeneration
-              ? "You are an expert Nigerian commerce assistant helping registered market traders create concise, accurate, appealing 1-2 sentence product descriptions for their stall listings. Focus on authenticity, quality, weight/packaging, and freshness. Do not output conversational filler or preamble—output only the description."
+              ? "You are an expert commerce assistant for SmartMove, an open multi-category marketplace (ranging from vehicles, electronics, fashion, and hardware to groceries and general merchandise). Generate an authentic, professional 1-2 sentence product listing description. Be context-aware: for vehicles and machinery, focus on mechanical condition and reliability; never use food tropes (like freshness or carton packaging) for vehicles or gadgets. Output only the final plain description text without preamble or quotes."
               : "You are Meta Muse Spark for SmartMove. Extract shopping items (name, quantity, unit, estimated_unit_price, brand_or_grade), quantities, budget, and deadline errands into strict JSON. When users provide concise, bundle, or category requests (e.g., 'i need to buy a set of stationaries', 'toiletries', 'soup ingredients', 'breakfast pack'), intelligently decompose the request into essential constituent items with realistic default quantities, units, and Nigerian market benchmark prices in Naira. Infer a realistic budget if none is specified. Output only valid JSON with keys: budget, shopping_items, deadline_errand.",
           },
           {

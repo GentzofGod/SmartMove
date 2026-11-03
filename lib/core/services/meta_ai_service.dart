@@ -5575,11 +5575,79 @@ class MetaAiService {
     double? price,
     String? currentNotes,
   }) async {
-    final prompt =
-        'Generate a concise, professional 1-2 sentence market product listing description for: $productName in category $category${brand != null && brand.isNotEmpty ? ', brand $brand' : ''}${unit != null && unit.isNotEmpty ? ', unit $unit' : ''}${price != null && price > 0 ? ', price ₦${price.toStringAsFixed(0)}' : ''}. Focus on authenticity, quality, weight/packaging, and freshness for retail buyers. Output only the description text without any markdown or quotes.';
+    final prodLower = productName.trim().toLowerCase();
+    final catLower = category.trim().toLowerCase();
+
+    // Check if the item is a vehicle, automotive, or heavy machinery
+    final isVehicle = catLower.contains('auto') ||
+        catLower.contains('vehic') ||
+        prodLower.contains('camry') ||
+        prodLower.contains('corolla') ||
+        prodLower.contains('toyota') ||
+        prodLower.contains('lexus') ||
+        prodLower.contains('honda') ||
+        prodLower.contains('benz') ||
+        prodLower.contains('mercedes') ||
+        prodLower.contains('hyundai') ||
+        prodLower.contains('car') ||
+        prodLower.contains('vehicle') ||
+        prodLower.contains('suv') ||
+        prodLower.contains('truck') ||
+        prodLower.contains('motorcycle') ||
+        prodLower.contains('keke');
+
+    // Unit sanity: never pass food units (carton, 1kg, tuber, heap) for cars or vehicles
+    String? effectiveUnit = unit?.trim();
+    if (isVehicle) {
+      if (effectiveUnit == null ||
+          effectiveUnit.isEmpty ||
+          effectiveUnit == '1kg' ||
+          effectiveUnit == 'carton' ||
+          effectiveUnit.contains('bag') ||
+          effectiveUnit.contains('tuber') ||
+          effectiveUnit.contains('heap') ||
+          effectiveUnit.contains('rubber') ||
+          effectiveUnit.contains('derica') ||
+          effectiveUnit.contains('congo') ||
+          effectiveUnit.contains('sachet')) {
+        effectiveUnit = 'vehicle';
+      }
+    }
+
+    final promptBuffer = StringBuffer();
+    promptBuffer.write(
+        'Generate a realistic, professional, and appealing 1 to 2 sentence marketplace listing description for: $productName');
+    promptBuffer.write(' in category "$category".');
+    if (brand != null && brand.trim().isNotEmpty) {
+      promptBuffer.write(' Brand: ${brand.trim()}.');
+    }
+    if (effectiveUnit != null &&
+        effectiveUnit.isNotEmpty &&
+        effectiveUnit != 'Custom unit...') {
+      promptBuffer.write(' Unit: $effectiveUnit.');
+    }
+    if (price != null && price > 0) {
+      promptBuffer.write(' Price: ₦${price.toStringAsFixed(0)}.');
+    }
+    if (currentNotes != null && currentNotes.trim().isNotEmpty) {
+      promptBuffer.write(
+          ' Seller details/specs: "${currentNotes.trim()}". Weave these specific details naturally into the description.');
+    }
+
+    final prompt = promptBuffer.toString();
 
     final systemInstruction =
-        'You are an expert Nigerian commerce assistant helping registered market traders create concise, accurate, appealing 1-2 sentence product descriptions for their stall listings. Focus on authenticity, quality, weight/packaging, and freshness. Do not output conversational filler or preamble—output only the final plain description text.';
+        'You are an expert commerce copywriter for SmartMove, an open multi-category marketplace. '
+        'SmartMove hosts diverse goods: vehicles & auto, electronics & gadgets, fashion & apparel, hardware & building materials, beauty & health, home & furniture, as well as groceries & agro produce. '
+        'Generate an authentic, professional 1-2 sentence product listing description. '
+        'CRITICAL RULES: '
+        '1. Be context-aware: For vehicles and cars, highlight vehicle condition (e.g. clean engine/transmission, road readiness, interior/exterior appeal, Tokunbo or Nigerian used). NEVER mention "freshness", "carton packaging", or food terms. '
+        '2. For electronics and appliances, focus on performance, genuine specifications, and durability. '
+        '3. For fashion, focus on material quality, fit, and style. '
+        '4. For hardware and tools, focus on heavy-duty durability and standards. '
+        '5. For food and agro produce, focus on cleanliness, quality, and grade. '
+        '6. Only mention packaging units if genuinely appropriate (e.g. 50kg bag, pack of 12); NEVER claim a vehicle or major appliance is sold in a carton. '
+        '7. Output ONLY the 1-2 sentence description without conversational preamble, filler, bullet points, or quotation marks.';
 
     // 1. Direct Meta API call if credentials present
     if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
@@ -5606,9 +5674,11 @@ class MetaAiService {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data is Map) {
-            final content = data['choices']?[0]?['message']?['content'] ?? data['text'];
+            final content =
+                data['choices']?[0]?['message']?['content'] ?? data['text'];
             if (content != null && content.toString().trim().isNotEmpty) {
-              return AiDescriptionResult.success(_cleanDescriptionText(content.toString()));
+              return AiDescriptionResult.success(
+                  _cleanDescriptionText(content.toString()));
             }
           }
         }
@@ -5718,17 +5788,50 @@ class MetaAiService {
     }
     // Fallback for offline or test environments without live proxy
     final brandPrefix = brand != null && brand.isNotEmpty ? '$brand ' : '';
-    final unitSuffix = unit != null && unit.isNotEmpty ? ' ($unit)' : '';
+    final prodLower = productName.toLowerCase();
     final catLower = category.toLowerCase();
 
-    if (catLower.contains('food') || catLower.contains('grocer') || catLower.contains('grain') || catLower.contains('tuber') || catLower.contains('oil')) {
+    final isVehicle = catLower.contains('auto') ||
+        catLower.contains('vehic') ||
+        prodLower.contains('camry') ||
+        prodLower.contains('corolla') ||
+        prodLower.contains('toyota') ||
+        prodLower.contains('lexus') ||
+        prodLower.contains('honda') ||
+        prodLower.contains('benz') ||
+        prodLower.contains('mercedes') ||
+        prodLower.contains('hyundai') ||
+        prodLower.contains('car') ||
+        prodLower.contains('vehicle') ||
+        prodLower.contains('suv') ||
+        prodLower.contains('truck') ||
+        prodLower.contains('motorcycle') ||
+        prodLower.contains('keke');
+
+    if (isVehicle) {
+      final specDetails = currentNotes != null && currentNotes.trim().isNotEmpty
+          ? ' with ${currentNotes.trim()}'
+          : '';
+      return 'Clean, sound $brandPrefix$productName in excellent mechanical condition$specDetails. Fully inspected engine, smooth transmission, and road-ready performance.';
+    } else if (catLower.contains('electron') ||
+        prodLower.contains('phone') ||
+        prodLower.contains('laptop') ||
+        prodLower.contains('tv') ||
+        prodLower.contains('blender') ||
+        prodLower.contains('cooker') ||
+        prodLower.contains('fridge')) {
+      return 'Authentic, high-performance $brandPrefix$productName with original manufacturer specifications. Reliable everyday operation and superior build quality.';
+    } else if (catLower.contains('fashion') || catLower.contains('cloth') || catLower.contains('shoe')) {
+      return 'Premium quality $brandPrefix$productName crafted with durable, comfortable materials. Elegant styling and superior finish suitable for everyday wear or special occasions.';
+    } else if (catLower.contains('hardware') || catLower.contains('tool') || catLower.contains('build')) {
+      return 'Standard grade, heavy-duty $brandPrefix$productName engineered for structural durability, high load capacity, and long-lasting performance.';
+    } else if (catLower.contains('pharm') || catLower.contains('health') || catLower.contains('drug')) {
+      return 'Genuine, properly stored $brandPrefix$productName with clear batch identification and sealed manufacturer packaging.';
+    } else if (catLower.contains('food') || catLower.contains('grocer') || catLower.contains('grain') || catLower.contains('tuber') || catLower.contains('oil')) {
+      final unitSuffix = unit != null && unit.isNotEmpty && !unit.contains('Custom') ? ' ($unit)' : '';
       return 'Fresh, premium quality $brandPrefix$productName$unitSuffix. Sourced directly for optimal taste, clean processing, and standard market weight.';
-    } else if (catLower.contains('electron')) {
-      return 'Authentic, durable $brandPrefix$productName$unitSuffix. Tested for optimal performance, original specifications, and reliable everyday operation.';
-    } else if (catLower.contains('pharm')) {
-      return 'Genuine, properly stored $brandPrefix$productName$unitSuffix with clear batch identification and sealed manufacturer packaging.';
     } else {
-      return 'High quality, genuine $brandPrefix$productName$unitSuffix available for immediate pickup or delivery. Verified store stock.';
+      return 'Authentic, high quality $brandPrefix$productName in prime condition. Verified merchant stock available for immediate inspection, pickup, or delivery.';
     }
   }
 }

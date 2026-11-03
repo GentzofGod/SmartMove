@@ -10,6 +10,8 @@ import '../../../core/services/location_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/presentation/widgets/commodity_image_widget.dart';
+import '../../../core/presentation/widgets/seller_catalog_sheet.dart';
+import '../../messages/presentation/chat_thread_screen.dart';
 
 class SellerPortalScreen extends ConsumerStatefulWidget {
   const SellerPortalScreen({super.key});
@@ -35,6 +37,9 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
   }
 
   static const List<String> _commonListingUnits = [
+    'piece / unit',
+    'item',
+    'vehicle',
     '1kg',
     '50kg bag',
     '25kg bag',
@@ -50,7 +55,6 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     'crate of 30',
     'tuber',
     'heap',
-    'piece / unit',
     'pair',
     'pack / packet',
     'carton',
@@ -64,13 +68,103 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     'Custom unit...',
   ];
 
+  static void _autoDetectCategoryAndUnit({
+    required String input,
+    required List<String> categories,
+    required void Function(String cat, String unit) onDetected,
+  }) {
+    final query = input.trim().toLowerCase();
+    if (query.isEmpty) return;
+
+    if (query.contains('camry') ||
+        query.contains('corolla') ||
+        query.contains('toyota') ||
+        query.contains('lexus') ||
+        query.contains('honda') ||
+        query.contains('benz') ||
+        query.contains('mercedes') ||
+        query.contains('hyundai') ||
+        query.contains('car') ||
+        query.contains('vehicle') ||
+        query.contains('suv') ||
+        query.contains('truck') ||
+        query.contains('motorcycle') ||
+        query.contains('keke') ||
+        query.contains('brake pad') ||
+        query.contains('engine oil')) {
+      final matchCat = categories.firstWhere(
+        (c) =>
+            c.toLowerCase().contains('vehic') ||
+            c.toLowerCase().contains('auto'),
+        orElse: () => 'Vehicles & Auto Spares',
+      );
+      final isCar = query.contains('car') ||
+          query.contains('camry') ||
+          query.contains('corolla') ||
+          query.contains('toyota') ||
+          query.contains('lexus') ||
+          query.contains('benz') ||
+          query.contains('vehicle');
+      onDetected(matchCat, isCar ? 'vehicle' : 'piece / unit');
+    } else if (query.contains('phone') ||
+        query.contains('iphone') ||
+        query.contains('samsung') ||
+        query.contains('laptop') ||
+        query.contains('macbook') ||
+        query.contains('tv') ||
+        query.contains('television') ||
+        query.contains('blender') ||
+        query.contains('cooker') ||
+        query.contains('fridge') ||
+        query.contains('refrigerator') ||
+        query.contains('generator')) {
+      final matchCat = categories.firstWhere(
+        (c) => c.toLowerCase().contains('electron'),
+        orElse: () => 'Electronics',
+      );
+      onDetected(matchCat, 'piece / unit');
+    } else if (query.contains('rice') ||
+        query.contains('beans') ||
+        query.contains('garri') ||
+        query.contains('yam') ||
+        query.contains('tomatoes') ||
+        query.contains('onion') ||
+        query.contains('pepper') ||
+        query.contains('semovita')) {
+      final matchCat = categories.firstWhere(
+        (c) => c.toLowerCase() == 'food',
+        orElse: () => 'Food',
+      );
+      onDetected(matchCat, query.contains('yam') ? 'tuber' : '1kg');
+    } else if (query.contains('shirt') ||
+        query.contains('trouser') ||
+        query.contains('dress') ||
+        query.contains('shoe') ||
+        query.contains('sneaker') ||
+        query.contains('suit') ||
+        query.contains('fabric') ||
+        query.contains('lace')) {
+      final matchCat = categories.firstWhere(
+        (c) => c.toLowerCase().contains('fashion'),
+        orElse: () => 'Fashion & Clothing',
+      );
+      onDetected(
+          matchCat,
+          query.contains('shoe') || query.contains('sneaker')
+              ? 'pair'
+              : (query.contains('fabric') || query.contains('lace')
+                  ? 'yard'
+                  : 'piece / unit'));
+    }
+  }
+
   void _showAddObservationDialog(BuildContext context, UserSession userSession) {
     final productController = TextEditingController();
     final sellerController = TextEditingController(
       text: userSession.businessName ?? userSession.displayName,
     );
     final priceController = TextEditingController();
-    final unitController = TextEditingController(text: '1kg');
+    final unitController = TextEditingController(text: 'piece / unit');
     final brandController = TextEditingController();
     final notesController = TextEditingController();
     String channel = userSession.sellerChannel ?? 'Local Market';
@@ -87,12 +181,12 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
         'Baby & Kids',
         'Books & Stationery',
         'Agro & Farm Produce',
-        'Auto Spares',
+        'Vehicles & Auto Spares',
         'Others',
       ]);
     }
     String selectedCategory = categories.first;
-    String selectedUnitOption = '1kg';
+    String selectedUnitOption = 'piece / unit';
     bool isCustomUnit = false;
     bool inStock = true;
     String? modalErrorMessage;
@@ -186,7 +280,19 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                       const SizedBox(height: 6),
                       TextField(
                         controller: productController,
-                        onChanged: (_) {
+                        onChanged: (val) {
+                          _autoDetectCategoryAndUnit(
+                            input: val,
+                            categories: categories,
+                            onDetected: (cat, unit) {
+                              selectedCategory = cat;
+                              if (_commonListingUnits.contains(unit)) {
+                                selectedUnitOption = unit;
+                                isCustomUnit = false;
+                                unitController.text = unit;
+                              }
+                            },
+                          );
                           if (modalErrorMessage != null) {
                             setModalState(() => modalErrorMessage = null);
                           } else {
@@ -194,7 +300,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           }
                         },
                         decoration: InputDecoration(
-                          hintText: 'e.g. White Garri, Brown Beans, Palm Oil',
+                          hintText: 'e.g. Toyota Camry, iPhone 15, Mama Gold Rice, Standing Fan',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -208,6 +314,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                       ),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
+                        key: ValueKey('add_cat_$selectedCategory'),
                         initialValue: selectedCategory,
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
@@ -266,6 +373,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
+                                  key: ValueKey('add_unit_$selectedUnitOption'),
                                   initialValue: selectedUnitOption,
                                   isExpanded: true,
                                   decoration: InputDecoration(
@@ -694,7 +802,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
         'Baby & Kids',
         'Books & Stationery',
         'Agro & Farm Produce',
-        'Auto Spares',
+        'Vehicles & Auto Spares',
         'Others',
       ]);
     }
@@ -773,7 +881,19 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                       const SizedBox(height: 6),
                       TextField(
                         controller: productController,
-                        onChanged: (_) {
+                        onChanged: (val) {
+                          _autoDetectCategoryAndUnit(
+                            input: val,
+                            categories: categories,
+                            onDetected: (cat, unit) {
+                              selectedCategory = cat;
+                              if (_commonListingUnits.contains(unit)) {
+                                selectedUnitOption = unit;
+                                isCustomUnit = false;
+                                unitController.text = unit;
+                              }
+                            },
+                          );
                           if (modalErrorMessage != null) {
                             setModalState(() => modalErrorMessage = null);
                           } else {
@@ -781,6 +901,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           }
                         },
                         decoration: InputDecoration(
+                          hintText: 'e.g. Toyota Camry, iPhone 15, Mama Gold Rice, Standing Fan',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -794,6 +915,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                       ),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
+                        key: ValueKey('edit_cat_$selectedCategory'),
                         initialValue: selectedCategory,
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
@@ -851,6 +973,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
+                                  key: ValueKey('edit_unit_$selectedUnitOption'),
                                   initialValue: selectedUnitOption,
                                   isExpanded: true,
                                   decoration: InputDecoration(
@@ -2048,7 +2171,13 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
           builder: (context, ref, _) {
             final chats = ref.watch(traderChatProvider);
             final messages = chats[conversationKey] ?? initialMessages;
-            final commodityName = messages.isNotEmpty ? messages.first.commodityName : null;
+            String? commodityName;
+            for (final m in messages.reversed) {
+              if (m.commodityName != null && m.commodityName!.isNotEmpty) {
+                commodityName = m.commodityName;
+                break;
+              }
+            }
 
             return SafeArea(
               child: Padding(
@@ -2100,6 +2229,22 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                               ),
                             ),
                             IconButton(
+                              icon: const Icon(Icons.open_in_new_rounded, size: 20, color: AppColors.primary),
+                              tooltip: 'Open Full Thread in Messages',
+                              onPressed: () {
+                                Navigator.pop(modalCtx);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatThreadScreen(
+                                      conversationKey: conversationKey,
+                                      initialCommodityName: commodityName,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.close),
                               onPressed: () => Navigator.pop(modalCtx),
                             ),
@@ -2140,6 +2285,27 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                             ? CrossAxisAlignment.end
                                             : CrossAxisAlignment.start,
                                         children: [
+                                          if (msg.commodityName != null && msg.commodityName!.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(bottom: 4),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: isFromSeller
+                                                      ? Colors.white.withValues(alpha: 0.2)
+                                                      : const Color(0xFFFEF3C7),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'Inquiry: ${msg.commodityName}',
+                                                  style: TextStyle(
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isFromSeller ? Colors.white : const Color(0xFF92400E),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                                           Text(
                                             isFromSeller ? 'You (${msg.senderName})' : msg.senderName,
                                             style: TextStyle(
@@ -2596,6 +2762,20 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                 Column(
                   children: storeInquiries.map((entry) {
                     final lastMsg = entry.value.isNotEmpty ? entry.value.last : null;
+                    String? effectiveCommodity = lastMsg?.commodityName;
+                    double? effectivePrice = lastMsg?.unitPrice;
+                    String? effectiveUnit = lastMsg?.unit;
+                    if (effectiveCommodity == null || effectiveCommodity.isEmpty) {
+                      for (final m in entry.value.reversed) {
+                        if (m.commodityName != null && m.commodityName!.isNotEmpty) {
+                          effectiveCommodity = m.commodityName;
+                          effectivePrice ??= m.unitPrice;
+                          effectiveUnit ??= m.unit;
+                          break;
+                        }
+                      }
+                    }
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
@@ -2616,6 +2796,43 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                if (effectiveCommodity != null && effectiveCommodity.isNotEmpty) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFDE68A)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          (effectiveCommodity.toLowerCase().contains('camry') ||
+                                                  effectiveCommodity.toLowerCase().contains('car') ||
+                                                  effectiveCommodity.toLowerCase().contains('corolla'))
+                                              ? Icons.directions_car_rounded
+                                              : Icons.shopping_bag_outlined,
+                                          size: 11,
+                                          color: const Color(0xFF92400E),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Inquiry: $effectiveCommodity${effectivePrice != null && effectivePrice > 0 ? " (₦${effectivePrice.toStringAsFixed(0)}${effectiveUnit != null ? "/$effectiveUnit" : ""})" : ""}',
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF92400E),
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                                 Row(
                                   children: [
                                     Text(
@@ -2623,22 +2840,6 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w700, fontSize: 13),
                                     ),
-                                    if (lastMsg?.commodityName != null) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.cardBorder,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          lastMsg!.commodityName!,
-                                          style: const TextStyle(
-                                              fontSize: 9.5, fontWeight: FontWeight.w600),
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -2695,12 +2896,29 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            TextButton.icon(
-              onPressed: () =>
-                  _showAddObservationDialog(context, userSession),
-              icon: const Icon(Icons.add_circle_outline, size: 16),
-              label: const Text('Add Listing',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (myObservations.isNotEmpty) ...[
+                  TextButton.icon(
+                    onPressed: () => SellerCatalogSheet.show(
+                      context,
+                      sellerName: userSession.businessName ?? userSession.displayName,
+                    ),
+                    icon: const Icon(Icons.storefront_outlined, size: 16),
+                    label: const Text('Store Catalog',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                TextButton.icon(
+                  onPressed: () =>
+                      _showAddObservationDialog(context, userSession),
+                  icon: const Icon(Icons.add_circle_outline, size: 16),
+                  label: const Text('Add Listing',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
             ),
           ],
         ),

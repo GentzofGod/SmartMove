@@ -364,7 +364,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         'Baby & Kids',
         'Books & Stationery',
         'Agro & Farm Produce',
-        'Auto Spares',
+        'Vehicles & Auto Spares',
         'Others',
       ]);
     }
