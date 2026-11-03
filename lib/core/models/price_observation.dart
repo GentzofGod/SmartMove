@@ -1,4 +1,5 @@
 import 'product.dart';
+import '../services/location_service.dart';
 
 enum ObservationSource {
   simulatedDemo,
@@ -125,7 +126,13 @@ class PriceObservation {
       )}';
 
   /// Converts this observation into a standard Product model for detail viewing & comparisons
-  Product toProduct() {
+  Product toProduct({GeoPoint? userLocation}) {
+    final dist = LocationService.resolveDistanceKm(
+      userLocation: userLocation,
+      destLat: latitude,
+      destLon: longitude,
+      destLocationName: marketLocation.isNotEmpty ? marketLocation : sellerName,
+    );
     return Product(
       id: productId.isNotEmpty ? productId : 'prod-$id',
       name: productName,
@@ -133,7 +140,7 @@ class PriceObservation {
       standardUnit: unit,
       lowestPrice: price,
       bestSeller: '$sellerName ($marketLocation)',
-      distanceKm: 1.5,
+      distanceKm: dist,
       updateTime: timeAgo,
       brandOrGrade: brandOrGrade,
       channel: channel,

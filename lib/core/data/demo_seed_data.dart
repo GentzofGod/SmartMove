@@ -551,7 +551,7 @@ class DemoSeedData {
         title: 'Jumia Pickup Station',
         subtitle: 'Collect order #JP-8829 (Deadline 2:00 PM)',
         location: 'Central Logistics Hub',
-        distanceKm: 1.5,
+        distanceKm: 0.0,
         durationMinutes: 0,
         timeWindow: '',
         badgeText: 'Before 2 PM deadline',

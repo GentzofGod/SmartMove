@@ -856,42 +856,166 @@ class LocationService {
 
   // Coordinates of recognized markets/merchants
   static const Map<String, GeoPoint> knownMarketCoordinates = {
-    'Market A': GeoPoint(
-      latitude: 6.4950,
-      longitude: 3.3780,
-      label: 'Market A (Oyingbo)',
-      city: 'Lagos',
-      town: 'Oyingbo',
-    ),
-    'Market B': GeoPoint(
-      latitude: 6.5150,
-      longitude: 3.3640,
-      label: 'Market B (Tejuosho)',
-      city: 'Lagos',
-      town: 'Yaba',
-    ),
-    'Market C': GeoPoint(
-      latitude: 6.6020,
-      longitude: 3.3900,
-      label: 'Market C (Mile 12)',
-      city: 'Lagos',
-      town: 'Mile 12',
-    ),
-    'MedPlus Pharmacy': GeoPoint(
-      latitude: 6.5200,
-      longitude: 3.3750,
-      label: 'MedPlus Pharmacy',
-      city: 'Lagos',
-      town: 'Yaba',
-    ),
-    'GIG Logistics': GeoPoint(
-      latitude: 6.5100,
-      longitude: 3.3700,
-      label: 'GIG Logistics Hub',
-      city: 'Lagos',
-      town: 'Yaba',
-    ),
+    // --- Lagos ---
+    'Market A': GeoPoint(latitude: 6.4950, longitude: 3.3780, label: 'Market A (Oyingbo)', city: 'Lagos', town: 'Oyingbo'),
+    'Market B': GeoPoint(latitude: 6.5150, longitude: 3.3640, label: 'Market B (Tejuosho)', city: 'Lagos', town: 'Yaba'),
+    'Market C': GeoPoint(latitude: 6.6020, longitude: 3.3900, label: 'Market C (Mile 12)', city: 'Lagos', town: 'Mile 12'),
+    'Oyingbo': GeoPoint(latitude: 6.4950, longitude: 3.3780, label: 'Oyingbo Wholesale Market', city: 'Lagos', town: 'Oyingbo'),
+    'Oyingbo Market': GeoPoint(latitude: 6.4950, longitude: 3.3780, label: 'Oyingbo Wholesale Market', city: 'Lagos', town: 'Oyingbo'),
+    'Tejuosho': GeoPoint(latitude: 6.5150, longitude: 3.3640, label: 'Tejuosho Ultra-Modern Market', city: 'Lagos', town: 'Yaba'),
+    'Tejuosho Market': GeoPoint(latitude: 6.5150, longitude: 3.3640, label: 'Tejuosho Ultra-Modern Market', city: 'Lagos', town: 'Yaba'),
+    'Mile 12': GeoPoint(latitude: 6.6020, longitude: 3.3900, label: 'Mile 12 Perishable Food Market', city: 'Lagos', town: 'Mile 12'),
+    'Mile 12 Market': GeoPoint(latitude: 6.6020, longitude: 3.3900, label: 'Mile 12 Perishable Food Market', city: 'Lagos', town: 'Mile 12'),
+    'Computer Village': GeoPoint(latitude: 6.6018, longitude: 3.3515, label: 'Ikeja Computer Village', city: 'Lagos', town: 'Ikeja'),
+    'Alaba': GeoPoint(latitude: 6.4619, longitude: 3.1936, label: 'Alaba International Market', city: 'Lagos', town: 'Ojo'),
+    'Alaba International Market': GeoPoint(latitude: 6.4619, longitude: 3.1936, label: 'Alaba International Market', city: 'Lagos', town: 'Ojo'),
+    'Balogun Market': GeoPoint(latitude: 6.4549, longitude: 3.3888, label: 'Balogun Textile & Commercial Market', city: 'Lagos', town: 'Lagos Island'),
+    'Idumota Market': GeoPoint(latitude: 6.4570, longitude: 3.3830, label: 'Idumota Wholesale Market', city: 'Lagos', town: 'Lagos Island'),
+    'Trade Fair Complex': GeoPoint(latitude: 6.4670, longitude: 3.2350, label: 'Lagos International Trade Fair', city: 'Lagos', town: 'Ojo'),
+    'MedPlus Pharmacy': GeoPoint(latitude: 6.5200, longitude: 3.3750, label: 'MedPlus Pharmacy', city: 'Lagos', town: 'Yaba'),
+    'GIG Logistics': GeoPoint(latitude: 6.5100, longitude: 3.3700, label: 'GIG Logistics Hub', city: 'Lagos', town: 'Yaba'),
+
+    // --- Oyo (Ibadan) ---
+    'Bodija': GeoPoint(latitude: 7.4343, longitude: 3.9056, label: 'Bodija Wholesale Market', city: 'Ibadan', town: 'Bodija'),
+    'Bodija Market': GeoPoint(latitude: 7.4343, longitude: 3.9056, label: 'Bodija Wholesale Market', city: 'Ibadan', town: 'Bodija'),
+    'Bodija Market Hub': GeoPoint(latitude: 7.4343, longitude: 3.9056, label: 'Bodija Wholesale Market', city: 'Ibadan', town: 'Bodija'),
+    'Bodija Wholesale Market': GeoPoint(latitude: 7.4343, longitude: 3.9056, label: 'Bodija Wholesale Market', city: 'Ibadan', town: 'Bodija'),
+    'Dugbe': GeoPoint(latitude: 7.3876, longitude: 3.8767, label: 'Dugbe Commercial District', city: 'Ibadan', town: 'Dugbe'),
+    'Dugbe Market': GeoPoint(latitude: 7.3876, longitude: 3.8767, label: 'Dugbe Commercial District', city: 'Ibadan', town: 'Dugbe'),
+    'Dugbe Business District': GeoPoint(latitude: 7.3876, longitude: 3.8767, label: 'Dugbe Commercial District', city: 'Ibadan', town: 'Dugbe'),
+    'Oje Market': GeoPoint(latitude: 7.3980, longitude: 3.9120, label: 'Oje Traditional Fabric & Produce Market', city: 'Ibadan', town: 'Oje'),
+    'Oje Fresh Produce': GeoPoint(latitude: 7.3980, longitude: 3.9120, label: 'Oje Traditional Fabric & Produce Market', city: 'Ibadan', town: 'Oje'),
+    'Iwo Road': GeoPoint(latitude: 7.4100, longitude: 3.9350, label: 'Iwo Road Transit & Electronics Hub', city: 'Ibadan', town: 'Iwo Road'),
+    'Challenge': GeoPoint(latitude: 7.3500, longitude: 3.8700, label: 'Challenge / Ring Road Commercial Zone', city: 'Ibadan', town: 'Challenge'),
+
+    // --- Ogun ---
+    'Kuto': GeoPoint(latitude: 7.1420, longitude: 3.3550, label: 'Kuto Market, Abeokuta', city: 'Ogun', town: 'Abeokuta'),
+    'Kuto Market': GeoPoint(latitude: 7.1420, longitude: 3.3550, label: 'Kuto Market, Abeokuta', city: 'Ogun', town: 'Abeokuta'),
+    'Omida Market': GeoPoint(latitude: 7.1480, longitude: 3.3450, label: 'Omida Shopping Complex, Abeokuta', city: 'Ogun', town: 'Abeokuta'),
+
+    // --- Abuja (FCT) ---
+    'Wuse Market': GeoPoint(latitude: 9.0765, longitude: 7.3986, label: 'Wuse 2 Commercial Market Zone', city: 'Abuja', town: 'Wuse 2'),
+    'Wuse 2': GeoPoint(latitude: 9.0765, longitude: 7.3986, label: 'Wuse 2 Commercial Market Zone', city: 'Abuja', town: 'Wuse 2'),
+    'Utako Market': GeoPoint(latitude: 9.0700, longitude: 7.4390, label: 'Utako Modern Market', city: 'Abuja', town: 'Utako'),
+    'Garki Model Market': GeoPoint(latitude: 9.0280, longitude: 7.4900, label: 'Garki Model Market', city: 'Abuja', town: 'Garki'),
+
+    // --- Eastern / Southern Commercial Hubs ---
+    'Onitsha Main Market': GeoPoint(latitude: 6.1498, longitude: 6.7858, label: 'Onitsha Main Market', city: 'Anambra', town: 'Onitsha'),
+    'Ariaria International Market': GeoPoint(latitude: 5.1065, longitude: 7.3667, label: 'Ariaria International Market, Aba', city: 'Abia', town: 'Aba'),
+    'Ogbete Main Market': GeoPoint(latitude: 6.4584, longitude: 7.5464, label: 'Ogbete Main Market, Enugu', city: 'Enugu', town: 'Enugu'),
+    'Relief Market': GeoPoint(latitude: 5.4836, longitude: 7.0333, label: 'Douglas / Relief Market, Owerri', city: 'Imo', town: 'Owerri'),
+    'Oil Mill Market': GeoPoint(latitude: 4.8156, longitude: 7.0498, label: 'Oil Mill Market, Port Harcourt', city: 'Rivers', town: 'Port Harcourt'),
+    'Ring Road Market': GeoPoint(latitude: 6.3350, longitude: 5.6037, label: 'Ring Road Market, Benin City', city: 'Edo', town: 'Benin City'),
+
+    // --- Northern Hubs ---
+    'Sabon Gari Market': GeoPoint(latitude: 12.0022, longitude: 8.5920, label: 'Sabon Gari / Kurmi Market, Kano', city: 'Kano', town: 'Kano'),
+    'Kaduna Central Market': GeoPoint(latitude: 10.5222, longitude: 7.4383, label: 'Kaduna Central Market Zone', city: 'Kaduna', town: 'Kaduna'),
+    'Terminus Main Market': GeoPoint(latitude: 9.8965, longitude: 8.8583, label: 'Terminus Main Market, Jos', city: 'Plateau', town: 'Jos'),
   };
+
+  /// Attempts to resolve geographic coordinates for a given market name, seller outlet, or town string.
+  static GeoPoint? resolveCoordinates(String? query) {
+    if (query == null || query.trim().isEmpty) return null;
+    final q = query.trim().toLowerCase();
+
+    // Online delivery / e-commerce platforms have zero transit distance
+    if (q.contains('online') ||
+        q.contains('jumia') ||
+        q.contains('konga') ||
+        q.contains('ecommerce') ||
+        q.contains('e-commerce') ||
+        q.contains('doorstep')) {
+      return null;
+    }
+
+    // 1. Direct or substring match in knownMarketCoordinates
+    for (final entry in knownMarketCoordinates.entries) {
+      final key = entry.key.toLowerCase();
+      if (q == key || q.contains(key) || key.contains(q)) {
+        return entry.value;
+      }
+    }
+
+    // 2. Extract potential market name from inside parentheses: e.g. "Mama Ngozi (Bodija Market)"
+    final parenMatch = RegExp(r'\(([^)]+)\)').firstMatch(query);
+    if (parenMatch != null) {
+      final inside = parenMatch.group(1)!.trim().toLowerCase();
+      for (final entry in knownMarketCoordinates.entries) {
+        final key = entry.key.toLowerCase();
+        if (inside == key || inside.contains(key) || key.contains(inside)) {
+          return entry.value;
+        }
+      }
+    }
+
+    // 3. Match against commercial hubs
+    for (final hub in availableHubs) {
+      final t = hub.town.toLowerCase();
+      final l = hub.label.toLowerCase();
+      final c = hub.city.toLowerCase();
+      if ((t.isNotEmpty && q.contains(t)) ||
+          q.contains(l) ||
+          (c.isNotEmpty && q.contains(c))) {
+        return hub;
+      }
+    }
+
+    // 4. Match against Nigerian towns directory
+    for (final town in nigerianTownDirectory) {
+      final t = town.town.toLowerCase();
+      final hub = town.commercialHub.toLowerCase();
+      if ((t.isNotEmpty && q.contains(t)) ||
+          (hub.isNotEmpty && q.contains(hub))) {
+        return GeoPoint(
+          latitude: town.latitude,
+          longitude: town.longitude,
+          label: town.commercialHub,
+          city: town.city,
+          town: town.town,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /// Calculates dynamic distance between user and a destination.
+  /// Returns 0.0 when distance cannot be calculated (uncalibrated / unknown / online delivery).
+  static double resolveDistanceKm({
+    required GeoPoint? userLocation,
+    double? destLat,
+    double? destLon,
+    String? destLocationName,
+  }) {
+    if (userLocation == null || !userLocation.isSet) {
+      return 0.0;
+    }
+
+    // If destination coordinates are explicitly provided
+    if (destLat != null && destLon != null && (destLat != 0.0 || destLon != 0.0)) {
+      return calculateDistanceKm(
+        lat1: userLocation.latitude,
+        lon1: userLocation.longitude,
+        lat2: destLat,
+        lon2: destLon,
+      );
+    }
+
+    // If destination name or market is provided, resolve its coordinates
+    if (destLocationName != null && destLocationName.trim().isNotEmpty) {
+      final point = resolveCoordinates(destLocationName);
+      if (point != null) {
+        return calculateDistanceKm(
+          lat1: userLocation.latitude,
+          lon1: userLocation.longitude,
+          lat2: point.latitude,
+          lon2: point.longitude,
+        );
+      }
+    }
+
+    return 0.0;
+  }
 
   /// Persist the selected or live location to SharedPreferences
   static Future<void> persistLocation(GeoPoint point) async {

@@ -327,8 +327,28 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
 
   void _openTraderChat() {
     Navigator.pop(context);
+    final buyerLocation = ref.read(locationProvider);
+    final sellerPos = _resolveSellerCoordinates();
+    final dist = (buyerLocation.isSet && sellerPos != null)
+        ? LocationService.calculateDistanceKm(
+            lat1: buyerLocation.latitude,
+            lon1: buyerLocation.longitude,
+            lat2: sellerPos.latitude,
+            lon2: sellerPos.longitude,
+          )
+        : LocationService.resolveDistanceKm(
+            userLocation: buyerLocation,
+            destLat: widget.sellerLat,
+            destLon: widget.sellerLng,
+            destLocationName: widget.marketLocation,
+          );
+
     final source = widget.observation != null
-        ? ItemAcquisitionSource.fromObservation(widget.observation!)
+        ? ItemAcquisitionSource.fromObservation(
+            widget.observation!,
+            dynamicDistanceKm: dist,
+            userLocation: buyerLocation,
+          )
         : ItemAcquisitionSource(
             id: 'src-${widget.sellerName.toLowerCase().replaceAll(' ', '-')}',
             itemId: 'item-${widget.productName ?? "commodity"}',
@@ -340,9 +360,9 @@ class _SellerLocationMapSheetState extends ConsumerState<SellerLocationMapSheet>
             outletName: widget.sellerName,
             channel: AcquisitionChannel.registeredTrader,
             marketHubOrLocation: widget.marketLocation,
-            latitude: widget.sellerLat,
-            longitude: widget.sellerLng,
-            dynamicDistanceKm: 1.5,
+            latitude: widget.sellerLat ?? sellerPos?.latitude,
+            longitude: widget.sellerLng ?? sellerPos?.longitude,
+            dynamicDistanceKm: dist,
             isPlatformRegisteredTrader: true,
             inStock: widget.inStock,
             brandOrGrade: widget.brandOrGrade,

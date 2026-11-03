@@ -141,7 +141,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Multimodal Vision Paper Note Gateway
+    // 2. Multimodal Vision Product & Paper Note Gateway
     if (action === "parse_image" || action === "vision") {
       const { imageBase64, prompt } = payload || {};
       const metaResponse = await fetch("https://api.meta.ai/v1/chat/completions", {
@@ -156,14 +156,14 @@ serve(async (req) => {
             {
               role: "system",
               content:
-                "You are Meta Muse Spark Vision. Transcribe handwritten shopping lists into JSON with fields: shoppingItems (array of {productName, quantity, unit, estimatedUnitPrice}), budget (number), notes (string).",
+                "You are SmartMove AI Vision Assistant. Examine the provided photo carefully. It may be either: (1) A photo of an actual physical commodity or product (e.g., vehicles, electronics, phones, kitchen appliances, machinery, food staples, fashion, or pharmaceuticals). In this case, identify the exact product name, brand/model, standard retail unit, and estimated price in Naira. Set 'is_product_photo': true, 'product_name': '<exact product name>', and add it to 'shopping_items'. (2) A photographed paper shopping list or receipt. In this case, transcribe all items into 'shopping_items' (productName, quantity, unit, estimatedUnitPrice), and extract budget. Set 'is_product_photo': false. Output valid JSON with keys: transcription, lines, budget, shopping_items, is_product_photo, product_name.",
             },
             {
               role: "user",
               content: [
                 {
                   type: "text",
-                  text: prompt || "Transcribe this paper shopping note into structured items.",
+                  text: prompt || "Examine this image. Identify the product name or transcribe the paper shopping list.",
                 },
                 {
                   type: "image_url",

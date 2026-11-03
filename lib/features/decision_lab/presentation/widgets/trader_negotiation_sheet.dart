@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/item_acquisition_source.dart';
 import '../../../../core/services/safe_outlet_launcher.dart';
+import '../../../../core/services/location_service.dart';
 import '../../../../core/state/app_state.dart';
 import '../../../messages/presentation/chat_thread_screen.dart';
 import '../../../../core/presentation/widgets/seller_catalog_sheet.dart';
@@ -296,10 +297,25 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        '${widget.source.marketHubOrLocation} • ${widget.source.dynamicDistanceKm.toStringAsFixed(1)} km away',
-                        style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                        overflow: TextOverflow.ellipsis,
+                      Builder(
+                        builder: (context) {
+                          final userLoc = ref.watch(locationProvider);
+                          final dist = widget.source.dynamicDistanceKm > 0
+                              ? widget.source.dynamicDistanceKm
+                              : LocationService.resolveDistanceKm(
+                                  userLocation: userLoc,
+                                  destLat: widget.source.latitude,
+                                  destLon: widget.source.longitude,
+                                  destLocationName: widget.source.marketHubOrLocation,
+                                );
+                          final distLabel = dist > 0 ? ' • ${dist.toStringAsFixed(1)} km away' : '';
+
+                          return Text(
+                            '${widget.source.marketHubOrLocation}$distLabel',
+                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
                       ),
                     ],
                   ),

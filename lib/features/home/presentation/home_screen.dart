@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/price_observation.dart';
+import '../../../core/models/commodity_item.dart';
 import '../../../core/localization/app_language.dart';
 import '../../discover/presentation/product_detail_sheet.dart';
 import 'widgets/location_picker_sheet.dart';
@@ -636,6 +637,31 @@ class HomeScreen extends ConsumerWidget {
                                   CommunityAssistanceSheet.show(context, observation: obs);
                                 },
                               ),
+                            IconButton(
+                              key: ValueKey('home_add_basket_${obs.id}'),
+                              icon: const Icon(Icons.add_shopping_cart, size: 19, color: AppColors.primary),
+                              tooltip: 'Add to Basket',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () {
+                                final item = ShoppingItem(
+                                  id: 'item-${obs.productId.isNotEmpty ? obs.productId : obs.id}-${DateTime.now().millisecondsSinceEpoch}',
+                                  productId: obs.productId,
+                                  productName: obs.productName,
+                                  quantity: 1,
+                                  unit: obs.unit,
+                                  estimatedUnitPrice: obs.price,
+                                  priority: CommodityPriority.essential,
+                                );
+                                ref.read(decisionLabProvider.notifier).addShoppingItem(item);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Added ${obs.productName} to basket!'),
+                                    backgroundColor: AppColors.primary,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -783,6 +809,31 @@ class HomeScreen extends ConsumerWidget {
                                   color: isPositive ? AppColors.successText : AppColors.errorText,
                                 ),
                               ),
+                            ),
+                            IconButton(
+                              key: ValueKey('home_add_deal_${p.id}'),
+                              icon: const Icon(Icons.add_shopping_cart, size: 19, color: AppColors.primary),
+                              tooltip: 'Add to Basket',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () {
+                                final item = ShoppingItem(
+                                  id: 'item-${p.id}-${DateTime.now().millisecondsSinceEpoch}',
+                                  productId: p.id,
+                                  productName: p.name,
+                                  quantity: 1,
+                                  unit: p.standardUnit,
+                                  estimatedUnitPrice: p.lowestPrice,
+                                  priority: CommodityPriority.essential,
+                                );
+                                ref.read(decisionLabProvider.notifier).addShoppingItem(item);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Added ${p.name} to basket!'),
+                                    backgroundColor: AppColors.primary,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),

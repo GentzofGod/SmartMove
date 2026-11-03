@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 import '../models/item_acquisition_source.dart';
 import '../presentation/widgets/seller_location_map_sheet.dart';
 import '../../features/decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
+import '../state/app_state.dart';
+import 'location_service.dart';
 import 'meta_ai_service.dart';
 import 'commodity_comparison_service.dart';
 
@@ -390,6 +393,15 @@ class SafeOutletLauncher {
                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                         ),
                                         onPressed: () {
+                                          final loc = vendor.snippet.split('•').first.trim();
+                                          GeoPoint? buyerLoc;
+                                          try {
+                                            buyerLoc = ProviderScope.containerOf(context, listen: false).read(locationProvider);
+                                          } catch (_) {}
+                                          final dist = LocationService.resolveDistanceKm(
+                                            userLocation: buyerLoc,
+                                            destLocationName: loc,
+                                          );
                                           final src = ItemAcquisitionSource(
                                             id: 'vendor-${vendor.vendorName.hashCode}',
                                             itemId: 'item-${comparison.commodityName.hashCode}',
@@ -403,8 +415,8 @@ class SafeOutletLauncher {
                                             totalCost: vendor.detectedPrice ?? 0.0,
                                             outletName: vendor.vendorName.replaceAll(' (SmartMove Catalog)', ''),
                                             channel: AcquisitionChannel.registeredTrader,
-                                            marketHubOrLocation: vendor.snippet.split('•').first.trim(),
-                                            dynamicDistanceKm: 1.5,
+                                            marketHubOrLocation: loc,
+                                            dynamicDistanceKm: dist,
                                             isPlatformRegisteredTrader: true,
                                             inStock: true,
                                           );

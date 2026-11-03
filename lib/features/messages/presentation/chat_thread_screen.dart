@@ -533,7 +533,7 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                   Text(
                     partnerIsTrader
                         ? (location != null && location.isNotEmpty
-                            ? '$location${distance != null ? " • ${distance.toStringAsFixed(1)}km" : ""}'
+                            ? '$location${(distance != null && distance > 0) ? " • ${distance.toStringAsFixed(1)}km" : ""}'
                             : 'Verified Market Stall')
                         : 'Customer Inquiry',
                     style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),

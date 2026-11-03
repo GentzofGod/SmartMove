@@ -6,7 +6,6 @@ import '../../features/navigation/presentation/main_scaffold.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/products/presentation/products_screen.dart';
 import '../../features/decision_lab/presentation/decision_lab_screen.dart';
-import '../../features/itinerary/presentation/itinerary_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
@@ -65,8 +64,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/itinerary',
-      parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) => const ItineraryScreen(),
+      redirect: (context, state) => '/decision-lab',
     ),
     GoRoute(
       path: '/profile',

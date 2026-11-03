@@ -557,7 +557,7 @@ class SamplePaperNote {
   ];
 }
 
-/// Result of handwritten paper shopping list scanning via Meta Muse Spark Vision
+/// Result of handwritten paper shopping list or product photo scanning via Meta Muse Spark Vision
 class PaperNoteScanResult {
   final String rawTranscribedText;
   final List<String> extractedLines;
@@ -571,6 +571,8 @@ class PaperNoteScanResult {
   final String noteTitle;
   final bool hasError;
   final String? errorMessage;
+  final bool isProductPhoto;
+  final String? detectedProductName;
 
   const PaperNoteScanResult({
     required this.rawTranscribedText,
@@ -582,19 +584,22 @@ class PaperNoteScanResult {
     required this.proposal,
     this.imageBytes,
     this.imagePath,
-    this.noteTitle = 'Handwritten Shopping Note',
+    this.noteTitle = 'Photographed Item / Note',
     this.hasError = false,
     this.errorMessage,
+    this.isProductPhoto = false,
+    this.detectedProductName,
   });
 
   factory PaperNoteScanResult.error({
     required String message,
     List<int>? imageBytes,
     String? imagePath,
-    String noteTitle = 'Handwritten Shopping Note',
+    String noteTitle = 'Photographed Item / Note',
+    String? detectedProductName,
   }) {
     return PaperNoteScanResult(
-      rawTranscribedText: '',
+      rawTranscribedText: detectedProductName ?? '',
       extractedLines: const [],
       confidence: 0.0,
       modelName: 'SmartMove AI Vision',
@@ -605,6 +610,8 @@ class PaperNoteScanResult {
       imageBytes: imageBytes,
       imagePath: imagePath,
       noteTitle: noteTitle,
+      isProductPhoto: detectedProductName != null && detectedProductName.isNotEmpty,
+      detectedProductName: detectedProductName,
     );
   }
 }
@@ -1435,14 +1442,25 @@ class MetaAiService {
 
   // --- 2. Muse Spark Vision (Handwritten Paper Note & Shopping List Parsing) ---
 
-  /// Parse handwritten or printed paper shopping lists from camera / photo images
+  /// Parse handwritten/printed paper shopping lists OR photographed products from camera / photo images
   /// using Meta Muse Spark Vision (`muse-spark-1.3`) multimodal vision model.
   Future<PaperNoteScanResult> parsePaperNoteImage({
     List<int>? imageBytes,
     String? imagePath,
+    String? imageName,
     String? simulatedNoteId,
     String? customNoteText,
   }) async {
+    // Heuristic candidate product name from filename / path if available
+    String? candidateProductName;
+    final nameToCheck = imageName ?? (imagePath?.split('/').last.split('\\').last);
+    if (nameToCheck != null && nameToCheck.isNotEmpty) {
+      final clean = nameToCheck.split('.').first.replaceAll(RegExp(r'[_-]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (clean.length > 2 && !RegExp(r'^(image|img|photo|scan|capture|camera|\d+)$', caseSensitive: false).hasMatch(clean)) {
+        candidateProductName = clean.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
+      }
+    }
+
     // 1. Resolve matching sample note if simulated or predefined
     SamplePaperNote? matchedSample;
     if (simulatedNoteId != null) {
@@ -1452,102 +1470,153 @@ class MetaAiService {
       );
     }
 
-    // 2. If authenticated Meta AI endpoint or Edge Proxy is configured and imageBytes provided, attempt multimodal vision inference
-    if (hasValidAuth && imageBytes != null && imageBytes.isNotEmpty) {
-      try {
-        final base64Image = base64Encode(imageBytes);
-        dynamic body;
+    String? detailedFailureReason;
 
-        if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
-          final response = await http
-              .post(
-                Uri.parse('$effectiveEndpoint/v1/chat/completions'),
-                headers: {
-                  'Authorization': 'Bearer $effectiveApiKey',
-                  'Content-Type': 'application/json',
-                },
-                body: jsonEncode({
-                  'model': 'muse-spark-1.3',
-                  'messages': [
-                    {
-                      'role': 'system',
-                      'content':
-                          'You are Meta Muse Spark Vision for SmartMove. You examine photographed handwritten or printed paper shopping lists in Nigeria / West Africa. Transcribe the handwritten lines and extract budget, shopping items (name, quantity, unit, estimatedUnitPrice, brandOrGrade), and return valid JSON with keys: "transcription", "lines", "budget", "shopping_items".',
-                    },
-                    {
-                      'role': 'user',
-                      'content': [
-                        {
-                          'type': 'text',
-                          'text':
-                              'Transcribe and extract this handwritten paper shopping note into structured commodity items and budget.',
-                        },
-                        {
-                          'type': 'image_url',
-                          'image_url': {
-                            'url': 'data:image/jpeg;base64,$base64Image',
+    // 2. Multimodal Vision Inference
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      if (hasValidAuth) {
+        try {
+          final base64Image = base64Encode(imageBytes);
+          dynamic body;
+
+          const visionSystemPrompt =
+              'You are SmartMove AI Vision Assistant. Examine the provided photo carefully. It may be either: '
+              '(1) A photograph of an actual physical commodity or product (e.g. vehicles, smartphones, kitchen appliances, electronics, tools, food staples, cosmetics, medicines, or household goods). '
+              'In this case, identify the exact product name, brand/model, standard retail unit, and estimated price in Nigerian Naira (₦). '
+              'Set "is_product_photo": true, "product_name": "<exact item name>", and add it to "shopping_items". '
+              '(2) A photographed paper shopping list or receipt. In this case, transcribe all items into "shopping_items" (productName, quantity, unit, estimatedUnitPrice), and extract budget. Set "is_product_photo": false. '
+              'Return valid JSON with keys: "transcription", "lines", "budget", "shopping_items", "is_product_photo", "product_name".';
+
+          if (effectiveApiKey != null && effectiveApiKey!.isNotEmpty) {
+            final response = await http
+                .post(
+                  Uri.parse('$effectiveEndpoint/v1/chat/completions'),
+                  headers: {
+                    'Authorization': 'Bearer $effectiveApiKey',
+                    'Content-Type': 'application/json',
+                  },
+                  body: jsonEncode({
+                    'model': 'muse-spark-1.3',
+                    'messages': [
+                      {
+                        'role': 'system',
+                        'content': visionSystemPrompt,
+                      },
+                      {
+                        'role': 'user',
+                        'content': [
+                          {
+                            'type': 'text',
+                            'text': 'Examine this image. Recognize the product or transcribe the shopping list.',
                           },
-                        },
-                      ],
-                    },
-                  ],
-                  'temperature': 0.1,
-                }),
-              )
-              .timeout(const Duration(seconds: 30));
+                          {
+                            'type': 'image_url',
+                            'image_url': {
+                              'url': 'data:image/jpeg;base64,$base64Image',
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                    'temperature': 0.1,
+                  }),
+                )
+                .timeout(const Duration(seconds: 30));
 
-          if (response.statusCode == 200) {
-            body = jsonDecode(response.body);
-          }
-        } else if (SupabaseDataService.isConnected) {
-          final proxyRes = await _invokeEdgeProxy(
-            action: 'vision',
-            payload: {'imageBase64': base64Image},
-          );
-          if (proxyRes.isSuccess && proxyRes.data != null) {
-            body = proxyRes.data;
-          }
-        }
-
-        if (body is Map) {
-          final content = body['choices']?[0]?['message']?['content'];
-          if (content != null) {
-            final parsedJson = content is Map ? content : jsonDecode(content.toString());
-            if (parsedJson is Map<String, dynamic> || parsedJson is Map) {
-              final jsonMap = Map<String, dynamic>.from(parsedJson as Map);
-              final transcription = jsonMap['transcription']?.toString() ?? '';
-              final linesRaw = jsonMap['lines'] as List<dynamic>?;
-              final lines = linesRaw?.map((l) => l.toString()).toList() ??
-                  transcription.split('\n').where((l) => l.trim().isNotEmpty).toList();
-
-              final proposal = validateProposal(
-                parsedJson,
-                transcription,
-                isFallback: false,
-                executionStatus: 'SmartMove AI: Document Vision (Success)',
-                fallbackReason: null,
-              );
-
-              if (proposal != null) {
-                return PaperNoteScanResult(
-                  rawTranscribedText: transcription,
-                  extractedLines: lines,
-                  confidence: 0.97,
-                  modelName: 'SmartMove AI Vision',
-                  isFallback: false,
-                  note:
-                      'SmartMove AI: Handwritten paper note transcribed with AI Vision (Success)',
-                  proposal: proposal,
-                  imageBytes: imageBytes,
-                  imagePath: imagePath,
-                  noteTitle: 'Photographed Shopping Note',
-                );
-              }
+            if (response.statusCode == 200) {
+              body = jsonDecode(response.body);
+            } else {
+              detailedFailureReason = 'Meta Model API returned HTTP ${response.statusCode}: ${response.body}';
+            }
+          } else if (SupabaseDataService.isConnected) {
+            final proxyRes = await _invokeEdgeProxy(
+              action: 'vision',
+              payload: {
+                'imageBase64': base64Image,
+                'prompt': 'Examine this image. Recognize the product or transcribe the shopping note.',
+              },
+            );
+            if (proxyRes.isSuccess && proxyRes.data != null) {
+              body = proxyRes.data;
+            } else {
+              detailedFailureReason = proxyRes.errorMessage ??
+                  'Supabase Edge Function returned HTTP ${proxyRes.statusCode ?? 'unknown'}';
             }
           }
+
+          if (body is Map) {
+            final content = body['choices']?[0]?['message']?['content'];
+            if (content != null) {
+              final parsedJson = content is Map ? content : jsonDecode(content.toString());
+              if (parsedJson is Map<String, dynamic> || parsedJson is Map) {
+                final jsonMap = Map<String, dynamic>.from(parsedJson as Map);
+                final isProductPhoto = jsonMap['is_product_photo'] == true ||
+                    (jsonMap['product_name'] != null && jsonMap['product_name'].toString().isNotEmpty);
+                final productName = jsonMap['product_name']?.toString() ?? candidateProductName ?? '';
+                final rawTranscription = jsonMap['transcription']?.toString() ?? '';
+                final transcription = rawTranscription.isNotEmpty
+                    ? rawTranscription
+                    : (productName.isNotEmpty ? productName : '');
+                final linesRaw = jsonMap['lines'] as List<dynamic>?;
+                final lines = linesRaw?.map((l) => l.toString()).toList() ??
+                    (transcription.isNotEmpty
+                        ? transcription.split('\n').where((l) => l.trim().isNotEmpty).toList()
+                        : (productName.isNotEmpty ? [productName] : []));
+
+                // If proposal doesn't have shopping items but product name was detected
+                var itemsRaw = jsonMap['shopping_items'] as List<dynamic>?;
+                if ((itemsRaw == null || itemsRaw.isEmpty) && productName.isNotEmpty) {
+                  jsonMap['shopping_items'] = [
+                    {
+                      'name': productName,
+                      'productName': productName,
+                      'quantity': 1,
+                      'unit': jsonMap['unit'] ?? 'item',
+                      'estimatedUnitPrice': jsonMap['budget'] ?? jsonMap['estimated_unit_price'] ?? 0.0,
+                    }
+                  ];
+                }
+
+                final proposal = validateProposal(
+                  jsonMap,
+                  transcription,
+                  isFallback: false,
+                  executionStatus: isProductPhoto
+                      ? 'SmartMove AI: Product Photo Recognized (Success)'
+                      : 'SmartMove AI: Document Vision (Success)',
+                  fallbackReason: null,
+                );
+
+                if (proposal != null) {
+                  return PaperNoteScanResult(
+                    rawTranscribedText: transcription,
+                    extractedLines: lines,
+                    confidence: 0.98,
+                    modelName: 'SmartMove AI Vision',
+                    isFallback: false,
+                    isProductPhoto: isProductPhoto,
+                    detectedProductName: productName.isNotEmpty ? productName : null,
+                    note: isProductPhoto
+                        ? 'Product recognized: $productName'
+                        : 'Shopping note transcribed with AI Vision',
+                    proposal: proposal,
+                    imageBytes: imageBytes,
+                    imagePath: imagePath,
+                    noteTitle: isProductPhoto ? (productName.isNotEmpty ? productName : 'Product Photo') : 'Photographed Shopping Note',
+                  );
+                } else {
+                  detailedFailureReason ??= 'AI Vision model returned an unparseable structure: $content';
+                }
+              }
+            } else {
+              detailedFailureReason ??= 'AI Vision model returned an empty choice.';
+            }
+          }
+        } catch (err) {
+          detailedFailureReason = 'Vision network error: $err';
         }
-      } catch (err) {
-        // Fall back gracefully to local vision intelligence
+      } else {
+        detailedFailureReason = 'No active Meta Model API key (META_API_KEY) or Supabase Cloud connection configured.';
       }
     }
 
@@ -1564,10 +1633,11 @@ class MetaAiService {
       if (proposal.hasError || proposal.shoppingItems.isEmpty) {
         return PaperNoteScanResult.error(
           message: proposal.errorMessage ??
-              'Could not identify any shopping commodities from the transcribed text. Please add items manually in Inference Lab.',
+              'Could not identify any shopping commodities from the transcribed text. Please check the name or add items manually in Inference Lab.',
           imageBytes: imageBytes,
           imagePath: imagePath,
-          noteTitle: 'Custom Paper Note',
+          noteTitle: candidateProductName ?? 'Custom Paper Note',
+          detectedProductName: candidateProductName,
         );
       }
 
@@ -1577,11 +1647,13 @@ class MetaAiService {
         confidence: 0.96,
         modelName: 'SmartMove AI Vision',
         isFallback: false,
-        note: 'Transcribed from custom note text',
+        isProductPhoto: candidateProductName != null,
+        detectedProductName: candidateProductName ?? textToProcess,
+        note: 'Transcribed from custom input text',
         proposal: proposal,
         imageBytes: imageBytes,
         imagePath: imagePath,
-        noteTitle: 'Custom Paper Note',
+        noteTitle: candidateProductName ?? 'Custom Paper Note',
       );
     }
 
@@ -1601,21 +1673,26 @@ class MetaAiService {
       );
     }
 
-    // 4. Rather than returning hardcoded default notes, report a user-friendly error
+    // 4. Report exact user-facing error message with detailed diagnostic
     if (imageBytes == null || imageBytes.isEmpty) {
       return PaperNoteScanResult.error(
         message:
-            'No photo provided. Please capture or select a photo of your handwritten shopping note.',
+            'No photo provided. Please capture or select a photo of your product or handwritten shopping note.',
         imagePath: imagePath,
       );
     }
 
+    final failureMsg = detailedFailureReason != null
+        ? 'AI Shopping Assistant vision service is currently unavailable: $detailedFailureReason\n\n'
+            'You can enter or confirm the product name below to look for sellers directly.'
+        : 'AI Shopping Assistant vision service is currently unavailable. Please verify your connection or enter your commodities manually below.';
+
     return PaperNoteScanResult.error(
-      message:
-          'AI Shopping Assistant vision service is currently unavailable. Please check your network connection or enter your commodities manually in Inference Lab.',
+      message: failureMsg,
       imageBytes: imageBytes,
       imagePath: imagePath,
-      noteTitle: 'Photographed Shopping Note',
+      noteTitle: candidateProductName ?? 'Photographed Item',
+      detectedProductName: candidateProductName,
     );
   }
 
@@ -4940,33 +5017,26 @@ class MetaAiService {
       final channel = obs.sellerChannel;
 
       // 1. Distance & Transit
-      double distance = 1.5;
-      String transitWindow = '15 mins transit';
+      double distance = 0.0;
+      String transitWindow = 'Physical Transit';
       if (channel == SellerChannel.onlineRetailer) {
         distance = 0.0;
         transitWindow = 'Doorstep Delivery';
-      } else if (userLocation != null && userLocation.isSet) {
-        final marketCoord =
-            LocationService.knownMarketCoordinates[obs.sellerName] ??
-                LocationService.knownMarketCoordinates[obs.marketLocation];
-        if (marketCoord != null) {
-          distance = LocationService.calculateDistanceKm(
-            lat1: userLocation.latitude,
-            lon1: userLocation.longitude,
-            lat2: marketCoord.latitude,
-            lon2: marketCoord.longitude,
-          );
-        } else {
-          distance = channel == SellerChannel.smbStore ? 1.2 : 2.4;
-        }
-        final mins =
-            (distance * (channel == SellerChannel.smbStore ? 6 : 7))
-                .clamp(5, 45)
-                .round();
-        transitWindow = '$mins mins transit';
       } else {
-        distance = channel == SellerChannel.smbStore ? 1.2 : 2.4;
-        transitWindow = '${(distance * 7).round()} mins transit';
+        distance = LocationService.resolveDistanceKm(
+          userLocation: userLocation,
+          destLat: obs.latitude,
+          destLon: obs.longitude,
+          destLocationName: obs.marketLocation.isNotEmpty ? obs.marketLocation : obs.sellerName,
+        );
+        if (distance > 0) {
+          final mins = (distance * (channel == SellerChannel.smbStore ? 6 : 7))
+              .clamp(5, 45)
+              .round();
+          transitWindow = '$mins mins transit';
+        } else {
+          transitWindow = 'Physical Transit';
+        }
       }
 
       // 2. Unit Price & Product Subtotal
@@ -5138,11 +5208,13 @@ class MetaAiService {
       final costFactor = maxCost > minCost
           ? (1.0 - (opt.totalLandedCost - minCost) / (maxCost - minCost))
           : 1.0;
-      final distFactor = opt.distanceKm == 0
+      final distFactor = (opt.channel == SellerChannel.onlineRetailer)
           ? 1.0
-          : (priority == UserDecisionPriority.convenienceDelivery
-              ? (1.0 - (opt.distanceKm / 3.0)).clamp(0.05, 0.55)
-              : (1.0 - (opt.distanceKm / 8.0)).clamp(0.15, 0.95));
+          : (opt.distanceKm > 0
+              ? (priority == UserDecisionPriority.convenienceDelivery
+                  ? (1.0 - (opt.distanceKm / 3.0)).clamp(0.05, 0.55)
+                  : (1.0 - (opt.distanceKm / 8.0)).clamp(0.15, 0.95))
+              : (priority == UserDecisionPriority.convenienceDelivery ? 0.35 : 0.70));
       final qualFactor = opt.qualityScore / 5.0;
       final repFactor = opt.reputationScore / 5.0;
       final suppFactor = opt.supportScore / 5.0;

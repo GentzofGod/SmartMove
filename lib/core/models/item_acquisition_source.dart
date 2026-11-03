@@ -1,4 +1,5 @@
 import 'price_observation.dart';
+import '../services/location_service.dart';
 
 enum AcquisitionChannel {
   registeredTrader,
@@ -67,7 +68,8 @@ class ItemAcquisitionSource {
 
   factory ItemAcquisitionSource.fromObservation(
     PriceObservation obs, {
-    double dynamicDistanceKm = 1.5,
+    double? dynamicDistanceKm,
+    GeoPoint? userLocation,
     double quantity = 1.0,
   }) {
     final chLower = obs.channel.toLowerCase();
@@ -76,6 +78,16 @@ class ItemAcquisitionSource {
         : (chLower.contains('smb')
             ? AcquisitionChannel.retailStore
             : AcquisitionChannel.physicalMarketHub);
+
+    final resolvedDistance = dynamicDistanceKm ??
+        (ch == AcquisitionChannel.ecommercePlatform
+            ? 0.0
+            : LocationService.resolveDistanceKm(
+                userLocation: userLocation,
+                destLat: obs.latitude,
+                destLon: obs.longitude,
+                destLocationName: obs.marketLocation.isNotEmpty ? obs.marketLocation : obs.sellerName,
+              ));
 
     return ItemAcquisitionSource(
       id: obs.id,
@@ -88,7 +100,9 @@ class ItemAcquisitionSource {
       outletName: obs.sellerName,
       channel: ch,
       marketHubOrLocation: obs.marketLocation,
-      dynamicDistanceKm: dynamicDistanceKm,
+      latitude: obs.latitude,
+      longitude: obs.longitude,
+      dynamicDistanceKm: resolvedDistance,
       isPlatformRegisteredTrader: obs.isVerified,
       inStock: obs.inStock,
       brandOrGrade: obs.brandOrGrade,

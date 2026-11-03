@@ -164,7 +164,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Header
-      expect(find.text('Scan Paper Shopping List'), findsOneWidget);
+      expect(find.text('Scan Product or Shopping List'), findsOneWidget);
       expect(find.text('SmartMove AI Vision Assistant'), findsOneWidget);
 
       // Verify Action Buttons
@@ -172,7 +172,7 @@ void main() {
       expect(find.byKey(const ValueKey('btn_choose_gallery_photo')), findsOneWidget);
 
       // Verify empty state is shown (no hardcoded sample presets or mock foodstuffs)
-      expect(find.text('No Paper Note Captured Yet'), findsOneWidget);
+      expect(find.text('Capture Product Photo or Shopping List'), findsOneWidget);
       expect(find.text('Bodija Market Foodstuffs'), findsNothing);
       expect(find.text('Household Pantry Restock'), findsNothing);
       expect(find.text('Mama Gold Rice 5kg'), findsNothing);
@@ -226,7 +226,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify PaperNoteScannerSheet opened
-      expect(find.text('Scan Paper Shopping List'), findsOneWidget);
+      expect(find.text('Scan Product or Shopping List'), findsOneWidget);
     });
 
     testWidgets('8. DiscoverScreen provides quick paper note scan button in search bar', (tester) async {
@@ -252,7 +252,7 @@ void main() {
       await tester.tap(discoverScanBtn);
       await tester.pumpAndSettle();
 
-      expect(find.text('Scan Paper Shopping List'), findsOneWidget);
+      expect(find.text('Scan Product or Shopping List'), findsOneWidget);
     });
   });
 }

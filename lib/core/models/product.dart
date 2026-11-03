@@ -129,7 +129,7 @@ class Product {
       bestSeller: (json['bestSeller'] ?? json['best_seller_name'])?.toString() ?? 'Local Market',
       sellerId: (json['sellerId'] ?? json['seller_id'])?.toString(),
       createdBy: (json['createdBy'] ?? json['created_by'])?.toString(),
-      distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 1.5,
+      distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       updateTime: json['updateTime']?.toString() ?? 'Updated recently',
       percentageChange:
           ((json['percentageChange'] ?? json['percentage_change']) as num?)?.toDouble() ?? 0.0,

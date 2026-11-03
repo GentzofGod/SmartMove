@@ -341,21 +341,15 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                         Builder(
                           builder: (context) {
                             final currentLocation = ref.watch(locationProvider);
-                            final marketCoord =
-                                LocationService.knownMarketCoordinates[widget
-                                    .product
-                                    .bestSeller];
-                            final dynamicDistance =
-                                (currentLocation.isSet && marketCoord != null)
-                                ? LocationService.calculateDistanceKm(
-                                    lat1: currentLocation.latitude,
-                                    lon1: currentLocation.longitude,
-                                    lat2: marketCoord.latitude,
-                                    lon2: marketCoord.longitude,
-                                  )
-                                : (currentLocation.isSet
-                                      ? widget.product.distanceKm
-                                      : null);
+                            final dynamicDistance = LocationService.resolveDistanceKm(
+                              userLocation: currentLocation,
+                              destLocationName: widget.product.bestSeller,
+                            );
+                            final effectiveDist = dynamicDistance > 0
+                                ? dynamicDistance
+                                : (widget.product.distanceKm > 0
+                                    ? widget.product.distanceKm
+                                    : null);
 
                             return Row(
                               children: [
@@ -367,8 +361,8 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    dynamicDistance != null
-                                        ? '${widget.product.bestSeller} • $dynamicDistance km away'
+                                    effectiveDist != null
+                                        ? '${widget.product.bestSeller} • ${effectiveDist.toStringAsFixed(1)} km away'
                                         : '${widget.product.bestSeller} • Open Market',
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -777,7 +771,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${obs.marketLocation} • ${sq.dynamicDistanceKm.toStringAsFixed(1)} km away • ${obs.sourceType.displayLabel}',
+                                    sq.dynamicDistanceKm > 0
+                                        ? '${obs.marketLocation} • ${sq.dynamicDistanceKm.toStringAsFixed(1)} km away • ${obs.sourceType.displayLabel}'
+                                        : '${obs.marketLocation} • ${obs.sourceType.displayLabel}',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: AppColors.textSecondary,

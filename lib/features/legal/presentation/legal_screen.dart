@@ -152,7 +152,7 @@ class _LegalScreenState extends ConsumerState<LegalScreen>
               '• Publish truthful, uninflated prices for all food commodities, building supplies, and energy products.\n'
               '• Adhere to standardized Nigerian retail measures (e.g. 50kg bag, 25kg bag, 1 derica, 4-litre paint rubber, kilogram).\n'
               '• Maintain accurate physical stall addresses and geocoordinates to facilitate buyer navigation.\n'
-              '• Promptly honor agreed quotes when a SmartMove shopper arrives with an active acquisition itinerary.',
+              '• Promptly honor agreed quotes when a SmartMove shopper arrives with an active shopping plan.',
         ),
         _buildSection(
           number: '4',
@@ -164,7 +164,7 @@ class _LegalScreenState extends ConsumerState<LegalScreen>
           number: '5',
           title: 'Decision Rehearsal & Route Navigation Guidance',
           content:
-              'SmartMove\'s Decision Rehearsal Lab simulates acquisition options, estimated transit cost, and multi-seller stops. Traffic congestion, sudden road diversions, and weather conditions remain the user\'s responsibility. Navigation routes are advisory and designed to minimize transit overhead.',
+              'SmartMove\'s Inference Lab simulates shopping options, estimated transit cost, and multi-seller stops. Traffic congestion, sudden road diversions, and weather conditions remain the user\'s responsibility. Navigation routes are advisory and designed to minimize transit overhead.',
         ),
         _buildSection(
           number: '6',

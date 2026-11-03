@@ -235,23 +235,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         break;
       case ComparisonSortPreference.closestDistance:
         displayedProducts.sort((a, b) {
-          final distA = (currentLocation.isSet && LocationService.knownMarketCoordinates.containsKey(a.bestSeller))
-              ? LocationService.calculateDistanceKm(
-                  lat1: currentLocation.latitude,
-                  lon1: currentLocation.longitude,
-                  lat2: LocationService.knownMarketCoordinates[a.bestSeller]!.latitude,
-                  lon2: LocationService.knownMarketCoordinates[a.bestSeller]!.longitude,
-                )
-              : a.distanceKm;
-          final distB = (currentLocation.isSet && LocationService.knownMarketCoordinates.containsKey(b.bestSeller))
-              ? LocationService.calculateDistanceKm(
-                  lat1: currentLocation.latitude,
-                  lon1: currentLocation.longitude,
-                  lat2: LocationService.knownMarketCoordinates[b.bestSeller]!.latitude,
-                  lon2: LocationService.knownMarketCoordinates[b.bestSeller]!.longitude,
-                )
-              : b.distanceKm;
-          return distA.compareTo(distB);
+          final distA = LocationService.resolveDistanceKm(
+            userLocation: currentLocation,
+            destLocationName: a.bestSeller,
+          );
+          final effectiveA = distA > 0 ? distA : (a.distanceKm > 0 ? a.distanceKm : 999.0);
+          final distB = LocationService.resolveDistanceKm(
+            userLocation: currentLocation,
+            destLocationName: b.bestSeller,
+          );
+          final effectiveB = distB > 0 ? distB : (b.distanceKm > 0 ? b.distanceKm : 999.0);
+          return effectiveA.compareTo(effectiveB);
         });
         break;
       case ComparisonSortPreference.highestTrust:
@@ -843,19 +837,15 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                 Expanded(
                                   child: Builder(
                                     builder: (context) {
-                                      final marketCoord = LocationService
-                                          .knownMarketCoordinates[p.bestSeller];
-                                      final dynamicDistance = marketCoord != null
-                                          ? LocationService.calculateDistanceKm(
-                                              lat1: currentLocation.latitude,
-                                              lon1: currentLocation.longitude,
-                                              lat2: marketCoord.latitude,
-                                              lon2: marketCoord.longitude,
-                                            )
-                                          : p.distanceKm;
+                                      final dist = LocationService.resolveDistanceKm(
+                                        userLocation: currentLocation,
+                                        destLocationName: p.bestSeller,
+                                      );
+                                      final effectiveDist = dist > 0 ? dist : (p.distanceKm > 0 ? p.distanceKm : null);
+                                      final distLabel = effectiveDist != null ? ' • ${effectiveDist.toStringAsFixed(1)} km' : '';
 
                                       return Text(
-                                        '${p.bestSeller} • ${p.channel} • $dynamicDistance km',
+                                        '${p.bestSeller} • ${p.channel}$distLabel',
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: 12,

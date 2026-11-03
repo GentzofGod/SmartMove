@@ -5,7 +5,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/models/product.dart';
 import '../../../core/models/price_observation.dart';
+import '../../../core/models/commodity_item.dart';
 import '../../../core/models/seller_application.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/services/meta_ai_service.dart';
 import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
@@ -677,7 +679,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         lowestPrice: p.lowestPrice,
         highestPrice: p.lowestPrice,
         bestSellerLocation: p.bestSeller,
-        distanceKm: p.distanceKm,
+        distanceKm: p.distanceKm > 0
+            ? p.distanceKm
+            : LocationService.resolveDistanceKm(
+                userLocation: currentLocation is GeoPoint ? currentLocation : null,
+                destLocationName: p.bestSeller,
+              ),
         inStock: true,
         originalProduct: p,
       );
@@ -713,6 +720,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         }
       } else {
         // Create an uncataloged unified item from observation
+        final obsDistance = LocationService.resolveDistanceKm(
+          userLocation: currentLocation is GeoPoint ? currentLocation : null,
+          destLat: obs.latitude,
+          destLon: obs.longitude,
+          destLocationName: obs.marketLocation,
+        );
         final builder = _UnifiedProductBuilder(
           id: obs.productId.isNotEmpty ? obs.productId : 'prod-unified-${obs.id}',
           name: obs.productName,
@@ -722,7 +735,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           lowestPrice: obs.price,
           highestPrice: obs.price,
           bestSellerLocation: obs.marketLocation,
-          distanceKm: 1.5,
+          distanceKm: obsDistance,
           inStock: obs.inStock,
           originalProduct: null,
         );
@@ -1240,7 +1253,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  '${item.bestSellerLocation} • ${item.distanceKm.toStringAsFixed(1)} km',
+                                  item.distanceKm > 0
+                                      ? '${item.bestSellerLocation} • ${item.distanceKm.toStringAsFixed(1)} km'
+                                      : item.bestSellerLocation,
                                   style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1260,6 +1275,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
                 // Footer Badges & Actions
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: item.hasVerifiedSellers
@@ -1285,10 +1301,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                     ),
-                    const SizedBox(width: 6),
-
-                    // Locate on Map Action or Community Help Action
                     if (item.hasVerifiedSellers) ...[
+                      const SizedBox(width: 6),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.location_on_outlined, size: 12, color: AppColors.primary),
                         label: const Text('Map', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
@@ -1312,8 +1326,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                           );
                         },
                       ),
-                      const SizedBox(width: 6),
                     ] else if (item.hasCommunityQuotes) ...[
+                      const SizedBox(width: 6),
                       OutlinedButton.icon(
                         key: const ValueKey('btn_unified_get_help'),
                         icon: const Icon(Icons.help_outline_rounded, size: 12, color: Color(0xFFE65100)),
@@ -1328,20 +1342,58 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                           CommunityAssistanceSheet.show(context, observation: mapObs);
                         },
                       ),
-                      const SizedBox(width: 6),
                     ],
+                  ],
+                ),
+                const SizedBox(height: 6),
 
-                    // Compare & Buy Action
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.visibility_outlined, size: 12),
-                      label: const Text('Compare', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                // Quick Add to Basket & Compare Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        key: ValueKey('btn_quick_add_${item.id}'),
+                        icon: const Icon(Icons.add_shopping_cart, size: 13),
+                        label: const Text('Add to Basket', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          final product = item.toProduct();
+                          final shoppingItem = ShoppingItem(
+                            id: 'item-${product.id}-${DateTime.now().millisecondsSinceEpoch}',
+                            productId: product.id,
+                            productName: product.name,
+                            quantity: 1,
+                            unit: product.standardUnit,
+                            estimatedUnitPrice: product.lowestPrice,
+                            priority: CommodityPriority.essential,
+                          );
+                          ref.read(decisionLabProvider.notifier).addShoppingItem(shoppingItem);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Added ${product.name} to basket!'),
+                              backgroundColor: AppColors.primary,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.visibility_outlined, size: 13, color: AppColors.primary),
+                      label: const Text('Compare', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                      style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
                       ),
                       onPressed: () {
                         showModalBottomSheet(

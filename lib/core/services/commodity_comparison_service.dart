@@ -324,19 +324,12 @@ class CommodityComparisonService {
           (multiplier > 0 ? q.price / multiplier : q.price);
 
       // Dynamic distance calculation
-      double distance = 1.5;
-      if (userLocation != null && userLocation.isSet) {
-        final marketCoord = LocationService.knownMarketCoordinates[q.sellerName] ??
-            LocationService.knownMarketCoordinates[q.marketLocation];
-        if (marketCoord != null) {
-          distance = LocationService.calculateDistanceKm(
-            lat1: userLocation.latitude,
-            lon1: userLocation.longitude,
-            lat2: marketCoord.latitude,
-            lon2: marketCoord.longitude,
-          );
-        }
-      }
+      final distance = LocationService.resolveDistanceKm(
+        userLocation: userLocation,
+        destLat: q.latitude,
+        destLon: q.longitude,
+        destLocationName: q.marketLocation.isNotEmpty ? q.marketLocation : q.sellerName,
+      );
 
       return _TempQuote(
         observation: q,

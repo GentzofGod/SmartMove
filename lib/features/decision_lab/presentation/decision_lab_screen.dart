@@ -132,46 +132,6 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           _buildCartTab(decisionState),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.cardBorder)),
-          ),
-          child: SizedBox(
-            height: 50,
-            child: ElevatedButton(
-              onPressed: candidates.isNotEmpty && selectedPlan.id != 'plan-default'
-                  ? () {
-                      // Lock in the selected option to the active itinerary / acquisition process
-                      ref.read(itineraryProvider.notifier).updateWithPlan(selectedPlan);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppColors.primary,
-                          content: Text('Proceeding with ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}! Loading acquisition process...'),
-                        ),
-                      );
-                      context.push('/itinerary');
-                    }
-                  : null,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  candidates.isNotEmpty && selectedPlan.id != 'plan-default'
-                      ? '${AppStrings.tr(ref, 'proceedWith')} ${selectedPlan.name.replaceAll(RegExp(r"Plan", caseSensitive: false), "Option")}'
-                      : 'Add Items to Cart to Proceed',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -949,8 +909,8 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
           ),
         ),
 
-        // Acquisition Outlets, Hubs & Registered Traders Section
-        _buildAcquisitionSourcesSection(context, selectedPlan),
+        // Verified Seller Outlets Section
+        _buildSellerOutletsSection(context, selectedPlan),
 
         const SizedBox(height: 16),
 
@@ -1251,7 +1211,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
     );
   }
 
-  Widget _buildAcquisitionSourcesSection(BuildContext context, PlanCandidate selectedPlan) {
+  Widget _buildSellerOutletsSection(BuildContext context, PlanCandidate selectedPlan) {
     if (selectedPlan.acquisitionSources.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -1283,7 +1243,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Acquisition Outlets & Registered Traders',
+                      'Verified Sellers & Outlets',
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
@@ -1292,7 +1252,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     ),
                     SizedBox(height: 1),
                     Text(
-                      'Itemized sources prioritized by platform trust, distance, and price',
+                      'Itemized seller outlets prioritized by platform trust, distance, and price',
                       style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ],

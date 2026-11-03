@@ -88,6 +88,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
 
     final result = await _aiService.parsePaperNoteImage(
       imageBytes: _capturedImageBytes,
+      imageName: _capturedImageName,
       customNoteText: _capturedImageBytes == null ? _transcriptController.text.trim() : null,
     );
 
@@ -95,7 +96,9 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
       setState(() {
         _isAnalyzing = false;
         _scanResult = result;
-        if (!result.hasError && result.rawTranscribedText.isNotEmpty) {
+        if (result.detectedProductName != null && result.detectedProductName!.isNotEmpty) {
+          _transcriptController.text = result.detectedProductName!;
+        } else if (!result.hasError && result.rawTranscribedText.isNotEmpty) {
           _transcriptController.text = result.rawTranscribedText;
         }
       });
@@ -156,7 +159,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
                         Text(
-                          'Scan Paper Shopping List',
+                          'Scan Product or Shopping List',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -248,14 +251,14 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.document_scanner_outlined,
+                        Icons.camera_enhance_outlined,
                         size: 26,
                         color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'No Paper Note Captured Yet',
+                      'Capture Product Photo or Shopping List',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
@@ -264,7 +267,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Take a photo of your handwritten paper shopping list or select an image to extract commodities with AI Shopping Assistant.',
+                      'Upload or photograph any product (vehicles, electronics, appliances, groceries, tools) or scan a paper note to identify items and find sellers.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 11.5,
@@ -413,7 +416,9 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                                 size: 14, color: AppColors.primary),
                             const SizedBox(width: 5),
                             Text(
-                              'Recognized Commodities (${_scanResult!.proposal.shoppingItems.length})',
+                              _scanResult!.isProductPhoto
+                                  ? 'Recognized Product: ${_scanResult!.detectedProductName ?? _scanResult!.proposal.shoppingItems.first.productName}'
+                                  : 'Recognized Commodities (${_scanResult!.proposal.shoppingItems.length})',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
@@ -495,11 +500,13 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
             // Editable Transcribed Prompt Area
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
+              children: [
                 Expanded(
                   child: Text(
-                    'Transcribed Request (Editable):',
-                    style: TextStyle(
+                    _scanResult?.isProductPhoto == true
+                        ? 'Recognized Product Name (Editable):'
+                        : 'Transcribed Request (Editable):',
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -507,7 +514,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
+                const Text(
                   'Manual Edit Available',
                   style: TextStyle(
                     fontSize: 11,
@@ -520,10 +527,10 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
             const SizedBox(height: 6),
             TextField(
               controller: _transcriptController,
-              maxLines: 3,
+              maxLines: 2,
               decoration: InputDecoration(
                 hintText:
-                    'Or type/paste your handwritten shopping list items here (e.g. 5kg rice, 2 crates eggs)...',
+                    'Product name or shopping items (e.g. Toyota Camry 2012, Binatone Blender, 5kg rice)...',
                 hintStyle: const TextStyle(fontSize: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -535,7 +542,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Generate Plan Proposal Action Button
+            // Generate Plan / Search Sellers Action Button
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -554,10 +561,15 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                icon: const Icon(Icons.auto_awesome, size: 18),
-                label: const Text(
-                  'Generate Options Proposal from Note',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                icon: Icon(
+                  _scanResult?.isProductPhoto == true ? Icons.search_rounded : Icons.auto_awesome,
+                  size: 18,
+                ),
+                label: Text(
+                  _scanResult?.isProductPhoto == true
+                      ? 'Look for Sellers & Compare Prices'
+                      : 'Generate Options Proposal from Note',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
               ),
             ),

@@ -1278,6 +1278,10 @@ class DecisionEngine {
           : ((userLocation != null && userLocation.city.isNotEmpty)
               ? userLocation.city
               : 'Local');
+      final fallbackMarketDist = LocationService.resolveDistanceKm(
+        userLocation: userLocation,
+        destLocationName: isExpress ? 'Express Mart' : '$activeCity Central Market',
+      );
       stops.add(
         ItineraryStop(
           id: '$planId-s$stopIndex',
@@ -1285,7 +1289,7 @@ class DecisionEngine {
           title: isExpress ? 'Express Mart' : '$activeCity Central Market',
           subtitle: 'Buy ${activeItems.take(3).map((i) => i.productName).join(', ')}${activeItems.length > 3 ? ' + more' : ''}',
           location: '$activeCity Market Area',
-          distanceKm: 1.2,
+          distanceKm: fallbackMarketDist,
           durationMinutes: 0,
           timeWindow: '',
           badgeText: 'Single Stop Hub',
@@ -1301,6 +1305,10 @@ class DecisionEngine {
       if (errand.shoppingItems.isNotEmpty && items.isNotEmpty) {
         continue;
       }
+      final errandDist = LocationService.resolveDistanceKm(
+        userLocation: userLocation,
+        destLocationName: errand.locationName,
+      );
       stops.add(
         ItineraryStop(
           id: '$planId-s$stopIndex',
@@ -1308,7 +1316,7 @@ class DecisionEngine {
           title: errand.title,
           subtitle: errand.deadline != null ? 'Complete before ${errand.deadline}' : errand.category,
           location: errand.locationName,
-          distanceKm: 1.5,
+          distanceKm: errandDist,
           durationMinutes: 0,
           timeWindow: '',
           badgeText: errand.deadline != null ? 'Before ${errand.deadline} deadline' : null,

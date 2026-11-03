@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_colors.dart';
 import '../../models/price_observation.dart';
 import '../../models/item_acquisition_source.dart';
+import '../../services/location_service.dart';
+import '../../state/app_state.dart';
 import '../../../features/decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 
 /// Bottom sheet providing direction assistance and contact options for
@@ -327,6 +329,13 @@ class CommunityAssistanceSheet extends ConsumerWidget {
                       color: AppColors.textSecondary),
                   onTap: () {
                     Navigator.pop(context);
+                    final userLoc = ref.read(locationProvider);
+                    final dist = LocationService.resolveDistanceKm(
+                      userLocation: userLoc,
+                      destLat: observation.latitude,
+                      destLon: observation.longitude,
+                      destLocationName: observation.marketLocation,
+                    );
                     final source = ItemAcquisitionSource(
                       id: 'scout-${observation.marketLocation.hashCode}',
                       itemId: 'obs-${observation.id}',
@@ -340,7 +349,9 @@ class CommunityAssistanceSheet extends ConsumerWidget {
                           : '${observation.marketLocation} Community Scout',
                       channel: AcquisitionChannel.registeredTrader,
                       marketHubOrLocation: observation.marketLocation,
-                      dynamicDistanceKm: 1.5,
+                      latitude: observation.latitude,
+                      longitude: observation.longitude,
+                      dynamicDistanceKm: dist,
                       isPlatformRegisteredTrader: false,
                       inStock: observation.inStock,
                       brandOrGrade: observation.brandOrGrade,

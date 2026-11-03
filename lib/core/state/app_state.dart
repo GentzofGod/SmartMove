@@ -469,9 +469,38 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
   }
 
   void addShoppingItem(ShoppingItem item) {
-    final updated = [...state.activeItems, item];
+    final existingIndex = state.activeItems.indexWhere((existing) {
+      if (item.productId != null &&
+          item.productId!.isNotEmpty &&
+          existing.productId != null &&
+          existing.productId!.isNotEmpty) {
+        return existing.productId == item.productId;
+      }
+      return existing.productName.trim().toLowerCase() ==
+          item.productName.trim().toLowerCase();
+    });
+
+    final List<ShoppingItem> updated;
+    if (existingIndex >= 0) {
+      final existing = state.activeItems[existingIndex];
+      final addedQty = item.quantity > 0 ? item.quantity : 1.0;
+      final mergedItem = existing.copyWith(
+        quantity: existing.quantity + addedQty,
+        estimatedUnitPrice: existing.estimatedUnitPrice > 0
+            ? existing.estimatedUnitPrice
+            : item.estimatedUnitPrice,
+      );
+      updated = List<ShoppingItem>.from(state.activeItems);
+      updated[existingIndex] = mergedItem;
+    } else {
+      updated = [...state.activeItems, item];
+    }
+
     state = _recalculate(
-      budget: state.budget > 0 ? state.budget : (updated.fold(0.0, (sum, i) => sum + i.totalEstimatedCost) * 1.25).roundToDouble(),
+      budget: state.budget > 0
+          ? state.budget
+          : (updated.fold(0.0, (sum, i) => sum + i.totalEstimatedCost) * 1.25)
+              .roundToDouble(),
       items: updated,
     );
   }
@@ -526,7 +555,29 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
     var errands = List<Errand>.from(state.activeErrands);
 
     if (result.addedItem != null) {
-      items.add(result.addedItem!);
+      final item = result.addedItem!;
+      final existingIndex = items.indexWhere((existing) {
+        if (item.productId != null &&
+            item.productId!.isNotEmpty &&
+            existing.productId != null &&
+            existing.productId!.isNotEmpty) {
+          return existing.productId == item.productId;
+        }
+        return existing.productName.trim().toLowerCase() ==
+            item.productName.trim().toLowerCase();
+      });
+      if (existingIndex >= 0) {
+        final existing = items[existingIndex];
+        final addedQty = item.quantity > 0 ? item.quantity : 1.0;
+        items[existingIndex] = existing.copyWith(
+          quantity: existing.quantity + addedQty,
+          estimatedUnitPrice: existing.estimatedUnitPrice > 0
+              ? existing.estimatedUnitPrice
+              : item.estimatedUnitPrice,
+        );
+      } else {
+        items.add(item);
+      }
     }
     if (result.removedItemId != null) {
       items.removeWhere((i) => i.id == result.removedItemId);

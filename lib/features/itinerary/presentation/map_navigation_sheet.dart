@@ -12,7 +12,7 @@ class MapNavigationSheet extends StatelessWidget {
     this.destinationTitle = 'Seller Outlet',
     this.destinationAddress = 'Seller Location',
     this.buyerAddress = 'Your Current Location',
-    this.distanceKm = 1.2,
+    this.distanceKm = 0.0,
   });
 
   @override
