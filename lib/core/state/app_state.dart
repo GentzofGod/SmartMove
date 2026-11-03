@@ -8,6 +8,8 @@ import '../models/store_edit_request.dart';
 import '../models/commodity_category.dart';
 import '../models/trader_chat_message.dart';
 export '../models/trader_chat_message.dart';
+import '../models/notification_item.dart';
+export '../models/notification_item.dart';
 export '../models/commodity_category.dart';
 import '../models/errand.dart';
 import '../models/itinerary_stop.dart';
@@ -879,12 +881,21 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
       final raw = prefs.getString(_chatCacheKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw) as Map<String, dynamic>;
-        final restored = <String, List<TraderChatMessage>>{};
+        final restored = Map<String, List<TraderChatMessage>>.from(state);
         decoded.forEach((key, val) {
           final list = (val as List<dynamic>)
               .map((item) => TraderChatMessage.fromJson(item as Map<String, dynamic>))
               .toList();
-          restored[key] = list;
+          final current = List<TraderChatMessage>.from(restored[key] ?? []);
+          final currentIds = current.map((m) => m.id).toSet();
+          for (final item in list) {
+            if (!currentIds.contains(item.id)) {
+              current.add(item);
+              currentIds.add(item.id);
+            }
+          }
+          current.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          restored[key] = current;
         });
         state = restored;
       }
@@ -910,11 +921,17 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
     required double listedPrice,
     required String messageText,
     double? proposedPrice,
+    String? outletLocation,
+    double? outletDistance,
   }) async {
+    final userSession = ref.read(authProvider);
+    if (userSession.isGuest) {
+      // Guests cannot send messages or negotiate without signing in
+      return;
+    }
+
     final now = DateTime.now();
     final currentHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
-
-    final userSession = ref.read(authProvider);
     final senderName = userSession.displayName.isNotEmpty
         ? userSession.displayName
         : 'Customer';
@@ -928,6 +945,14 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
       proposedPrice: proposedPrice,
       conversationKey: traderName,
       commodityName: commodityName,
+      isRead: true, // Read by sender
+      senderId: userSession.id,
+      recipientName: traderName,
+      unit: unit,
+      quantity: quantity,
+      unitPrice: listedPrice,
+      outletLocation: outletLocation,
+      outletDistance: outletDistance,
     );
 
     currentHistory.add(customerMsg);
@@ -952,35 +977,195 @@ class TraderChatNotifier extends Notifier<Map<String, List<TraderChatMessage>>> 
     required String replyText,
     String? customerName,
     String? commodityName,
+    double? proposedPrice,
+    bool? isOfferAccepted,
+    bool? isOfferDeclined,
   }) async {
-    final now = DateTime.now();
-    final currentHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
+    try {
+      final now = DateTime.now();
+      final currentHistory = List<TraderChatMessage>.from(state[traderName] ?? []);
+      final userSession = ref.read(authProvider);
+      final isUserTrader = (userSession.businessName?.trim().toLowerCase() == traderName.trim().toLowerCase());
 
-    final traderMsg = TraderChatMessage(
-      id: 'trader-${now.millisecondsSinceEpoch}',
-      senderName: traderName,
-      isTrader: true,
-      text: replyText,
-      timestamp: now,
-      conversationKey: traderName,
-      commodityName: commodityName,
-    );
+      final traderMsg = TraderChatMessage(
+        id: 'trader-${now.millisecondsSinceEpoch}',
+        senderName: traderName,
+        isTrader: true,
+        text: replyText,
+        timestamp: now,
+        conversationKey: traderName,
+        commodityName: commodityName,
+        isRead: isUserTrader, // Unread for customer unless current user is trader
+        recipientName: customerName,
+        proposedPrice: proposedPrice,
+        isOfferAccepted: isOfferAccepted,
+        isOfferDeclined: isOfferDeclined,
+      );
 
-    currentHistory.add(traderMsg);
+      currentHistory.add(traderMsg);
 
-    final newState = {
+      final newState = {
+        ...state,
+        traderName: currentHistory,
+      };
+      state = newState;
+      _persist(newState);
+
+      // Sync to Supabase backend database
+      SupabaseDataService.sendChatMessage(
+        traderMsg,
+        conversationKey: traderName,
+        commodityName: commodityName ?? 'Commodity',
+      );
+
+      // Dispatch notification to user if incoming
+      if (!isUserTrader) {
+        try {
+          ref.read(notificationsProvider.notifier).addNotification(
+            NotificationItem(
+              id: 'notif-msg-${now.millisecondsSinceEpoch}',
+              title: 'New message from $traderName',
+              subtitle: commodityName != null && commodityName.isNotEmpty
+                  ? 'Regarding $commodityName: $replyText'
+                  : replyText,
+              timestamp: now,
+              type: 'Messages',
+              isRead: false,
+              conversationKey: traderName,
+              route: '/messages',
+            ),
+          );
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  Future<void> acceptOffer({
+    required String conversationKey,
+    required String offerMessageId,
+    required double acceptedPrice,
+    String? commodityName,
+    required bool isSellerActing,
+  }) async {
+    final currentList = List<TraderChatMessage>.from(state[conversationKey] ?? []);
+    if (currentList.isEmpty) return;
+
+    final updatedList = currentList.map((m) {
+      if (m.id == offerMessageId) {
+        return m.copyWith(isOfferAccepted: true, isOfferDeclined: false);
+      }
+      return m;
+    }).toList();
+
+    state = {
       ...state,
-      traderName: currentHistory,
+      conversationKey: updatedList,
     };
+    _persist(state);
+
+    final session = ref.read(authProvider);
+    if (isSellerActing) {
+      final traderName = session.businessName ?? session.displayName;
+      final replyText =
+          'Offer of ₦${acceptedPrice.toStringAsFixed(0)} accepted! Please come to stall for pickup or reach out to arrange delivery.';
+      await sendTraderReply(
+        traderName: traderName.isNotEmpty ? traderName : conversationKey,
+        replyText: replyText,
+        commodityName: commodityName,
+        isOfferAccepted: true,
+      );
+    } else {
+      final messageText =
+          'I accept your counter-offer of ₦${acceptedPrice.toStringAsFixed(0)}! I will proceed with pickup.';
+      await sendCustomerMessage(
+        traderName: conversationKey,
+        commodityName: commodityName ?? 'Commodity',
+        quantity: 1,
+        unit: 'unit',
+        listedPrice: acceptedPrice,
+        messageText: messageText,
+      );
+    }
+  }
+
+  Future<void> declineOffer({
+    required String conversationKey,
+    required String offerMessageId,
+    required double declinedPrice,
+    String? commodityName,
+    required bool isSellerActing,
+  }) async {
+    final currentList = List<TraderChatMessage>.from(state[conversationKey] ?? []);
+    if (currentList.isEmpty) return;
+
+    final updatedList = currentList.map((m) {
+      if (m.id == offerMessageId) {
+        return m.copyWith(isOfferDeclined: true, isOfferAccepted: false);
+      }
+      return m;
+    }).toList();
+
+    state = {
+      ...state,
+      conversationKey: updatedList,
+    };
+    _persist(state);
+
+    final session = ref.read(authProvider);
+    if (isSellerActing) {
+      final traderName = session.businessName ?? session.displayName;
+      final replyText =
+          'Thank you for your offer of ₦${declinedPrice.toStringAsFixed(0)}, but I cannot accept this price for ${commodityName ?? "this item"}.';
+      await sendTraderReply(
+        traderName: traderName.isNotEmpty ? traderName : conversationKey,
+        replyText: replyText,
+        commodityName: commodityName,
+        isOfferDeclined: true,
+      );
+    } else {
+      final messageText =
+          'Thank you for the counter-proposal, but ₦${declinedPrice.toStringAsFixed(0)} is above my budget.';
+      await sendCustomerMessage(
+        traderName: conversationKey,
+        commodityName: commodityName ?? 'Commodity',
+        quantity: 1,
+        unit: 'unit',
+        listedPrice: declinedPrice,
+        messageText: messageText,
+      );
+    }
+  }
+
+  void markConversationAsRead(String conversationKey) {
+    final current = state[conversationKey];
+    if (current == null || current.isEmpty) return;
+
+    bool changed = false;
+    final updatedList = current.map((msg) {
+      if (!msg.isRead) {
+        changed = true;
+        return msg.copyWith(isRead: true);
+      }
+      return msg;
+    }).toList();
+
+    if (changed) {
+      final newState = {
+        ...state,
+        conversationKey: updatedList,
+      };
+      state = newState;
+      _persist(newState);
+      ref.read(notificationsProvider.notifier).markConversationNotificationsAsRead(conversationKey);
+    }
+  }
+
+  void deleteConversation(String conversationKey) {
+    if (!state.containsKey(conversationKey)) return;
+    final newState = Map<String, List<TraderChatMessage>>.from(state)..remove(conversationKey);
     state = newState;
     _persist(newState);
-
-    // Sync to Supabase backend database
-    SupabaseDataService.sendChatMessage(
-      traderMsg,
-      conversationKey: traderName,
-      commodityName: commodityName ?? 'Commodity',
-    );
+    ref.read(notificationsProvider.notifier).removeConversationNotifications(conversationKey);
   }
 
   /// Synchronize chat history from Cloud Supabase database for a given trader/outlet
@@ -1048,6 +1233,269 @@ final traderChatProvider =
     NotifierProvider<TraderChatNotifier, Map<String, List<TraderChatMessage>>>(
   TraderChatNotifier.new,
 );
+
+class ConversationSummary {
+  final String conversationKey;
+  final String partnerName;
+  final TraderChatMessage lastMessage;
+  final int unreadCount;
+  final String? commodityName;
+  final double? lastProposedPrice;
+  final bool isTraderPartner;
+  final String? outletLocation;
+  final double? outletDistance;
+  final int totalMessages;
+  final DateTime lastTimestamp;
+
+  const ConversationSummary({
+    required this.conversationKey,
+    required this.partnerName,
+    required this.lastMessage,
+    required this.unreadCount,
+    this.commodityName,
+    this.lastProposedPrice,
+    required this.isTraderPartner,
+    this.outletLocation,
+    this.outletDistance,
+    required this.totalMessages,
+    required this.lastTimestamp,
+  });
+}
+
+final activeConversationsProvider = Provider<List<ConversationSummary>>((ref) {
+  final chatMap = ref.watch(traderChatProvider);
+  final session = ref.watch(authProvider);
+  final myBusiness = session.businessName?.trim().toLowerCase();
+
+  final list = <ConversationSummary>[];
+
+  chatMap.forEach((key, messages) {
+    if (messages.isEmpty) return;
+    final sorted = List<TraderChatMessage>.from(messages)..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final lastMsg = sorted.last;
+
+    // Check if this thread belongs to the user acting as seller
+    final isSellingThread = myBusiness != null &&
+        myBusiness.isNotEmpty &&
+        (key.toLowerCase().contains(myBusiness) || myBusiness.contains(key.toLowerCase()));
+
+    int unread = 0;
+    for (final m in sorted) {
+      if (m.isRead) continue;
+      if (isSellingThread) {
+        if (!m.isTrader) unread++;
+      } else {
+        if (m.isTrader) unread++;
+      }
+    }
+
+    String partner = key;
+    bool partnerIsTrader = true;
+    if (isSellingThread) {
+      final firstCustomerMsg = sorted.cast<TraderChatMessage?>().firstWhere(
+            (m) => m != null && !m.isTrader,
+            orElse: () => null,
+          );
+      partner = firstCustomerMsg?.senderName ??
+          (lastMsg.isTrader ? (lastMsg.recipientName ?? 'Customer') : lastMsg.senderName);
+      partnerIsTrader = false;
+    }
+
+    String? commodity = lastMsg.commodityName;
+    if (commodity == null || commodity.isEmpty) {
+      for (final m in sorted.reversed) {
+        if (m.commodityName != null && m.commodityName!.isNotEmpty) {
+          commodity = m.commodityName;
+          break;
+        }
+      }
+    }
+
+    double? latestOffer;
+    for (final m in sorted.reversed) {
+      if (m.proposedPrice != null && m.proposedPrice! > 0) {
+        latestOffer = m.proposedPrice;
+        break;
+      }
+    }
+
+    String? outletLoc;
+    double? outletDist;
+    for (final m in sorted) {
+      if (m.outletLocation != null && m.outletLocation!.isNotEmpty) outletLoc = m.outletLocation;
+      if (m.outletDistance != null) outletDist = m.outletDistance;
+    }
+
+    list.add(ConversationSummary(
+      conversationKey: key,
+      partnerName: partner,
+      lastMessage: lastMsg,
+      unreadCount: unread,
+      commodityName: commodity,
+      lastProposedPrice: latestOffer,
+      isTraderPartner: partnerIsTrader,
+      outletLocation: outletLoc,
+      outletDistance: outletDist,
+      totalMessages: sorted.length,
+      lastTimestamp: lastMsg.timestamp,
+    ));
+  });
+
+  list.sort((a, b) => b.lastTimestamp.compareTo(a.lastTimestamp));
+  return list;
+});
+
+final unreadMessageCountProvider = Provider<int>((ref) {
+  final conversations = ref.watch(activeConversationsProvider);
+  return conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+});
+
+// --- Dynamic Notifications State ---
+class NotificationsNotifier extends Notifier<List<NotificationItem>> {
+  static const _notifCacheKey = 'smartmove_notifications_cache_v3';
+
+  @override
+  List<NotificationItem> build() {
+    _loadFromCache();
+    return _defaultNotifications();
+  }
+
+  static List<NotificationItem> _defaultNotifications() {
+    final now = DateTime.now();
+    return [
+      NotificationItem(
+        id: 'notif-1',
+        title: 'Price drop alert',
+        subtitle: 'Tomatoes at Market C dropped to ₦1,100/kg',
+        timestamp: now.subtract(const Duration(hours: 1)),
+        type: 'Prices',
+        isRead: false,
+      ),
+      NotificationItem(
+        id: 'notif-2',
+        title: 'Wholesale deal unlocked',
+        subtitle: 'Mama Bello Grain Store offers 5% discount on bulk rice',
+        timestamp: now.subtract(const Duration(hours: 3)),
+        type: 'Deals',
+        isRead: false,
+      ),
+      NotificationItem(
+        id: 'notif-3',
+        title: 'New price report',
+        subtitle: 'Rice observation verified by Trader Mama Bello',
+        timestamp: now.subtract(const Duration(hours: 4)),
+        type: 'Prices',
+        isRead: true,
+      ),
+      NotificationItem(
+        id: 'notif-4',
+        title: 'Weekly savings summary',
+        subtitle: 'You saved ₦2,350 by comparing commodities across sellers this week',
+        timestamp: now.subtract(const Duration(days: 1)),
+        type: 'System',
+        isRead: true,
+      ),
+    ];
+  }
+
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_notifCacheKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        if (decoded.isNotEmpty) {
+          state = decoded
+              .map((j) => NotificationItem.fromJson(j as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(List<NotificationItem> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encodable = items.map((i) => i.toJson()).toList();
+      await prefs.setString(_notifCacheKey, jsonEncode(encodable));
+    } catch (_) {}
+  }
+
+  void addNotification(NotificationItem item) {
+    final existing = state.where((n) => n.id != item.id).toList();
+    final updated = [item, ...existing];
+    state = updated;
+    _persist(updated);
+  }
+
+  void markAsRead(String id) {
+    bool changed = false;
+    final updated = state.map((n) {
+      if (n.id == id && !n.isRead) {
+        changed = true;
+        return n.copyWith(isRead: true);
+      }
+      return n;
+    }).toList();
+    if (changed) {
+      state = updated;
+      _persist(updated);
+    }
+  }
+
+  void markAllAsRead({String? filterType}) {
+    bool changed = false;
+    final updated = state.map((n) {
+      if ((filterType == null || n.type == filterType) && !n.isRead) {
+        changed = true;
+        return n.copyWith(isRead: true);
+      }
+      return n;
+    }).toList();
+    if (changed) {
+      state = updated;
+      _persist(updated);
+    }
+  }
+
+  void markConversationNotificationsAsRead(String conversationKey) {
+    bool changed = false;
+    final updated = state.map((n) {
+      if (n.conversationKey == conversationKey && !n.isRead) {
+        changed = true;
+        return n.copyWith(isRead: true);
+      }
+      return n;
+    }).toList();
+    if (changed) {
+      state = updated;
+      _persist(updated);
+    }
+  }
+
+  void removeConversationNotifications(String conversationKey) {
+    final updated = state.where((n) => n.conversationKey != conversationKey).toList();
+    if (updated.length != state.length) {
+      state = updated;
+      _persist(updated);
+    }
+  }
+
+  void clearAll() {
+    state = [];
+    _persist([]);
+  }
+}
+
+final notificationsProvider =
+    NotifierProvider<NotificationsNotifier, List<NotificationItem>>(
+  NotificationsNotifier.new,
+);
+
+final unreadNotificationsCountProvider = Provider<int>((ref) {
+  final notifs = ref.watch(notificationsProvider);
+  return notifs.where((n) => !n.isRead).length;
+});
 
 // --- Community Observations State ---
 class CommunityNotifier extends Notifier<List<PriceObservation>> {

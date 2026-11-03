@@ -47,4 +47,6 @@ class AppColors {
   // Accent Tints
   static const Color amber = Color(0xFFFFAB00);
   static const Color blue = Color(0xFF0052CC);
+  static const Color blueDark = Color(0xFF0747A6);
+  static const Color accentRed = Color(0xFFDE350B);
 }

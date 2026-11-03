@@ -175,7 +175,7 @@ void main() {
       expect(spiderEntries, isEmpty);
 
       final benchmarks = observations.where((o) => o.submitterName == 'Historical Market Benchmark').toList();
-      expect(benchmarks.length, equals(5));
+      expect(benchmarks.length, equals(3));
     });
   });
 

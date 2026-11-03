@@ -8,7 +8,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?logo=dart)](https://dart.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Database-3ECF8E?logo=supabase)](https://supabase.com)
 [![Meta AI](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%20%26%20Voice%20%26%20Vision-0668E1?logo=meta)](https://about.meta.com)
-[![Tests](https://img.shields.io/badge/Tests-230%20Passing-success?logo=checkmarx)](test/)
+[![Tests](https://img.shields.io/badge/Tests-252%20Passing-success?logo=checkmarx)](test/)
 [![Analyzer](https://img.shields.io/badge/Analyzer-0%20Issues-success)](lib/)
 
 ---
@@ -162,6 +162,32 @@ SmartMove has undergone continuous iterative development and real-world hardenin
   - **Re-open Review**: Resets rejected or reviewed applications back to `Pending` for re-evaluation.
 - **Application Queue Deduplication**: Reapplying with updated stall documentation replaces previous applications cleanly rather than cluttering administrative queues with duplicates.
 - **Transparent Rejection & Reapply Guidance**: Rejected sellers see a dedicated feedback card in `SellerPortalScreen` explaining the decision and enabling 1-tap re-application with corrected information.
+
+### 24. 💬 Dedicated Message Box, Persistent Buyer-Seller Chat & Multi-Channel Notifications
+- **Centralized Message Box (`MessageBoxScreen` & `/messages`)**:
+  - Unifies negotiations, customer inquiries, and seller quotes into a dedicated inbox with live search and filter pills: `All`, `Buying (Sellers)`, `Selling (Customer Inquiries)`, and `Unread`.
+  - Displays partner avatars (storefront icon for verified traders, person icon for shoppers), commodity tags, latest message previews, relative timestamps, counter-offer badges, and unread counter badges.
+  - Safe swipe-to-delete with confirmation modal and "Mark all as read" action.
+- **Interactive Chat Thread View (`ChatThreadScreen`)**:
+  - Full chronological message history between buyers and sellers with distinct styling for customer messages and trader replies.
+  - Highlighted counter-offer cards displaying proposed price in Naira, discount percentage, and quick response options.
+  - Top commodity negotiation banner displaying negotiated item, unit, and listed price.
+  - Quick negotiation suggestion chips for common market bargaining scenarios (*e.g., bulk discount, pickup hold, cash on pickup, quality inspection*).
+  - 1-tap direct phone call (`tel:`) and WhatsApp launcher (`wa.me/`).
+  - Automatically marks thread messages as read upon viewing, immediately clearing notification counters.
+- **Multi-Channel Notification Center (`NotificationsScreen`)**:
+  - Dynamic notification hub with dedicated tabs: `All`, `Messages`, `Prices`, `Deals`, `System`.
+  - Real-time unread badges on `HomeScreen` top bar for both Message Box (`Icons.chat_bubble_outline_rounded`) and Notifications (`Icons.notifications_none_rounded`).
+  - Tapping a message notification directly opens the chat thread and marks the notification as read.
+  - Profile menu integration (`menu_messages_inquiries`) displaying live unread counts.
+
+### 25. 🏪 Unified 3-Tab Architecture & Multi-Seller Comparison
+- **Unified 3-Tab Bottom Navigation**: Consolidated `MainScaffold` into exactly 3 core tabs: `Home`, `Products` (unified catalog combining discover benchmark listings and community reports without duplicate entries), and `Price Lab` (Decision Engine).
+- **Strict Multi-Seller Comparison**: `ProductDetailSheet` strictly compares identical/similar commodities from distinct alternative sellers, suppressing self-comparison and same-seller duplication. If no alternative sellers exist, cleanly presents a "No Alternative Sellers Available Yet" state.
+- **Expanded Listing Categories & Custom Units**: Expanded to 12 distinct market categories across listings, accompanied by a dropdown of common Nigerian units (*1kg, 50kg bag, 25kg bag, paint bucket, crate of 30, derica, tuber, piece, carton, pack, tin, sachet, meter*) plus custom unit entry.
+- **Community Sightings with Direction Assistance**: Price sightings in open markets without registered stalls offer `CommunityAssistanceSheet`, providing direct WhatsApp/Call helpline options with voluntary reporter contacts, in-app scout chat, and community inquiries.
+- **Settings Page Cleanup**: Removed redundant "Market Hub & Location" from profile settings menu.
+- **Zero False Fallbacks for AI Descriptions**: Explicit error reporting on modal banners and SnackBars for Meta AI description generation.
 
 ---
 

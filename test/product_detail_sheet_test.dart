@@ -161,8 +161,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify exactly 1 genuine quote is displayed
-    expect(find.text('1 quotes'), findsOneWidget);
+    // Verify that when no alternative sellers exist, the clean no-alternative state is shown (no self comparison)
+    expect(find.byKey(const ValueKey('card_no_alternative_sellers')), findsOneWidget);
+    expect(find.text('No Alternative Sellers Available Yet'), findsOneWidget);
 
     // Verify fake benchmark stores are NOT present
     expect(find.text('Foodco Supermarket'), findsNothing);

@@ -5,6 +5,7 @@ import '../../../core/models/seller_application.dart';
 import '../../../core/models/price_observation.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/meta_ai_service.dart';
+import '../../../core/services/supabase_data_service.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/theme/app_colors.dart';
 

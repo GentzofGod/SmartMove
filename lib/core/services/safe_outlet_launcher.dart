@@ -6,6 +6,7 @@ import '../models/item_acquisition_source.dart';
 import '../presentation/widgets/seller_location_map_sheet.dart';
 import '../../features/decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
 import 'meta_ai_service.dart';
+import 'commodity_comparison_service.dart';
 
 class SafeOutletLauncher {
   /// Displays an interactive modal bottom sheet presenting live web vendor alternatives,

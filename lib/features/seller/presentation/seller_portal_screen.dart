@@ -266,7 +266,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
-                                  value: selectedUnitOption,
+                                  initialValue: selectedUnitOption,
                                   isExpanded: true,
                                   decoration: InputDecoration(
                                     contentPadding: const EdgeInsets.symmetric(
@@ -851,7 +851,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
-                                  value: selectedUnitOption,
+                                  initialValue: selectedUnitOption,
                                   isExpanded: true,
                                   decoration: InputDecoration(
                                     contentPadding: const EdgeInsets.symmetric(
@@ -2519,37 +2519,55 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.chat_bubble_outline_rounded,
-                          color: AppColors.primary, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Customer Inquiries (${storeInquiries.length})',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded,
+                            color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Customer Inquiries (${storeInquiries.length})',
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  if (storeInquiries.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => context.push('/messages'),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.badgeSuccessBg,
+                        color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.cardBorder),
                       ),
-                      child: const Text(
-                        'Live Supabase Synced',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.forum_outlined, size: 13, color: AppColors.primary),
+                          SizedBox(width: 4),
+                          Text(
+                            'Message Box',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),

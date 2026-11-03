@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/item_acquisition_source.dart';
 import '../../../../core/services/safe_outlet_launcher.dart';
@@ -65,7 +66,54 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
     });
   }
 
+  void _showGuestAuthPrompt(BuildContext context, {String actionName = 'chat and negotiate'}) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.lock_outline_rounded, color: AppColors.primary, size: 22),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Sign In to Chat & Negotiate',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'You are currently exploring as a guest. To $actionName with verified traders and save counter-offers, please sign in or create an account.',
+          style: const TextStyle(fontSize: 13, height: 1.4, color: AppColors.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Browse as Guest'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              context.push('/auth');
+            },
+            child: const Text('Sign In / Register', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _sendMessage(String text, {double? proposedPrice}) {
+    final session = ref.read(authProvider);
+    if (session.isGuest) {
+      _showGuestAuthPrompt(context, actionName: 'send messages');
+      return;
+    }
     if (text.trim().isEmpty) return;
     final traderKey = widget.source.outletName;
     ref.read(traderChatProvider.notifier).sendCustomerMessage(
@@ -82,6 +130,12 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
   }
 
   void _showMakeOfferDialog() {
+    final session = ref.read(authProvider);
+    if (session.isGuest) {
+      _showGuestAuthPrompt(context, actionName: 'make price offers');
+      return;
+    }
+
     final offerCtrl = TextEditingController(
       text: (widget.source.totalCost * 0.9).toStringAsFixed(0),
     );
@@ -454,6 +508,33 @@ class _TraderNegotiationSheetState extends ConsumerState<TraderNegotiationSheet>
                       fontStyle: FontStyle.italic,
                       color: AppColors.textSecondary,
                     ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Guest Mode Notice if unauthenticated
+          if (ref.watch(authProvider).isGuest)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              color: const Color(0xFFFEF3C7),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded, size: 14, color: Color(0xFFB45309)),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Guest Mode: Sign in to chat & make offers with this stall.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push('/auth'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Sign In', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.primary)),
                   ),
                 ],
               ),

@@ -10,7 +10,6 @@ import '../../../core/models/seller_application.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
 import '../../../core/localization/app_language.dart';
 import '../../../core/presentation/widgets/language_selection_sheet.dart';
-import '../../home/presentation/widgets/location_picker_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -58,7 +57,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final rawUserSession = ref.watch(authProvider);
     final applications = ref.watch(sellerApplicationsProvider);
-    final currentLocation = ref.watch(locationProvider);
+    final unreadMessages = ref.watch(unreadMessageCountProvider);
 
     final matchingApp = applications.cast<SellerApplication?>().firstWhere(
           (a) =>
@@ -697,6 +696,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 1, indent: 56, color: AppColors.divider),
                 ],
+                ListTile(
+                  key: const ValueKey('menu_messages_inquiries'),
+                  onTap: () => context.push('/messages'),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text(
+                    'Message Box & Inquiries',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Buyer negotiations and seller inquiries',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unreadMessages > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentRed,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$unreadMessages',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, indent: 56, color: AppColors.divider),
                 ListTile(
                   key: const ValueKey('menu_notifications_tile'),
                   onTap: () => _showNotificationPreferencesSheet(context),

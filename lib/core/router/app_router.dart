@@ -13,6 +13,8 @@ import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/admin/presentation/superadmin_panel_screen.dart';
 import '../../features/legal/presentation/legal_screen.dart';
 import '../../features/seller/presentation/seller_portal_screen.dart';
+import '../../features/messages/presentation/message_box_screen.dart';
+import '../../features/messages/presentation/chat_thread_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -75,6 +77,32 @@ final appRouter = GoRouter(
       path: '/notifications',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/messages',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final keyParam = state.uri.queryParameters['key'];
+        return MessageBoxScreen(initialConversationKey: keyParam);
+      },
+    ),
+    GoRoute(
+      path: '/messages/thread',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final convKey = state.uri.queryParameters['key'] ?? '';
+        final partner = state.uri.queryParameters['partner'];
+        final commodity = state.uri.queryParameters['commodity'];
+        final priceStr = state.uri.queryParameters['price'];
+        final unit = state.uri.queryParameters['unit'];
+        return ChatThreadScreen(
+          conversationKey: convKey,
+          initialPartnerName: partner,
+          initialCommodityName: commodity,
+          initialPrice: priceStr != null ? double.tryParse(priceStr) : null,
+          initialUnit: unit,
+        );
+      },
     ),
     GoRoute(
       path: '/auth',

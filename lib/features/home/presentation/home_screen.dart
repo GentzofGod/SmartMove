@@ -22,6 +22,8 @@ class HomeScreen extends ConsumerWidget {
     final decisionState = ref.watch(decisionLabProvider);
     final currentLocation = ref.watch(locationProvider);
     final userSession = ref.watch(authProvider);
+    final unreadMessages = ref.watch(unreadMessageCountProvider);
+    final unreadNotifications = ref.watch(unreadNotificationsCountProvider);
     final recentProducts = products.take(3).toList();
     final recentObservations = observations.take(4).toList();
 
@@ -37,49 +39,51 @@ class HomeScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  InkWell(
-                    onTap: () => LocationPickerSheet.show(context),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: currentLocation.isSet
-                              ? (currentLocation.isDeviceLocation
-                                  ? AppColors.primary
-                                  : AppColors.cardBorder)
-                              : AppColors.badgeWarningText,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            currentLocation.isSet
+                  Flexible(
+                    child: InkWell(
+                      onTap: () => LocationPickerSheet.show(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: currentLocation.isSet
                                 ? (currentLocation.isDeviceLocation
-                                    ? Icons.my_location_rounded
-                                    : Icons.location_on_rounded)
-                                : Icons.add_location_alt_outlined,
-                            size: 14,
-                            color: currentLocation.isSet ? AppColors.primary : AppColors.badgeWarningText,
+                                    ? AppColors.primary
+                                    : AppColors.cardBorder)
+                                : AppColors.badgeWarningText,
                           ),
-                          const SizedBox(width: 4),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 175),
-                            child: Text(
-                              currentLocation.isSet ? currentLocation.displayLocation : 'Set Your Town',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: currentLocation.isSet ? AppColors.textPrimary : AppColors.badgeWarningText,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              currentLocation.isSet
+                                  ? (currentLocation.isDeviceLocation
+                                      ? Icons.my_location_rounded
+                                      : Icons.location_on_rounded)
+                                  : Icons.add_location_alt_outlined,
+                              size: 14,
+                              color: currentLocation.isSet ? AppColors.primary : AppColors.badgeWarningText,
+                            ),
+                            const SizedBox(width: 4),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 95),
+                              child: Text(
+                                currentLocation.isSet ? currentLocation.displayLocation : 'Set Your Town',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: currentLocation.isSet ? AppColors.textPrimary : AppColors.badgeWarningText,
+                                ),
                               ),
                             ),
-                          ),
-                          const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
-                        ],
+                            const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -116,21 +120,98 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
+                      // Message Box Icon with unread badge
                       InkWell(
+                        key: const ValueKey('btn_home_messages'),
+                        onTap: () => context.push('/messages'),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 20,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if (unreadMessages > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.accentRed,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  child: Text(
+                                    unreadMessages > 9 ? '9+' : '$unreadMessages',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Notification Bell with unread badge
+                      InkWell(
+                        key: const ValueKey('btn_home_notifications'),
                         onTap: () => context.push('/notifications'),
                         borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: const Icon(
-                            Icons.notifications_none_rounded,
-                            size: 20,
-                            color: AppColors.textPrimary,
-                          ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: const Icon(
+                                Icons.notifications_none_rounded,
+                                size: 20,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if (unreadNotifications > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.accentRed,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  child: Text(
+                                    unreadNotifications > 9 ? '9+' : '$unreadNotifications',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 10),

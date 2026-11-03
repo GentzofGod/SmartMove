@@ -341,7 +341,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final priceController = TextEditingController();
     final unitController = TextEditingController(text: '1kg');
     final contactController = TextEditingController(
-      text: userSession.phoneNumber ?? '',
+      text: userSession.phone ?? '',
     );
     final brandController = TextEditingController();
     final notesController = TextEditingController();
@@ -442,7 +442,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         Expanded(
                           flex: 3,
                           child: DropdownButtonFormField<String>(
-                            value: selectedUnitOption,
+                            initialValue: selectedUnitOption,
                             isExpanded: true,
                             decoration: InputDecoration(
                               labelText: 'Unit / Measure *',

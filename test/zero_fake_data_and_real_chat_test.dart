@@ -4,10 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smartmove/core/models/item_acquisition_source.dart';
 import 'package:smartmove/core/models/price_observation.dart';
 import 'package:smartmove/core/models/seller_application.dart';
+import 'package:smartmove/core/services/auth_service.dart';
 import 'package:smartmove/core/services/location_service.dart';
 import 'package:smartmove/core/services/decision_engine.dart';
 import 'package:smartmove/core/state/app_state.dart';
 import 'package:smartmove/core/presentation/widgets/seller_location_map_sheet.dart';
+
+class _FakeAuthNotifier extends AuthNotifier {
+  final UserSession initialSession;
+  _FakeAuthNotifier(this.initialSession);
+
+  @override
+  UserSession build() => initialSession;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -89,7 +98,21 @@ void main() {
 
   group('Real Persistent Buyer-Seller Chat Tests', () {
     test('4. TraderChatNotifier handles buyer message and real seller reply without auto-reply simulation', () async {
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [
+          authProvider.overrideWith(
+            () => _FakeAuthNotifier(
+              const UserSession(
+                id: 'usr-buyer-01',
+                email: 'buyer@test.com',
+                displayName: 'Ade Shopper',
+                isGuest: false,
+                role: 'Customer',
+              ),
+            ),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       final notifier = container.read(traderChatProvider.notifier);
