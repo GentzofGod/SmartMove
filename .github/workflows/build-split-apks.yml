@@ -50,29 +50,62 @@ jobs:
           dart --version
 
       - name: Configure Environment File (.env)
+        env:
+          ENV_SECRET: ${{ secrets.ENV_FILE || secrets.DOTENV }}
+          SECRET_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SECRET_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SECRET_META_APP_ID: ${{ secrets.META_APP_ID }}
+          SECRET_META_CLIENT_TOKEN: ${{ secrets.META_CLIENT_TOKEN }}
+          SECRET_MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          SECRET_META_AI_ENDPOINT: ${{ secrets.META_AI_ENDPOINT }}
         run: |
-          if [ -f .env.example ]; then
-            cp .env.example .env
+          if [ -n "$ENV_SECRET" ]; then
+            echo "$ENV_SECRET" > .env
+            echo "Successfully loaded .env from repository secret (ENV_FILE/DOTENV)."
           else
-            echo "SUPABASE_URL=${{ secrets.SUPABASE_URL || 'https://ljhkptuvbtysuhddicsj.supabase.co' }}" > .env
-            echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_demo_key' }}" >> .env
-            echo "META_APP_ID=${{ secrets.META_APP_ID || '4820239824866512' }}" >> .env
-            echo "META_CLIENT_TOKEN=${{ secrets.META_CLIENT_TOKEN || '431b591db92df606f6e695c8be332d4d' }}" >> .env
+            SUPABASE_URL="${SECRET_SUPABASE_URL:-https://ljhkptuvbtysuhddicsj.supabase.co}"
+            SUPABASE_ANON_KEY="${SECRET_SUPABASE_ANON_KEY:-sb_publishable_49SigJ19lzEzJ0b6wKcalw_C_QTP-le}"
+            META_APP_ID="${SECRET_META_APP_ID:-4820239824866512}"
+            META_CLIENT_TOKEN="${SECRET_META_CLIENT_TOKEN:-431b591db92df606f6e695c8be332d4d}"
+            MODEL_API_KEY="${SECRET_MODEL_API_KEY:-}"
+            META_AI_ENDPOINT="${SECRET_META_AI_ENDPOINT:-https://api.meta.ai}"
+
+            cat <<EOF > .env
+SUPABASE_URL=$SUPABASE_URL
+SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+META_APP_ID=$META_APP_ID
+META_CLIENT_TOKEN=$META_CLIENT_TOKEN
+MODEL_API_KEY=$MODEL_API_KEY
+META_AI_ENDPOINT=$META_AI_ENDPOINT
+EOF
+            echo "Generated .env using GitHub repository secrets with production fallbacks."
           fi
+          echo "Configured environment keys:"
+          grep -E '^[A-Za-z0-9_]+=' .env | cut -d'=' -f1 | sed 's/^/  - /'
 
       - name: Install Dependencies
         run: flutter pub get
 
       - name: Verify Code & Run Tests
-        run: flutter test
+        run: flutter test --dart-define-from-file=.env
 
       - name: Build Split APKs (${{ inputs.build_type || 'release' }})
         run: |
           BUILD_MODE="${{ inputs.build_type || 'release' }}"
+
+          DART_DEFINE_ARGS=("--dart-define-from-file=.env")
+          while IFS='=' read -r key value || [ -n "$key" ]; do
+            clean_key=$(echo "$key" | tr -d ' \r\n\t')
+            if [[ ! "$clean_key" =~ ^#.* ]] && [ -n "$clean_key" ]; then
+              clean_val=$(echo "$value" | tr -d '\r\n')
+              DART_DEFINE_ARGS+=("--dart-define=$clean_key=$clean_val")
+            fi
+          done < .env
+
           if [ "$BUILD_MODE" = "debug" ]; then
-            flutter build apk --debug --split-per-abi
+            flutter build apk --debug --split-per-abi "${DART_DEFINE_ARGS[@]}"
           else
-            flutter build apk --release --split-per-abi
+            flutter build apk --release --split-per-abi "${DART_DEFINE_ARGS[@]}"
           fi
 
       - name: Inspect Generated APKs
