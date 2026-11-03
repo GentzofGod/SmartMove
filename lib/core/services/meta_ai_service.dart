@@ -1545,11 +1545,14 @@ class MetaAiService {
           }
 
           if (body is Map) {
-            final content = body['choices']?[0]?['message']?['content'];
+            final content = body['choices']?[0]?['message']?['content'] ??
+                body['text'] ??
+                body['answer'] ??
+                body['content'];
             if (content != null) {
-              final parsedJson = content is Map ? content : jsonDecode(content.toString());
-              if (parsedJson is Map<String, dynamic> || parsedJson is Map) {
-                final jsonMap = Map<String, dynamic>.from(parsedJson as Map);
+              final parsedJson = _parseFlexibleAiResponse(content);
+              if (parsedJson is Map) {
+                final jsonMap = Map<String, dynamic>.from(parsedJson);
                 final isProductPhoto = jsonMap['is_product_photo'] == true ||
                     (jsonMap['product_name'] != null && jsonMap['product_name'].toString().isNotEmpty);
                 final productName = jsonMap['product_name']?.toString() ?? candidateProductName ?? '';
@@ -2088,7 +2091,10 @@ class MetaAiService {
         }
 
         if (body is Map) {
-          final content = body['choices']?[0]?['message']?['content'];
+          final content = body['choices']?[0]?['message']?['content'] ??
+              body['text'] ??
+              body['answer'] ??
+              body['content'];
           if (content != null) {
             final parsedJson = _parseFlexibleAiResponse(content);
             final validated = validateProposal(
@@ -2098,34 +2104,31 @@ class MetaAiService {
               executionStatus: 'AI Shopping Assistant Live Cloud: Success',
               fallbackReason: null,
             );
-            if (validated != null) {
+            if (validated != null && !validated.hasError && validated.shoppingItems.isNotEmpty) {
               initialProposal = validated;
             } else {
-              return AiPlanProposal.error(
-                message:
-                    'AI Shopping Assistant cloud service returned an unparseable response. Please enter your commodities manually in Inference Lab.',
-                rawInput: sanitizedPrompt,
+              // Resilient fallback to local NLP engine instead of failing with unparseable error
+              initialProposal = _extractLocalProposal(
+                sanitizedPrompt,
+                fallbackReason: 'AI cloud response unparseable, structured via local engine',
               );
             }
           } else {
-            return AiPlanProposal.error(
-              message:
-                  'AI Shopping Assistant cloud service returned an empty response. Please enter your commodities manually in Inference Lab.',
-              rawInput: sanitizedPrompt,
+            initialProposal = _extractLocalProposal(
+              sanitizedPrompt,
+              fallbackReason: 'AI cloud response empty, structured via local engine',
             );
           }
         } else {
-          return AiPlanProposal.error(
-            message:
-                'AI Shopping Assistant cloud service returned an error (HTTP ${statusCode ?? 'unavailable'}). Please enter your commodities manually in Inference Lab.',
-            rawInput: sanitizedPrompt,
+          initialProposal = _extractLocalProposal(
+            sanitizedPrompt,
+            fallbackReason: 'AI cloud connection unavailable (HTTP ${statusCode ?? "offline"}), structured via local engine',
           );
         }
       } catch (err) {
-        return AiPlanProposal.error(
-          message:
-              'AI Shopping Assistant cloud connection timed out or is unreachable. Please check your network connection or enter your commodities manually in Inference Lab.',
-          rawInput: sanitizedPrompt,
+        initialProposal = _extractLocalProposal(
+          sanitizedPrompt,
+          fallbackReason: 'AI cloud connection timeout, structured via local engine',
         );
       }
     } else {
@@ -2144,6 +2147,23 @@ class MetaAiService {
       city: city,
       inAppObservations: inAppObservations,
     );
+  }
+
+  /// Sanitizes common LLM JSON syntax quirks (trailing commas, single quotes, Python literals)
+  static String _sanitizeJsonString(String input) {
+    var s = input.trim();
+    // Replace single quotes around keys and string values: 'key': 'val' -> "key": "val"
+    s = s.replaceAllMapped(
+      RegExp(r"(?<=[{\[,:\s])'([^'\\]*(?:\\.[^'\\]*)*)'(?=[\],:\s}])"),
+      (m) => '"${m.group(1)}"',
+    );
+    // Remove trailing commas before closing braces or brackets: [1, 2,] -> [1, 2]
+    s = s.replaceAll(RegExp(r',\s*([}\]])'), r'$1');
+    // Replace Python/JS literals
+    s = s.replaceAll(RegExp(r'\bTrue\b'), 'true')
+        .replaceAll(RegExp(r'\bFalse\b'), 'false')
+        .replaceAll(RegExp(r'\bNone\b'), 'null');
+    return s;
   }
 
   /// Flexible JSON and unstructured text parser catering to irregular structures or markdown formatting
@@ -2172,7 +2192,11 @@ class MetaAiService {
         final jsonSnippet = text.substring(firstBrace, lastBrace + 1);
         try {
           return jsonDecode(jsonSnippet);
-        } catch (_) {}
+        } catch (_) {
+          try {
+            return jsonDecode(_sanitizeJsonString(jsonSnippet));
+          } catch (_) {}
+        }
       }
     } else if (firstBracket != -1) {
       final lastBracket = text.lastIndexOf(']');
@@ -2181,14 +2205,23 @@ class MetaAiService {
         try {
           final decoded = jsonDecode(jsonSnippet);
           if (decoded is List) return {'shopping_items': decoded};
-        } catch (_) {}
+        } catch (_) {
+          try {
+            final decoded = jsonDecode(_sanitizeJsonString(jsonSnippet));
+            if (decoded is List) return {'shopping_items': decoded};
+          } catch (_) {}
+        }
       }
     }
 
     try {
       return jsonDecode(text);
     } catch (_) {
-      return null;
+      try {
+        return jsonDecode(_sanitizeJsonString(text));
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -2543,12 +2576,19 @@ class MetaAiService {
     String? fallbackReason,
   }) {
     try {
-      if (json is! Map<String, dynamic>) return null;
+      if (json is! Map) return null;
+      final jsonMap = Map<String, dynamic>.from(json);
 
-      final double budget = (json['budget'] as num?)?.toDouble() ?? 15000.0;
-      if (budget <= 0 || budget > 10000000) return null; // Sanity check
+      double budget = (jsonMap['budget'] as num?)?.toDouble() ?? 0.0;
+      if (budget < 0 || budget > 500000000) {
+        budget = 0.0;
+      }
 
-      final itemsRaw = json['shopping_items'] as List<dynamic>?;
+      final itemsRaw = (jsonMap['shopping_items'] ??
+              jsonMap['shoppingItems'] ??
+              jsonMap['items'] ??
+              jsonMap['commodities'] ??
+              jsonMap['products']) as List<dynamic>?;
       final List<ShoppingItem> validatedItems = [];
 
       if (itemsRaw != null) {
@@ -2644,18 +2684,26 @@ class MetaAiService {
         }
       }
 
+      if (budget <= 0) {
+        final totalCost = validatedItems.fold<double>(
+          0.0,
+          (sum, it) => sum + (it.estimatedUnitPrice * it.quantity),
+        );
+        budget = totalCost > 0 ? (totalCost * 1.15).roundToDouble() : 15000.0;
+      }
+
       if (validatedItems.isEmpty) {
         return AiPlanProposal.error(
           message:
-              'AI Shopping Assistant could not identify any shopping commodities in the model response. Please enter them manually in Inference Lab.',
+              'AI Shopping Assistant could not identify any shopping commodities in your request. Please specify commodities and quantities (e.g. "2kg rice, 1 crate eggs"), or enter them directly in Inference Lab.',
           rawInput: rawInput,
         );
       }
 
       final ambiguities = detectAmbiguitiesAndFollowUps(rawInput, budget, validatedItems, errand);
 
-      final webSummary = (json['web_search_summary'] ?? json['webSearchSummary'])?.toString();
-      final liveVendorsRaw = (json['live_web_vendors'] ?? json['liveWebVendors']) as List<dynamic>?;
+      final webSummary = (jsonMap['web_search_summary'] ?? jsonMap['webSearchSummary'])?.toString();
+      final liveVendorsRaw = (jsonMap['live_web_vendors'] ?? jsonMap['liveWebVendors']) as List<dynamic>?;
       final List<LiveWebVendorResult> liveVendors = [];
       if (liveVendorsRaw != null) {
         for (final v in liveVendorsRaw) {
