@@ -184,12 +184,32 @@ class SupabaseDataService {
       if (name != null && name.trim().isNotEmpty) {
         final cleanName = name.trim();
         await client.from('products').delete().ilike('name', cleanName);
+        await client.from('products').delete().ilike('name', '%$cleanName%');
         await client.from('price_observations').delete().ilike('product_name', cleanName);
+        await client.from('price_observations').delete().ilike('product_name', '%$cleanName%');
       }
       return true;
     } catch (_) {
       return false;
     }
+  }
+
+  /// Purges hardcoded/demo seed products (e.g. cooking oil, eggs crate) from Cloud Supabase
+  static Future<void> purgeDemoSeedProducts() async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.from('products').delete().ilike('name', '%cooking oil%');
+      await client.from('products').delete().ilike('name', '%eggs (crate)%');
+      await client.from('products').delete().ilike('name', 'eggs');
+      await client.from('products').delete().eq('id', 'b0000000-0000-0000-0000-000000000002');
+      await client.from('products').delete().eq('id', 'b0000000-0000-0000-0000-000000000004');
+      await client.from('price_observations').delete().ilike('product_name', '%cooking oil%');
+      await client.from('price_observations').delete().ilike('product_name', '%eggs (crate)%');
+      await client.from('price_observations').delete().ilike('product_name', 'eggs');
+      await client.from('price_observations').delete().eq('product_id', 'b0000000-0000-0000-0000-000000000002');
+      await client.from('price_observations').delete().eq('product_id', 'b0000000-0000-0000-0000-000000000004');
+    } catch (_) {}
   }
 
   /// Fetch crowdsourced community price observations from Cloud Supabase
@@ -401,7 +421,9 @@ class SupabaseDataService {
       if (productName != null && productName.trim().isNotEmpty) {
         final cleanName = productName.trim();
         await client.from('price_observations').delete().ilike('product_name', cleanName);
+        await client.from('price_observations').delete().ilike('product_name', '%$cleanName%');
         await client.from('products').delete().ilike('name', cleanName);
+        await client.from('products').delete().ilike('name', '%$cleanName%');
       }
       return true;
     } catch (_) {

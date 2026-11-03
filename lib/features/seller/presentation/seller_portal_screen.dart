@@ -34,6 +34,36 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     });
   }
 
+  static const List<String> _commonListingUnits = [
+    '1kg',
+    '50kg bag',
+    '25kg bag',
+    '10kg bag',
+    '5kg bag',
+    'paint rubber / 4kg',
+    'congo / 1.5kg',
+    'derica',
+    '1L bottle',
+    '2L bottle',
+    '5L gallon',
+    '25L jerrycan',
+    'crate of 30',
+    'tuber',
+    'heap',
+    'piece / unit',
+    'pair',
+    'pack / packet',
+    'carton',
+    'roll',
+    'bundle',
+    'set',
+    'sachet',
+    'can / tin',
+    'yard',
+    'meter',
+    'Custom unit...',
+  ];
+
   void _showAddObservationDialog(BuildContext context, UserSession userSession) {
     final productController = TextEditingController();
     final sellerController = TextEditingController(
@@ -46,9 +76,24 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     String channel = userSession.sellerChannel ?? 'Local Market';
     final categories = ref.read(categoriesProvider).map((c) => c.name).toList();
     if (categories.isEmpty) {
-      categories.addAll(['Food', 'Electronics', 'Pharmacy', 'Others']);
+      categories.addAll([
+        'Food',
+        'Electronics',
+        'Pharmacy',
+        'Fashion & Clothing',
+        'Beauty & Personal Care',
+        'Home & Kitchen',
+        'Hardware & Tools',
+        'Baby & Kids',
+        'Books & Stationery',
+        'Agro & Farm Produce',
+        'Auto Spares',
+        'Others',
+      ]);
     }
     String selectedCategory = categories.first;
+    String selectedUnitOption = '1kg';
+    bool isCustomUnit = false;
     bool inStock = true;
     String? modalErrorMessage;
     bool isGeneratingDescription = false;
@@ -211,7 +256,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            flex: 2,
+                            flex: 3,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -220,21 +265,63 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
-                                TextField(
-                                  controller: unitController,
-                                  onChanged: (_) => setModalState(() {}),
+                                DropdownButtonFormField<String>(
+                                  value: selectedUnitOption,
+                                  isExpanded: true,
                                   decoration: InputDecoration(
-                                    hintText: '1kg / paint',
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 12),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
+                                  items: _commonListingUnits.map((u) {
+                                    return DropdownMenuItem(
+                                      value: u,
+                                      child: Text(
+                                        u,
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setModalState(() {
+                                        selectedUnitOption = val;
+                                        if (val == 'Custom unit...') {
+                                          isCustomUnit = true;
+                                          if (unitController.text.trim() == '1kg' ||
+                                              unitController.text.trim().isEmpty) {
+                                            unitController.clear();
+                                          }
+                                        } else {
+                                          isCustomUnit = false;
+                                          unitController.text = val;
+                                        }
+                                      });
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
                         ],
                       ),
+                      if (isCustomUnit) ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: unitController,
+                          onChanged: (_) => setModalState(() {}),
+                          decoration: InputDecoration(
+                            labelText: 'Enter Custom Unit *',
+                            hintText: 'e.g. 75cl bottle, paint bucket, pack of 6',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
                       if (parsedPrice > 0) ...[
                         const SizedBox(height: 6),
                         Container(
@@ -365,8 +452,8 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                       isGeneratingDescription = true;
                                     });
 
-                                    final desc = await const MetaAiService()
-                                        .generateProductDescription(
+                                    final res = await const MetaAiService()
+                                        .generateProductDescriptionDetailed(
                                       productName: prodName,
                                       category: selectedCategory,
                                       brand: brandController.text.trim().isNotEmpty
@@ -383,7 +470,19 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
 
                                     setModalState(() {
                                       isGeneratingDescription = false;
-                                      notesController.text = desc;
+                                      if (res.isSuccess) {
+                                        notesController.text = res.text;
+                                        modalErrorMessage = null;
+                                      } else {
+                                        modalErrorMessage =
+                                            'AI Generation Failed: ${res.errorMessage ?? "Could not reach Meta AI"}';
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: const Color(0xFFC62828),
+                                            content: Text(modalErrorMessage!),
+                                          ),
+                                        );
+                                      }
                                     });
                                   },
                           ),
@@ -584,11 +683,29 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
     final notesController = TextEditingController(text: obs.notes ?? '');
     final categories = ref.read(categoriesProvider).map((c) => c.name).toList();
     if (categories.isEmpty) {
-      categories.addAll(['Food', 'Electronics', 'Pharmacy', 'Others']);
+      categories.addAll([
+        'Food',
+        'Electronics',
+        'Pharmacy',
+        'Fashion & Clothing',
+        'Beauty & Personal Care',
+        'Home & Kitchen',
+        'Hardware & Tools',
+        'Baby & Kids',
+        'Books & Stationery',
+        'Agro & Farm Produce',
+        'Auto Spares',
+        'Others',
+      ]);
     }
     String selectedCategory = categories.contains(obs.category)
         ? obs.category
         : (categories.isNotEmpty ? categories.first : 'Food');
+    String selectedUnitOption = _commonListingUnits.contains(obs.unit)
+        ? obs.unit
+        : 'Custom unit...';
+    bool isCustomUnit = !_commonListingUnits.contains(obs.unit) ||
+        selectedUnitOption == 'Custom unit...';
     bool inStock = obs.inStock;
     String? modalErrorMessage;
     bool isGeneratingDescription = false;
@@ -724,7 +841,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            flex: 2,
+                            flex: 3,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -733,20 +850,59 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 6),
-                                TextField(
-                                  controller: unitController,
-                                  onChanged: (_) => setModalState(() {}),
+                                DropdownButtonFormField<String>(
+                                  value: selectedUnitOption,
+                                  isExpanded: true,
                                   decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 12),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
+                                  items: _commonListingUnits.map((u) {
+                                    return DropdownMenuItem(
+                                      value: u,
+                                      child: Text(
+                                        u,
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setModalState(() {
+                                        selectedUnitOption = val;
+                                        if (val == 'Custom unit...') {
+                                          isCustomUnit = true;
+                                        } else {
+                                          isCustomUnit = false;
+                                          unitController.text = val;
+                                        }
+                                      });
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           ),
                         ],
                       ),
+                      if (isCustomUnit) ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: unitController,
+                          onChanged: (_) => setModalState(() {}),
+                          decoration: InputDecoration(
+                            labelText: 'Enter Custom Unit *',
+                            hintText: 'e.g. 75cl bottle, paint bucket, pack of 6',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
                       if (parsedPrice > 0) ...[
                         const SizedBox(height: 6),
                         Container(
@@ -876,8 +1032,8 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                       isGeneratingDescription = true;
                                     });
 
-                                    final desc = await const MetaAiService()
-                                        .generateProductDescription(
+                                    final res = await const MetaAiService()
+                                        .generateProductDescriptionDetailed(
                                       productName: prodName,
                                       category: selectedCategory,
                                       brand: brandController.text.trim().isNotEmpty
@@ -894,7 +1050,19 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
 
                                     setModalState(() {
                                       isGeneratingDescription = false;
-                                      notesController.text = desc;
+                                      if (res.isSuccess) {
+                                        notesController.text = res.text;
+                                        modalErrorMessage = null;
+                                      } else {
+                                        modalErrorMessage =
+                                            'AI Generation Failed: ${res.errorMessage ?? "Could not reach Meta AI"}';
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: const Color(0xFFC62828),
+                                            content: Text(modalErrorMessage!),
+                                          ),
+                                        );
+                                      }
                                     });
                                   },
                           ),

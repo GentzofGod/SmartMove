@@ -4623,6 +4623,13 @@ class MetaAiService {
     String stdUnit = '1kg';
     double minPrice = 500;
     double maxPrice = 5000;
+    List<String> targetPlatforms = const [
+      'Jumia Nigeria',
+      'Konga Online',
+      'Supermart.ng',
+      'Local Market Community Submissions',
+      'PriceCheck Nigeria (Verified Crawl)',
+    ];
 
     if (lower.contains('rice')) {
       category = 'Grains & Cereals';
@@ -4664,18 +4671,86 @@ class MetaAiService {
       stdUnit = '1kg';
       minPrice = 3200;
       maxPrice = 5500;
-    } else if (lower.contains('paracetamol') || lower.contains('panadol') || lower.contains('pharmacy')) {
+    } else if (lower.contains('paracetamol') ||
+        lower.contains('panadol') ||
+        lower.contains('pharmacy') ||
+        lower.contains('drug') ||
+        lower.contains('medicine') ||
+        lower.contains('syrup')) {
       category = 'Pharmacy & Health';
       stdUnit = 'pack';
       minPrice = 600;
-      maxPrice = 1500;
-    } else if (lower.contains('cable') || lower.contains('charger') || lower.contains('electronics')) {
+      maxPrice = 2500;
+    } else if (lower.contains('cooker') ||
+        lower.contains('blender') ||
+        lower.contains('kettle') ||
+        lower.contains('microwave') ||
+        lower.contains('toaster') ||
+        lower.contains('fridge') ||
+        lower.contains('refrigerator') ||
+        lower.contains('iron') ||
+        lower.contains('fan')) {
+      category = 'Home & Kitchen Appliances';
+      stdUnit = 'unit';
+      minPrice = 12000;
+      maxPrice = 65000;
+      targetPlatforms = const [
+        'Jumia Nigeria',
+        'Konga Electronics',
+        'Alaba International Market Crawl',
+        'Local Market Electronic Stores',
+      ];
+    } else if (lower.contains('cable') ||
+        lower.contains('charger') ||
+        lower.contains('electronics') ||
+        lower.contains('phone') ||
+        lower.contains('laptop') ||
+        lower.contains('tv') ||
+        lower.contains('television') ||
+        lower.contains('battery') ||
+        lower.contains('generator') ||
+        lower.contains('inverter')) {
       category = 'Electronics & Gadgets';
-      stdUnit = 'piece';
-      minPrice = 2000;
-      maxPrice = 4500;
+      stdUnit = 'unit';
+      minPrice = 3500;
+      maxPrice = 45000;
+      targetPlatforms = const [
+        'Jumia Nigeria',
+        'Konga Online',
+        'Computer Village Market Crawl',
+        'Local Market Electronic Outlets',
+      ];
+    } else if (lower.contains('shoe') ||
+        lower.contains('shirt') ||
+        lower.contains('trouser') ||
+        lower.contains('dress') ||
+        lower.contains('jeans') ||
+        lower.contains('cloth')) {
+      category = 'Fashion & Apparel';
+      stdUnit = lower.contains('shoe') ? 'pair' : 'piece';
+      minPrice = 4000;
+      maxPrice = 25000;
+      targetPlatforms = const [
+        'Jumia Fashion',
+        'Konga Fashion',
+        'Balogun Market Hub',
+        'Local Market Boutiques',
+      ];
+    } else if (lower.contains('cement') ||
+        lower.contains('paint') ||
+        lower.contains('drill') ||
+        lower.contains('hammer') ||
+        lower.contains('tool') ||
+        lower.contains('pipe')) {
+      category = 'Hardware & Building';
+      stdUnit = lower.contains('cement') ? '50kg bag' : 'unit';
+      minPrice = 5000;
+      maxPrice = 40000;
     } else {
       stdUnit = CommodityComparisonService.resolveBaseUnit(clean, commodityName: clean);
+      if (stdUnit == 'unit' || stdUnit == 'piece') {
+        category = 'General Merchandise';
+      }
     }
 
     return OnlinePriceResearchPlan(
@@ -4690,13 +4765,7 @@ class MetaAiService {
         'Jumia $clean',
         'Konga $clean',
       ],
-      targetPlatforms: const [
-        'Jumia Supermarket',
-        'Konga Food & Groceries',
-        'Supermart.ng',
-        'Local Market Community Submissions',
-        'PriceCheck Nigeria (Verified Crawl)',
-      ],
+      targetPlatforms: targetPlatforms,
       estimatedBenchmarkMin: minPrice,
       estimatedBenchmarkMax: maxPrice,
     );
@@ -5494,8 +5563,82 @@ class MetaAiService {
     };
   }
 
+class AiDescriptionResult {
+  final bool isSuccess;
+  final String text;
+  final String? errorMessage;
+
+  const AiDescriptionResult({
+    required this.isSuccess,
+    required this.text,
+    this.errorMessage,
+  });
+
+  factory AiDescriptionResult.success(String text) =>
+      AiDescriptionResult(isSuccess: true, text: text);
+
+  factory AiDescriptionResult.failure(String errorMessage) =>
+      AiDescriptionResult(isSuccess: false, text: '', errorMessage: errorMessage);
+}
+
   /// Generates a realistic, descriptive notes string for a seller listing
   /// based on the provided product name, category, brand, unit, and price.
+  /// Reports explicit errors without false fallback strings.
+  Future<AiDescriptionResult> generateProductDescriptionDetailed({
+    required String productName,
+    required String category,
+    String? brand,
+    String? unit,
+    double? price,
+    String? currentNotes,
+  }) async {
+    final prompt =
+        'Generate a concise, professional 1-2 sentence market product listing description for: $productName in category $category${brand != null && brand.isNotEmpty ? ', brand $brand' : ''}${unit != null && unit.isNotEmpty ? ', unit $unit' : ''}${price != null && price > 0 ? ', price ₦${price.toStringAsFixed(0)}' : ''}. Focus on authenticity, quality, weight/packaging, and freshness for retail buyers.';
+
+    try {
+      final res = await _invokeEdgeProxy(
+        action: 'generate_description',
+        payload: {
+          'model': 'muse-spark-1.3',
+          'prompt': prompt,
+        },
+      );
+
+      if (res.isSuccess && res.data != null && res.data is Map) {
+        final data = res.data as Map;
+        final raw = data['text'] ??
+            data['answer'] ??
+            data['content'] ??
+            (data['choices'] is List && (data['choices'] as List).isNotEmpty
+                ? data['choices'][0]?['message']?['content']
+                : null);
+
+        if (raw != null) {
+          final text = raw.toString().trim();
+          if (text.isNotEmpty) {
+            return AiDescriptionResult.success(text);
+          }
+        }
+        return AiDescriptionResult.failure(
+          'Meta AI returned an empty response. Please check prompt details.',
+        );
+      }
+
+      final errorMsg = res.errorMessage ??
+          (res.data is Map && res.data['error'] != null
+              ? (res.data['error'] is Map
+                  ? res.data['error']['message']?.toString()
+                  : res.data['error']?.toString())
+              : 'Meta AI Edge Proxy responded with HTTP ${res.statusCode}.');
+
+      return AiDescriptionResult.failure(errorMsg);
+    } catch (e) {
+      return AiDescriptionResult.failure('Network connection error: $e');
+    }
+  }
+
+  /// Generates a product description, throwing an exception on failure
+  /// (no silent false fallback strings).
   Future<String> generateProductDescription({
     required String productName,
     required String category,
@@ -5504,43 +5647,17 @@ class MetaAiService {
     double? price,
     String? currentNotes,
   }) async {
-    // If cloud Meta API / edge proxy is available:
-    if (hasValidAuth) {
-      try {
-        final prompt =
-            'Generate a concise, professional 1-2 sentence market product description for: $productName in category $category${brand != null ? ', brand $brand' : ''}${unit != null ? ', unit $unit' : ''}. Focus on quality, packaging, and freshness for retail buyers.';
-        final res = await _invokeEdgeProxy(
-          action: 'llm_generate',
-          payload: {
-            'model': 'meta/llama-3-70b-instruct',
-            'prompt': prompt,
-          },
-        );
-        if (res.isSuccess && res.data != null && res.data is Map) {
-          final raw = res.data['text'] ?? res.data['answer'] ?? res.data['content'];
-          if (raw != null) {
-            final text = raw.toString().trim();
-            if (text.isNotEmpty) {
-              return text;
-            }
-          }
-        }
-      } catch (_) {}
+    final result = await generateProductDescriptionDetailed(
+      productName: productName,
+      category: category,
+      brand: brand,
+      unit: unit,
+      price: price,
+      currentNotes: currentNotes,
+    );
+    if (result.isSuccess) {
+      return result.text;
     }
-
-    // High quality deterministic context-aware generation based on category & product
-    final brandPrefix = brand != null && brand.isNotEmpty ? '$brand ' : '';
-    final unitSuffix = unit != null && unit.isNotEmpty ? ' ($unit)' : '';
-    final catLower = category.toLowerCase();
-
-    if (catLower.contains('food') || catLower.contains('grocer') || catLower.contains('grain') || catLower.contains('tuber') || catLower.contains('oil')) {
-      return 'Fresh, premium quality $brandPrefix$productName$unitSuffix. Sourced directly for optimal taste, clean processing, and standard market weight.';
-    } else if (catLower.contains('electron')) {
-      return 'Authentic, durable $brandPrefix$productName$unitSuffix. Tested for optimal performance, original specifications, and reliable everyday operation.';
-    } else if (catLower.contains('pharm')) {
-      return 'Genuine, properly stored $brandPrefix$productName$unitSuffix with clear batch identification and sealed manufacturer packaging.';
-    } else {
-      return 'High quality, genuine $brandPrefix$productName$unitSuffix available for immediate pickup or delivery. Verified store stock.';
-    }
+    throw Exception(result.errorMessage ?? 'Failed to generate product description.');
   }
 }

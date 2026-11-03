@@ -394,7 +394,10 @@ class SafeOutletLauncher {
                                             itemId: 'item-${comparison.commodityName.hashCode}',
                                             commodityName: comparison.commodityName,
                                             quantity: 1.0,
-                                            unit: '1kg',
+                                            unit: CommodityComparisonService.resolveBaseUnit(
+                                              '',
+                                              commodityName: comparison.commodityName,
+                                            ),
                                             unitPrice: vendor.detectedPrice ?? 0.0,
                                             totalCost: vendor.detectedPrice ?? 0.0,
                                             outletName: vendor.vendorName.replaceAll(' (SmartMove Catalog)', ''),

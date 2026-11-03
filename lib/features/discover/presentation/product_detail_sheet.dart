@@ -10,6 +10,7 @@ import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/presentation/widgets/commodity_image_widget.dart';
 import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../../core/presentation/widgets/community_assistance_sheet.dart';
 import '../../../core/presentation/widgets/report_modal_sheet.dart';
 import '../../../core/models/item_acquisition_source.dart';
 import '../../decision_lab/presentation/widgets/trader_negotiation_sheet.dart';
@@ -67,76 +68,130 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
     ReportModalSheet.show(context, targetObs);
   }
 
-  List<PriceObservation> _getComparisonQuotes(
+  static String _cleanCommodityKey(String name) {
+    return name
+        .toLowerCase()
+        .replaceAll(RegExp(r'\([^)]*\)'), '')
+        .replaceAll(RegExp(r'\[[^\]]*\]'), '')
+        .replaceAll(RegExp(r'\b\d+(?:kg|g|l|cl|ml|k)?\b'), '')
+        .replaceAll(RegExp(r'\b(?:bag|carton|crate|tuber|paint rubber|derica|congo|bottle|gallon|jerrycan|pack|piece|unit)\b'), '')
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .trim();
+  }
+
+  static String _cleanSellerKey(String seller) {
+    return seller
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s*\([^)]*\)'), '')
+        .replaceAll(RegExp(r'\b(?:market hub|market|stalls|stall|depot|store|mart|supermarket|ventures|enterprise)\b'), '')
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .trim();
+  }
+
+  static bool _isSameOrSimilarCommodity(String prodNameA, String prodNameB) {
+    final keyA = _cleanCommodityKey(prodNameA);
+    final keyB = _cleanCommodityKey(prodNameB);
+    if (keyA.isEmpty || keyB.isEmpty) return false;
+    if (keyA == keyB) return true;
+
+    final wordsA = keyA.split(RegExp(r'\s+')).where((w) => w.length >= 3).toSet();
+    final wordsB = keyB.split(RegExp(r'\s+')).where((w) => w.length >= 3).toSet();
+    final intersection = wordsA.intersection(wordsB);
+
+    if (intersection.isNotEmpty) {
+      if (keyA.contains('palm') && !keyB.contains('palm')) return false;
+      if (!keyA.contains('palm') && keyB.contains('palm')) return false;
+      return true;
+    }
+    return false;
+  }
+
+  List<PriceObservation> _getAlternativeQuotes(
     List<PriceObservation> communityObs,
   ) {
-    final matching = communityObs
-        .where(
-          (o) =>
-              o.productId == widget.product.id ||
-              o.productName.toLowerCase() ==
-                  widget.product.name.toLowerCase() ||
-              o.productName.toLowerCase().contains(
-                widget.product.name.toLowerCase(),
-              ) ||
-              widget.product.name.toLowerCase().contains(
-                o.productName.toLowerCase(),
-              ),
-        )
-        .toList();
+    final currentSellerKey = _cleanSellerKey(widget.product.bestSeller);
+    final currentSellerRaw = widget.product.bestSeller.trim().toLowerCase();
+
+    // Group alternative candidates strictly by distinct seller
+    final Map<String, PriceObservation> bestQuotePerSeller = {};
+
+    for (final obs in communityObs) {
+      // 1. Exclude the product itself
+      if (obs.id == widget.product.id ||
+          (obs.productId.isNotEmpty &&
+              obs.productId == widget.product.id &&
+              obs.id.startsWith('listing-'))) {
+        continue;
+      }
+
+      // 2. Must be the same or similar commodity
+      if (!_isSameOrSimilarCommodity(obs.productName, widget.product.name)) {
+        continue;
+      }
+
+      // 3. Must be from a DIFFERENT seller (never compare against the same seller or itself)
+      final obsSellerKey = _cleanSellerKey(obs.sellerName);
+      final obsSellerRaw = obs.sellerName.trim().toLowerCase();
+      if (obsSellerRaw == currentSellerRaw ||
+          (currentSellerKey.isNotEmpty && obsSellerKey == currentSellerKey)) {
+        continue;
+      }
+      if (currentSellerKey.isNotEmpty && obsSellerKey.isNotEmpty) {
+        if (obsSellerKey.contains(currentSellerKey) ||
+            currentSellerKey.contains(obsSellerKey)) {
+          continue;
+        }
+      }
+
+      // 4. Deduplicate multiple listings from the same alternative seller (keep their lowest price)
+      final sellerMapKey =
+          obsSellerKey.isNotEmpty ? obsSellerKey : obsSellerRaw;
+      final existing = bestQuotePerSeller[sellerMapKey];
+      if (existing == null || obs.price < existing.price) {
+        bestQuotePerSeller[sellerMapKey] = obs;
+      }
+    }
+
+    return bestQuotePerSeller.values.toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final observations = ref.watch(communityProvider);
+    final alternativeQuotes = _getAlternativeQuotes(observations);
+    final hasAlternatives = alternativeQuotes.isNotEmpty;
+    final currentLocation = ref.watch(locationProvider);
 
     final basePrice = widget.product.lowestPrice;
-
-    // Genuine product listing observation from catalog
     final productQuote = PriceObservation(
       id: 'listing-${widget.product.id}',
       productId: widget.product.id,
       productName: widget.product.name,
       sellerName: widget.product.bestSeller,
-      marketLocation: '${widget.product.bestSeller} (Open Market)',
+      marketLocation: '${widget.product.bestSeller} (Current Seller)',
       price: basePrice,
       unit: widget.product.standardUnit,
       timestamp: DateTime.now(),
       sourceType: widget.product.sourceType,
       submitterName: widget.product.bestSeller,
       submitterRole: 'Trader',
-      isVerified:
-          widget.product.sourceType ==
-              ObservationSource.independentlyVerified ||
+      isVerified: widget.product.sourceType == ObservationSource.independentlyVerified ||
           widget.product.sourceType == ObservationSource.traderConfirmed,
-      channel: widget.product.channel.isNotEmpty
-          ? widget.product.channel
-          : 'Local Market',
+      channel: widget.product.channel.isNotEmpty ? widget.product.channel : 'Local Market',
       brandOrGrade: widget.product.brandOrGrade ?? 'Grade A / Market Benchmark',
       standardizedUnitPrice: widget.product.standardizedUnitPrice ?? basePrice,
       baseUnit: widget.product.baseUnit,
       inStock: true,
-      notes: 'Direct listing price.',
+      notes: 'Current product listing.',
     );
 
-    final quotes = <PriceObservation>[productQuote];
-    for (final obs in matching) {
-      final isDuplicate = quotes.any(
-        (q) =>
-            q.id == obs.id ||
-            (q.sellerName.toLowerCase() == obs.sellerName.toLowerCase() &&
-                (q.price - obs.price).abs() < 0.01),
-      );
-      if (!isDuplicate) {
-        quotes.add(obs);
-      }
-    }
-    return quotes;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final observations = ref.watch(communityProvider);
-    final comparisonQuotes = _getComparisonQuotes(observations);
-    final currentLocation = ref.watch(locationProvider);
+    // Only combine with current product for comparison if genuine alternatives from other sellers exist
+    final allComparisonQuotes = hasAlternatives
+        ? [productQuote, ...alternativeQuotes]
+        : <PriceObservation>[productQuote];
 
     final standardizedQuotes = CommodityComparisonService.standardizeQuotes(
-      quotes: comparisonQuotes,
+      quotes: allComparisonQuotes,
       userLocation: currentLocation,
       commodityName: widget.product.name,
     );
@@ -146,34 +201,37 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
       commodityName: widget.product.name,
     );
 
-    var filteredQuotes = _selectedChannelFilter == null
-        ? standardizedQuotes
-        : standardizedQuotes
-              .where(
-                (q) =>
-                    q.observation.channel.toLowerCase() ==
-                    _selectedChannelFilter!.toLowerCase(),
-              )
-              .toList();
+    // Filter alternative seller quotes only (excluding current product listing from alternative cards)
+    var filteredQuotes = standardizedQuotes
+        .where((q) => q.observation.id != productQuote.id)
+        .toList();
+
+    if (_selectedChannelFilter != null) {
+      filteredQuotes = filteredQuotes
+          .where((q) => q.observation.channel.toLowerCase() == _selectedChannelFilter!.toLowerCase())
+          .toList();
+    }
 
     filteredQuotes = CommodityComparisonService.rankQuotes(
       quotes: filteredQuotes,
       preference: _sortPreference,
     );
 
-    final lowestQuotePrice = comparisonQuotes.isNotEmpty
-        ? comparisonQuotes.map((q) => q.price).reduce((a, b) => a < b ? a : b)
+    final lowestQuotePrice = allComparisonQuotes.isNotEmpty
+        ? allComparisonQuotes.map((q) => q.price).reduce((a, b) => a < b ? a : b)
         : widget.product.lowestPrice;
 
     final estimatedBasketTotal = lowestQuotePrice * _quantity;
 
-    final multiCriteriaResult = _metaAiService.analyzeAvailableOptions(
-      product: widget.product,
-      observations: comparisonQuotes,
-      requestedQuantity: _quantity,
-      priority: _decisionPriority,
-      userLocation: currentLocation,
-    );
+    final multiCriteriaResult = hasAlternatives
+        ? _metaAiService.analyzeAvailableOptions(
+            product: widget.product,
+            observations: allComparisonQuotes,
+            requestedQuantity: _quantity,
+            priority: _decisionPriority,
+            userLocation: currentLocation,
+          )
+        : null;
 
     // Price History Trend: Only when genuine historical observations exist across time
     final historyQuotes =
@@ -414,7 +472,9 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
                   ),
                 ),
                 Text(
-                  '${comparisonQuotes.length} quotes',
+                  hasAlternatives
+                      ? '${alternativeQuotes.length} alternative seller(s)'
+                      : 'No other sellers',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -424,474 +484,590 @@ class _ProductDetailSheetState extends ConsumerState<ProductDetailSheet> {
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Prices standardized per unit to ensure fair comparison across channels.',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            Text(
+              hasAlternatives
+                  ? 'Comparing identical / similar ${widget.product.name} quotes from different sellers.'
+                  : 'Only one seller is currently listing this product on the platform.',
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
 
-            // Comparison Summary Card
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F8E9),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.25),
+            if (!hasAlternatives) ...[
+              Container(
+                key: const ValueKey('card_no_alternative_sellers'),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.badgeSuccessBg,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Price Spread: ${comparisonSummary.priceSpreadPercentage.toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.badgeSuccessText,
-                          ),
-                        ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.storefront_outlined, size: 40, color: AppColors.textTertiary),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No Alternative Sellers Available Yet',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
-                      Text(
-                        'Lowest: ₦${comparisonSummary.lowestUnitPrice.toStringAsFixed(0)} / ${comparisonSummary.baseUnit}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primaryDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    comparisonSummary.keySavingsInsight,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.35,
                     ),
-                  ),
-                  if (comparisonSummary.anomalies.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFFB74D)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'This product is currently only available from ${widget.product.bestSeller}. No other verified traders or community members have logged alternative quotes for this commodity yet.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            size: 16,
-                            color: Color(0xFFE65100),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              comparisonSummary.anomalies.first,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFBF360C),
-                              ),
-                            ),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
+                      label: const Text(
+                        'Report Quote from Another Stall',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
                       ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        context.go('/products');
+                      },
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Sort Preference Selector
-            Row(
-              children: [
-                const Text(
-                  'Sort by:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
+              const SizedBox(height: 14),
+            ] else ...[
+              // Comparison Summary Card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F8E9),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.25),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: ComparisonSortPreference.values.map((pref) {
-                        final isSelected = _sortPreference == pref;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
-                          child: ChoiceChip(
-                            label: Text(
-                              pref.label,
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            selected: isSelected,
-                            selectedColor: AppColors.primaryTint,
-                            onSelected: (val) {
-                              if (val) setState(() => _sortPreference = pref);
-                            },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Channel Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildChannelFilterChip(label: 'All Channels', channel: null),
-                  const SizedBox(width: 6),
-                  _buildChannelFilterChip(
-                    label: 'Local Market',
-                    channel: 'Local Market',
-                  ),
-                  const SizedBox(width: 6),
-                  _buildChannelFilterChip(
-                    label: 'SMB Store',
-                    channel: 'SMB Store',
-                  ),
-                  const SizedBox(width: 6),
-                  _buildChannelFilterChip(
-                    label: 'Online Retailer',
-                    channel: 'Online Retailer',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Multi-Seller Quote Cards
-            if (filteredQuotes.isNotEmpty) ...[
-              ...filteredQuotes.map((sq) {
-                final obs = sq.observation;
-                final isLowest = sq.isLowestPrice;
-                final diff = sq.priceDifferenceVsLowest;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isLowest
-                          ? AppColors.primary.withValues(alpha: 0.4)
-                          : AppColors.cardBorder,
-                      width: isLowest ? 1.5 : 1.0,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Channel & Verification Badges Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildChannelBadge(obs.sellerChannel),
-                          Row(
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  color: obs.inStock
-                                      ? AppColors.badgeSuccessText
-                                      : AppColors.errorText,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                obs.inStock ? 'In Stock' : 'Out of Stock',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: obs.inStock
-                                      ? AppColors.badgeSuccessText
-                                      : AppColors.errorText,
-                                ),
-                              ),
-                              if (obs.isVerified) ...[
-                                const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.verified,
-                                  size: 14,
-                                  color: AppColors.primary,
-                                ),
-                              ],
-                            ],
+                          decoration: BoxDecoration(
+                            color: AppColors.badgeSuccessBg,
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Seller Name & Price Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  obs.sellerName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${obs.marketLocation} • ${sq.dynamicDistanceKm.toStringAsFixed(1)} km away • ${obs.sourceType.displayLabel}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                if (obs.brandOrGrade != null &&
-                                    obs.brandOrGrade!.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Grade: ${obs.brandOrGrade}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primaryDark,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                          child: Text(
+                            'Price Spread: ${comparisonSummary.priceSpreadPercentage.toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.badgeSuccessText,
                             ),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                obs.formattedPrice,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 16,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                sq.displayStandardizedRate,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              if (isLowest)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.badgeSuccessBg,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'Lowest Price',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.badgeSuccessText,
-                                    ),
-                                  ),
-                                )
-                              else
-                                Text(
-                                  '+₦${diff.toStringAsFixed(0)} (+${sq.percentDifferenceVsLowest.toStringAsFixed(0)}%)',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.badgeWarningText,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Outlay for selected quantity
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
                         ),
+                        Text(
+                          'Lowest: ₦${comparisonSummary.lowestUnitPrice.toStringAsFixed(0)} / ${comparisonSummary.baseUnit}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      comparisonSummary.keySavingsInsight,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (comparisonSummary.anomalies.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(6),
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFFB74D)),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Outlay for ${_quantity.toInt()} ${widget.product.standardUnit}:',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: Color(0xFFE65100),
                             ),
-                            Text(
-                              '₦${(obs.price * _quantity).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                comparisonSummary.anomalies.first,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFBF360C),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                visualDensity: VisualDensity.compact,
-                                side: const BorderSide(color: AppColors.primary),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              icon: const Icon(Icons.explore_outlined, size: 15),
-                              label: const Text(
-                                'Locate Stall',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                              onPressed: () {
-                                SellerLocationMapSheet.show(
-                                  context,
-                                  sellerName: obs.sellerName,
-                                  marketLocation: obs.marketLocation,
-                                  stallLocation: obs.notes,
-                                  productName: obs.productName,
-                                  price: obs.price,
-                                  unit: obs.unit,
-                                  brandOrGrade: obs.brandOrGrade,
-                                  inStock: obs.inStock,
-                                  observation: obs,
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                visualDensity: VisualDensity.compact,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              icon: const Icon(Icons.chat_bubble_outline, size: 15),
-                              label: const Text(
-                                'Chat & Buy',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                              onPressed: () {
-                                final source = ItemAcquisitionSource(
-                                  id: 'src-${obs.sellerName.toLowerCase().replaceAll(' ', '-')}',
-                                  itemId: 'item-${widget.product.id}',
-                                  commodityName: obs.productName,
-                                  quantity: _quantity,
-                                  unit: obs.unit,
-                                  unitPrice: obs.price,
-                                  totalCost: obs.price * _quantity,
-                                  outletName: obs.sellerName,
-                                  channel: obs.sellerChannel == SellerChannel.onlineRetailer
-                                      ? AcquisitionChannel.ecommercePlatform
-                                      : AcquisitionChannel.registeredTrader,
-                                  marketHubOrLocation: obs.marketLocation,
-                                  dynamicDistanceKm: sq.dynamicDistanceKm,
-                                  isPlatformRegisteredTrader: obs.isVerified,
-                                  inStock: obs.inStock,
-                                  brandOrGrade: obs.brandOrGrade,
-                                );
-                                TraderNegotiationSheet.show(context, source: source);
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: Icon(
-                              obs.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
-                              size: 16,
-                              color: obs.isFlaggedAnomaly ? const Color(0xFFC62828) : AppColors.textTertiary,
-                            ),
-                            tooltip: obs.isFlaggedAnomaly ? 'Listing Reported' : 'Report Product or Seller',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => ReportModalSheet.show(context, obs),
-                          ),
-                        ],
-                      ),
                     ],
-                  ),
-                );
-              }),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'No seller reports logged in this channel yet. Submit yours in Community tab!',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // Sort Preference Selector
+              Row(
+                children: [
+                  const Text(
+                    'Sort by:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: ComparisonSortPreference.values.map((pref) {
+                          final isSelected = _sortPreference == pref;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6.0),
+                            child: ChoiceChip(
+                              label: Text(
+                                pref.label,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppColors.primaryTint,
+                              onSelected: (val) {
+                                if (val) setState(() => _sortPreference = pref);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Channel Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildChannelFilterChip(label: 'All Channels', channel: null),
+                    const SizedBox(width: 6),
+                    _buildChannelFilterChip(
+                      label: 'Local Market',
+                      channel: 'Local Market',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildChannelFilterChip(
+                      label: 'SMB Store',
+                      channel: 'SMB Store',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildChannelFilterChip(
+                      label: 'Online Retailer',
+                      channel: 'Online Retailer',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Multi-Seller Quote Cards
+              if (filteredQuotes.isNotEmpty) ...[
+                ...filteredQuotes.map((sq) {
+                  final obs = sq.observation;
+                  final isLowest = sq.isLowestPrice;
+                  final diff = sq.priceDifferenceVsLowest;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isLowest
+                            ? AppColors.primary.withValues(alpha: 0.4)
+                            : AppColors.cardBorder,
+                        width: isLowest ? 1.5 : 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Channel & Verification Badges Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildChannelBadge(obs.sellerChannel),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: obs.inStock
+                                        ? AppColors.badgeSuccessText
+                                        : AppColors.errorText,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  obs.inStock ? 'In Stock' : 'Out of Stock',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: obs.inStock
+                                        ? AppColors.badgeSuccessText
+                                        : AppColors.errorText,
+                                  ),
+                                ),
+                                if (obs.isVerified) ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.verified,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Seller Name & Price Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    obs.sellerName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${obs.marketLocation} • ${sq.dynamicDistanceKm.toStringAsFixed(1)} km away • ${obs.sourceType.displayLabel}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  if (obs.brandOrGrade != null &&
+                                      obs.brandOrGrade!.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Grade: ${obs.brandOrGrade}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primaryDark,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  obs.formattedPrice,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  sq.displayStandardizedRate,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                if (isLowest)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.badgeSuccessBg,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'Lowest Price',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.badgeSuccessText,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Text(
+                                    '+₦${diff.toStringAsFixed(0)} (+${sq.percentDifferenceVsLowest.toStringAsFixed(0)}%)',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.badgeWarningText,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Outlay for selected quantity
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Outlay for ${_quantity.toInt()} ${widget.product.standardUnit}:',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                '₦${(obs.price * _quantity).toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Builder(builder: (context) {
+                          final isVerifiedTrader = obs.isVerified ||
+                              obs.sourceType == ObservationSource.traderConfirmed ||
+                              obs.sourceType == ObservationSource.traderProvided;
+
+                          if (isVerifiedTrader) {
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      visualDensity: VisualDensity.compact,
+                                      side: const BorderSide(color: AppColors.primary),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.explore_outlined, size: 15),
+                                    label: const Text(
+                                      'Locate Stall',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                    ),
+                                    onPressed: () {
+                                      SellerLocationMapSheet.show(
+                                        context,
+                                        sellerName: obs.sellerName,
+                                        marketLocation: obs.marketLocation,
+                                        stallLocation: obs.notes,
+                                        productName: obs.productName,
+                                        price: obs.price,
+                                        unit: obs.unit,
+                                        brandOrGrade: obs.brandOrGrade,
+                                        inStock: obs.inStock,
+                                        observation: obs,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      visualDensity: VisualDensity.compact,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                                    label: const Text(
+                                      'Chat & Buy',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                    ),
+                                    onPressed: () {
+                                      final source = ItemAcquisitionSource(
+                                        id: 'src-${obs.sellerName.toLowerCase().replaceAll(' ', '-')}',
+                                        itemId: 'item-${widget.product.id}',
+                                        commodityName: obs.productName,
+                                        quantity: _quantity,
+                                        unit: obs.unit,
+                                        unitPrice: obs.price,
+                                        totalCost: obs.price * _quantity,
+                                        outletName: obs.sellerName,
+                                        channel: obs.sellerChannel == SellerChannel.onlineRetailer
+                                            ? AcquisitionChannel.ecommercePlatform
+                                            : AcquisitionChannel.registeredTrader,
+                                        marketHubOrLocation: obs.marketLocation,
+                                        dynamicDistanceKm: sq.dynamicDistanceKm,
+                                        isPlatformRegisteredTrader: obs.isVerified,
+                                        inStock: obs.inStock,
+                                        brandOrGrade: obs.brandOrGrade,
+                                      );
+                                      TraderNegotiationSheet.show(context, source: source);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+
+                          // Community Observation: No formal stall pin; offer directions & contact assistance
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  key: const ValueKey('btn_community_help'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    visualDensity: VisualDensity.compact,
+                                    side: const BorderSide(color: Color(0xFFE65100)),
+                                    foregroundColor: const Color(0xFFE65100),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.help_outline_rounded, size: 15, color: Color(0xFFE65100)),
+                                  label: const Text(
+                                    'Get Stall Help',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                  ),
+                                  onPressed: () {
+                                    CommunityAssistanceSheet.show(context, observation: obs);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  key: const ValueKey('btn_ask_scout_help'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFE65100),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    visualDensity: VisualDensity.compact,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.people_alt_outlined, size: 15),
+                                  label: const Text(
+                                    'Ask Reporter / Scout',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                                  ),
+                                  onPressed: () {
+                                    CommunityAssistanceSheet.show(context, observation: obs);
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Icon(
+                            obs.isFlaggedAnomaly ? Icons.flag_rounded : Icons.flag_outlined,
+                            size: 16,
+                            color: obs.isFlaggedAnomaly ? const Color(0xFFC62828) : AppColors.textTertiary,
+                          ),
+                          tooltip: obs.isFlaggedAnomaly ? 'Listing Reported' : 'Report Product or Seller',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => ReportModalSheet.show(context, obs),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'No alternative seller quotes in this channel filter.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+
+              // Meta AI Muse Spark Multi-Criteria Options Analysis
+              if (multiCriteriaResult != null) ...[
+                _buildMultiCriteriaAnalysisSection(multiCriteriaResult),
+                const SizedBox(height: 14),
+              ],
             ],
-
-            const SizedBox(height: 12),
-
-            // Meta AI Muse Spark Multi-Criteria Options Analysis
-            _buildMultiCriteriaAnalysisSection(multiCriteriaResult),
             const SizedBox(height: 14),
 
             // Price History Section: Only rendered when genuine historical observations exist across time

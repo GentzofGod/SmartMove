@@ -11,6 +11,7 @@ import '../../../core/services/commodity_comparison_service.dart';
 import '../../../core/services/safe_outlet_launcher.dart';
 import '../../../core/presentation/widgets/commodity_image_widget.dart';
 import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../../core/presentation/widgets/community_assistance_sheet.dart';
 import '../../discover/presentation/product_detail_sheet.dart';
 import '../../home/presentation/widgets/paper_note_scanner_sheet.dart';
 
@@ -339,11 +340,34 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final sellerController = TextEditingController();
     final priceController = TextEditingController();
     final unitController = TextEditingController(text: '1kg');
+    final contactController = TextEditingController(
+      text: userSession.phoneNumber ?? '',
+    );
     final brandController = TextEditingController();
     final notesController = TextEditingController();
     String channel = 'Local Market';
     String category = 'Food';
+    String selectedUnitOption = '1kg';
+    bool isCustomUnit = false;
     bool inStock = true;
+
+    final availableCategories = ref.read(categoriesProvider).map((c) => c.name).toList();
+    if (availableCategories.isEmpty) {
+      availableCategories.addAll([
+        'Food',
+        'Electronics',
+        'Pharmacy',
+        'Fashion & Clothing',
+        'Beauty & Personal Care',
+        'Home & Kitchen',
+        'Hardware & Tools',
+        'Baby & Kids',
+        'Books & Stationery',
+        'Agro & Farm Produce',
+        'Auto Spares',
+        'Others',
+      ]);
+    }
 
     showModalBottomSheet(
       context: context,
@@ -400,6 +424,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     const SizedBox(height: 10),
 
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           flex: 2,
@@ -415,25 +440,100 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: unitController,
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            value: selectedUnitOption,
+                            isExpanded: true,
                             decoration: InputDecoration(
                               labelText: 'Unit / Measure *',
-                              hintText: 'e.g. 1kg, paint rubber',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             ),
+                            items: [
+                              '1kg',
+                              '50kg bag',
+                              '25kg bag',
+                              '10kg bag',
+                              '5kg bag',
+                              'paint rubber / 4kg',
+                              'congo / 1.5kg',
+                              'derica',
+                              '1L bottle',
+                              '2L bottle',
+                              '5L gallon',
+                              '25L jerrycan',
+                              'crate of 30',
+                              'tuber',
+                              'heap',
+                              'piece / unit',
+                              'pair',
+                              'pack / packet',
+                              'carton',
+                              'roll',
+                              'bundle',
+                              'set',
+                              'sachet',
+                              'can / tin',
+                              'yard',
+                              'meter',
+                              'Custom unit...',
+                            ].map((u) {
+                              return DropdownMenuItem(
+                                value: u,
+                                child: Text(u, style: const TextStyle(fontSize: 12.5), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setModalState(() {
+                                  selectedUnitOption = val;
+                                  if (val == 'Custom unit...') {
+                                    isCustomUnit = true;
+                                    if (unitController.text.trim() == '1kg') {
+                                      unitController.clear();
+                                    }
+                                  } else {
+                                    isCustomUnit = false;
+                                    unitController.text = val;
+                                  }
+                                });
+                              }
+                            },
                           ),
                         ),
                       ],
                     ),
+                    if (isCustomUnit) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: unitController,
+                        decoration: InputDecoration(
+                          labelText: 'Enter Custom Unit *',
+                          hintText: 'e.g. 75cl bottle, paint bucket, pack of 6',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
 
                     TextField(
                       controller: sellerController,
                       decoration: InputDecoration(
-                        labelText: 'Market / Stall / Seller Name',
-                        hintText: 'e.g. Bodija Market, Stall 14',
+                        labelText: 'Market Area or Stall Landmark (Optional)',
+                        hintText: 'e.g. Bodija Market open section, Dugbe, or leave blank',
+                        helperText: 'Optional: Anonymous open-air vendor price sightings welcome',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Submitter contact (optional)
+                    TextField(
+                      controller: contactController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Your Phone or WhatsApp (Optional)',
+                        hintText: 'e.g. +2348012345678 (to help shoppers find stall)',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -445,32 +545,37 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: ['Food', 'Electronics', 'Pharmacy', 'Others'].map((cat) {
-                        final isSel = category == cat;
-                        return ChoiceChip(
-                          label: Text(cat),
-                          selected: isSel,
-                          selectedColor: AppColors.primaryTint,
-                          labelStyle: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                            color: isSel ? AppColors.primary : AppColors.textSecondary,
-                          ),
-                          onSelected: (val) {
-                            if (val) setModalState(() => category = cat);
-                          },
-                        );
-                      }).toList(),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: availableCategories.map((cat) {
+                          final isSel = category == cat;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6.0),
+                            child: ChoiceChip(
+                              label: Text(cat),
+                              selected: isSel,
+                              selectedColor: AppColors.primaryTint,
+                              labelStyle: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                color: isSel ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                              onSelected: (val) {
+                                if (val) setModalState(() => category = cat);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                     const SizedBox(height: 10),
 
                     TextField(
                       controller: notesController,
                       decoration: InputDecoration(
-                        labelText: 'Stall Notes (Optional)',
-                        hintText: 'e.g. Fresh stock, discounts for bulk buyers',
+                        labelText: 'Stall Notes & Landmark Directions (Optional)',
+                        hintText: 'e.g. Second lane behind agro depot, brown wooden table',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -495,6 +600,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         ),
                         onPressed: () {
                           final price = double.tryParse(priceController.text.trim());
+                          final unit = unitController.text.trim().isNotEmpty
+                              ? unitController.text.trim()
+                              : selectedUnitOption;
                           if (productController.text.trim().isNotEmpty && price != null) {
                             final posterName = posterNameController.text.trim().isNotEmpty
                                 ? posterNameController.text.trim()
@@ -502,13 +610,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                     ? userSession.displayName.trim()
                                     : 'Community Shopper');
 
+                            final sName = sellerController.text.trim().isNotEmpty
+                                ? sellerController.text.trim()
+                                : 'Open Market Vendor';
+
                             ref.read(communityProvider.notifier).addObservation(
                                   productName: productController.text.trim(),
-                                  sellerName: sellerController.text.trim().isNotEmpty
-                                      ? sellerController.text.trim()
-                                      : 'Local Market',
+                                  sellerName: sName,
                                   price: price,
-                                  unit: unitController.text.trim(),
+                                  unit: unit,
                                   submitterName: posterName,
                                   submitterRole: 'Customer',
                                   channel: channel,
@@ -519,6 +629,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                   inStock: inStock,
                                   notes: notesController.text.trim().isNotEmpty
                                       ? notesController.text.trim()
+                                      : null,
+                                  submitterContact: contactController.text.trim().isNotEmpty
+                                      ? contactController.text.trim()
                                       : null,
                                 );
                             Navigator.pop(bottomCtx);
@@ -1174,7 +1287,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     ),
                     const SizedBox(width: 6),
 
-                    // Locate on Map Action
+                    // Locate on Map Action or Community Help Action
                     if (item.hasVerifiedSellers) ...[
                       OutlinedButton.icon(
                         icon: const Icon(Icons.location_on_outlined, size: 12, color: AppColors.primary),
@@ -1197,6 +1310,22 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                             sellerLat: mapObs.latitude,
                             sellerLng: mapObs.longitude,
                           );
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                    ] else if (item.hasCommunityQuotes) ...[
+                      OutlinedButton.icon(
+                        key: const ValueKey('btn_unified_get_help'),
+                        icon: const Icon(Icons.help_outline_rounded, size: 12, color: Color(0xFFE65100)),
+                        label: const Text('Help', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFFE65100))),
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          side: const BorderSide(color: Color(0xFFFFB74D)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          CommunityAssistanceSheet.show(context, observation: mapObs);
                         },
                       ),
                       const SizedBox(width: 6),

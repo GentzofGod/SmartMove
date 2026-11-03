@@ -54,14 +54,35 @@ class ProductsNotifier extends Notifier<List<Product>> {
     } catch (_) {}
   }
 
+  static const _hardcodedLegacyNames = [
+    'cooking oil',
+    'eggs (crate)',
+    'eggs',
+    'egg',
+  ];
+  static const _hardcodedLegacyIds = [
+    'p2',
+    'p4',
+    'b0000000-0000-0000-0000-000000000002',
+    'b0000000-0000-0000-0000-000000000004',
+  ];
+
   bool _isTombstoned(Product p) {
-    if (_deletedProductIds.contains(p.id)) return true;
+    if (_hardcodedLegacyIds.contains(p.id) || _deletedProductIds.contains(p.id)) return true;
     final clean = p.name.trim().toLowerCase();
-    if (clean.isNotEmpty && _deletedProductNames.contains(clean)) return true;
+    if (clean.isEmpty) return false;
+    for (final legacy in _hardcodedLegacyNames) {
+      if (clean == legacy || clean.contains(legacy)) return true;
+    }
+    if (_deletedProductNames.contains(clean)) return true;
+    for (final del in _deletedProductNames) {
+      if (del.isNotEmpty && (clean.contains(del) || del.contains(clean))) return true;
+    }
     return false;
   }
 
   Future<void> _fetchLive() async {
+    SupabaseDataService.purgeDemoSeedProducts();
     final live = await SupabaseDataService.fetchProducts();
     if (live != null) {
       _allProducts = live.where((p) => !_isTombstoned(p)).toList();
@@ -574,7 +595,7 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
       name: 'Food',
       slug: 'food',
       iconName: 'restaurant_outlined',
-      description: 'Groceries, grains, tubers, oils, seasonings, and cooking items',
+      description: 'Groceries, foodstuffs, grains, tubers, seasonings, and cooking items',
       displayOrder: 1,
     ),
     CommodityCategory(
@@ -582,7 +603,7 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
       name: 'Electronics',
       slug: 'electronics',
       iconName: 'electrical_services_outlined',
-      description: 'Home appliances, gadgets, spares, and hardware',
+      description: 'Home appliances, gadgets, electricals, and phone accessories',
       displayOrder: 2,
     ),
     CommodityCategory(
@@ -590,16 +611,80 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
       name: 'Pharmacy',
       slug: 'pharmacy',
       iconName: 'medication_outlined',
-      description: 'Healthcare, medicines, OTC drugs, and hygiene',
+      description: 'Healthcare, medicines, OTC drugs, first-aid, and hygiene',
       displayOrder: 3,
+    ),
+    CommodityCategory(
+      id: 'cat-fashion',
+      name: 'Fashion & Clothing',
+      slug: 'fashion-clothing',
+      iconName: 'checkroom_outlined',
+      description: 'Apparel, footwear, textiles, bags, and fashion accessories',
+      displayOrder: 4,
+    ),
+    CommodityCategory(
+      id: 'cat-beauty',
+      name: 'Beauty & Personal Care',
+      slug: 'beauty-personal-care',
+      iconName: 'spa_outlined',
+      description: 'Cosmetics, skincare, hair products, perfumes, and grooming',
+      displayOrder: 5,
+    ),
+    CommodityCategory(
+      id: 'cat-home',
+      name: 'Home & Kitchen',
+      slug: 'home-kitchen',
+      iconName: 'kitchen_outlined',
+      description: 'Cookware, dinnerware, bedding, cleaning supplies, and decor',
+      displayOrder: 6,
+    ),
+    CommodityCategory(
+      id: 'cat-hardware',
+      name: 'Hardware & Tools',
+      slug: 'hardware-tools',
+      iconName: 'build_outlined',
+      description: 'Building materials, plumbing, paints, electrical, and hand tools',
+      displayOrder: 7,
+    ),
+    CommodityCategory(
+      id: 'cat-baby',
+      name: 'Baby & Kids',
+      slug: 'baby-kids',
+      iconName: 'child_care_outlined',
+      description: 'Baby food, diapers, clothing, toys, and nursery essentials',
+      displayOrder: 8,
+    ),
+    CommodityCategory(
+      id: 'cat-stationery',
+      name: 'Books & Stationery',
+      slug: 'books-stationery',
+      iconName: 'menu_book_outlined',
+      description: 'Notebooks, pens, textbooks, office stationery, and art supplies',
+      displayOrder: 9,
+    ),
+    CommodityCategory(
+      id: 'cat-agro',
+      name: 'Agro & Farm Produce',
+      slug: 'agro-farm-produce',
+      iconName: 'agriculture_outlined',
+      description: 'Farm inputs, animal feeds, seeds, fertilizers, and livestock items',
+      displayOrder: 10,
+    ),
+    CommodityCategory(
+      id: 'cat-auto',
+      name: 'Auto Spares',
+      slug: 'auto-spares',
+      iconName: 'directions_car_outlined',
+      description: 'Automobile parts, engine oil, tires, batteries, and accessories',
+      displayOrder: 11,
     ),
     CommodityCategory(
       id: 'cat-others',
       name: 'Others',
       slug: 'others',
       iconName: 'more_horiz_outlined',
-      description: 'Household items, clothing, and general commodities',
-      displayOrder: 4,
+      description: 'General market commodities and miscellaneous goods',
+      displayOrder: 12,
     ),
   ];
 
@@ -630,7 +715,13 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
               })
               .toList();
           final seen = <String>{};
-          state = loaded.where((c) => seen.add(c.name.toLowerCase())).toList();
+          final cleanLoaded = loaded.where((c) => seen.add(c.name.toLowerCase())).toList();
+          for (final def in _defaultCategories) {
+            if (seen.add(def.name.toLowerCase())) {
+              cleanLoaded.add(def);
+            }
+          }
+          state = cleanLoaded;
         }
       }
     } catch (_) {}
@@ -656,6 +747,11 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
       final seen = <String>{};
       final cleanLive =
           consolidated.where((c) => seen.add(c.name.toLowerCase())).toList();
+      for (final def in _defaultCategories) {
+        if (seen.add(def.name.toLowerCase())) {
+          cleanLive.add(def);
+        }
+      }
       state = cleanLive;
       _persist(cleanLive);
     }
@@ -683,6 +779,11 @@ class CategoriesNotifier extends Notifier<List<CommodityCategory>> {
       final seen = <String>{};
       final cleanLive =
           consolidated.where((c) => seen.add(c.name.toLowerCase())).toList();
+      for (final def in _defaultCategories) {
+        if (seen.add(def.name.toLowerCase())) {
+          cleanLive.add(def);
+        }
+      }
       state = cleanLive;
       _persist(cleanLive);
     }
@@ -980,10 +1081,38 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     } catch (_) {}
   }
 
+  static const _hardcodedLegacyObsNames = [
+    'cooking oil',
+    'eggs (crate)',
+    'eggs',
+    'egg',
+  ];
+  static const _hardcodedLegacyObsIds = [
+    'p2',
+    'p4',
+    'b0000000-0000-0000-0000-000000000002',
+    'b0000000-0000-0000-0000-000000000004',
+  ];
+
   bool _isTombstoned(PriceObservation obs) {
     if (_deletedTombstoneIds.contains(obs.id)) return true;
+    final idLower = obs.id.toLowerCase();
+    final prodIdLower = obs.productId.toLowerCase();
+    if (_hardcodedLegacyObsIds.contains(idLower) ||
+        _hardcodedLegacyObsIds.contains(prodIdLower) ||
+        idLower.contains('obs-oil') ||
+        idLower.contains('obs-eggs')) {
+      return true;
+    }
     final clean = obs.productName.trim().toLowerCase();
-    if (clean.isNotEmpty && _deletedProductNames.contains(clean)) return true;
+    if (clean.isEmpty) return false;
+    for (final legacy in _hardcodedLegacyObsNames) {
+      if (clean == legacy || clean.contains(legacy)) return true;
+    }
+    if (_deletedProductNames.contains(clean)) return true;
+    for (final del in _deletedProductNames) {
+      if (del.isNotEmpty && (clean.contains(del) || del.contains(clean))) return true;
+    }
     return false;
   }
 
@@ -1114,6 +1243,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
     String? imageUrl,
     double? latitude,
     double? longitude,
+    String? submitterContact,
   }) {
     final cleanName = productName.trim().toLowerCase();
     _deletedProductNames.remove(cleanName);
@@ -1157,6 +1287,7 @@ class CommunityNotifier extends Notifier<List<PriceObservation>> {
       imageUrl: imageUrl,
       latitude: latitude,
       longitude: longitude,
+      submitterContact: submitterContact,
     );
     state = [newObs, ...state];
     _persist(state);

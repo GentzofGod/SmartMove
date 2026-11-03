@@ -1,3 +1,5 @@
+import 'product.dart';
+
 enum ObservationSource {
   simulatedDemo,
   communityReported,
@@ -70,6 +72,7 @@ class PriceObservation {
   final String? anomalyReason;
   final double? latitude;
   final double? longitude;
+  final String? submitterContact;
 
   const PriceObservation({
     required this.id,
@@ -96,6 +99,7 @@ class PriceObservation {
     this.anomalyReason,
     this.latitude,
     this.longitude,
+    this.submitterContact,
   });
 
   bool get isConfirmed =>
@@ -119,6 +123,26 @@ class PriceObservation {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (Match m) => '${m[1]},',
       )}';
+
+  /// Converts this observation into a standard Product model for detail viewing & comparisons
+  Product toProduct() {
+    return Product(
+      id: productId.isNotEmpty ? productId : 'prod-$id',
+      name: productName,
+      category: category.isNotEmpty ? category : 'Food',
+      standardUnit: unit,
+      lowestPrice: price,
+      bestSeller: '$sellerName ($marketLocation)',
+      distanceKm: 1.5,
+      updateTime: timeAgo,
+      brandOrGrade: brandOrGrade,
+      channel: channel,
+      imageUrl: imageUrl,
+      sourceType: sourceType,
+      isCheapest: true,
+      description: notes,
+    );
+  }
 
   String get timeAgo {
     final diff = DateTime.now().difference(timestamp);
@@ -161,6 +185,7 @@ class PriceObservation {
     String? anomalyReason,
     double? latitude,
     double? longitude,
+    String? submitterContact,
   }) {
     return PriceObservation(
       id: id ?? this.id,
@@ -188,6 +213,7 @@ class PriceObservation {
       anomalyReason: anomalyReason ?? this.anomalyReason,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      submitterContact: submitterContact ?? this.submitterContact,
     );
   }
 
@@ -216,6 +242,7 @@ class PriceObservation {
         'anomalyReason': anomalyReason,
         'latitude': latitude,
         'longitude': longitude,
+        'submitterContact': submitterContact,
       };
 
   factory PriceObservation.fromJson(Map<String, dynamic> json) {
@@ -262,6 +289,7 @@ class PriceObservation {
       anomalyReason: (json['anomalyReason'] ?? json['anomaly_reason'])?.toString(),
       latitude: ((json['latitude'] ?? json['lat']) as num?)?.toDouble(),
       longitude: ((json['longitude'] ?? json['lng'] ?? json['lon']) as num?)?.toDouble(),
+      submitterContact: (json['submitterContact'] ?? json['submitter_contact'] ?? json['phone'])?.toString(),
     );
   }
 }

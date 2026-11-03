@@ -9,6 +9,8 @@ import '../../discover/presentation/product_detail_sheet.dart';
 import 'widgets/location_picker_sheet.dart';
 import 'widgets/meta_ai_scenario_card.dart';
 import '../../../core/presentation/widgets/commodity_image_widget.dart';
+import '../../../core/presentation/widgets/seller_location_map_sheet.dart';
+import '../../../core/presentation/widgets/community_assistance_sheet.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,10 +18,12 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final products = ref.watch(productsProvider);
+    final observations = ref.watch(communityProvider);
     final decisionState = ref.watch(decisionLabProvider);
     final currentLocation = ref.watch(locationProvider);
     final userSession = ref.watch(authProvider);
     final recentProducts = products.take(3).toList();
+    final recentObservations = observations.take(4).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -374,8 +378,190 @@ class HomeScreen extends ConsumerWidget {
 
 
 
-              // Recent Price Changes Section (Section 5.1: Live market data or clean empty state)
-              if (recentProducts.isNotEmpty) ...[
+              // Recent Market Observations Section (Live crowdsourced & trader reports)
+              if (recentObservations.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        AppStrings.tr(ref, 'recentObservations'),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => context.go('/products'),
+                      child: const Text(
+                        'View all',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Live Observation Cards List
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: recentObservations.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final obs = recentObservations[index];
+                    final isVerified = obs.isVerified ||
+                        obs.sourceType == ObservationSource.traderConfirmed ||
+                        obs.sourceType == ObservationSource.traderProvided;
+
+                    return InkWell(
+                      key: ValueKey('home_obs_card_${obs.id}'),
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => ProductDetailSheet(product: obs.toProduct()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            CommodityImageWidget(
+                              commodityName: obs.productName,
+                              imageUrl: obs.imageUrl,
+                              size: 40,
+                              borderRadius: 10,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          obs.productName,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        '${obs.formattedPrice} / ${obs.unit}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13.5,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${obs.sellerName} • ${obs.marketLocation}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: isVerified
+                                              ? AppColors.badgeSuccessBg
+                                              : const Color(0xFFFFF3E0),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          isVerified ? 'Verified Stall' : 'Community Sighting',
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: isVerified
+                                                ? AppColors.badgeSuccessText
+                                                : const Color(0xFFE65100),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          '${obs.timeAgo} by ${obs.submitterName}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: AppColors.textTertiary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (isVerified)
+                              IconButton(
+                                icon: const Icon(Icons.location_on_outlined, size: 20, color: AppColors.primary),
+                                tooltip: 'Locate on Map',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  SellerLocationMapSheet.show(
+                                    context,
+                                    sellerName: obs.sellerName,
+                                    marketLocation: obs.marketLocation,
+                                    stallLocation: obs.notes,
+                                    productName: obs.productName,
+                                    price: obs.price,
+                                    unit: obs.unit,
+                                    brandOrGrade: obs.brandOrGrade,
+                                    inStock: obs.inStock,
+                                    observation: obs,
+                                    sellerLat: obs.latitude,
+                                    sellerLng: obs.longitude,
+                                  );
+                                },
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.help_outline_rounded, size: 20, color: Color(0xFFE65100)),
+                                tooltip: 'Get Direction Help',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  CommunityAssistanceSheet.show(context, observation: obs);
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ] else if (recentProducts.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

@@ -183,22 +183,28 @@ serve(async (req) => {
       });
     }
 
-    // 3. Muse Spark Reasoning Gateway (Chat Completions & Price Intelligence)
+    // 3. Muse Spark Reasoning Gateway (Chat Completions & Price Intelligence & Product Description)
     if (
       action === "parse_request" ||
       action === "explain_plan" ||
       action === "chat_completions" ||
-      action === "research_price"
+      action === "research_price" ||
+      action === "generate_description" ||
+      action === "llm_generate"
     ) {
-      const { prompt, contextRecords, messages, model = "muse-spark-1.3", temperature = 0.1 } =
+      const { prompt, contextRecords, messages, model = "muse-spark-1.3", temperature = 0.2 } =
         payload || {};
+
+      const isDescriptionGeneration =
+        action === "generate_description" || action === "llm_generate";
 
       const chatMessages =
         messages || [
           {
             role: "system",
-            content:
-              "You are Meta Muse Spark for SmartMove. Extract shopping items (name, quantity, unit, estimated_unit_price, brand_or_grade), quantities, budget, and deadline errands into strict JSON. When users provide concise, bundle, or category requests (e.g., 'i need to buy a set of stationaries', 'toiletries', 'soup ingredients', 'breakfast pack'), intelligently decompose the request into essential constituent items with realistic default quantities, units, and Nigerian market benchmark prices in Naira. Infer a realistic budget if none is specified. Output only valid JSON with keys: budget, shopping_items, deadline_errand.",
+            content: isDescriptionGeneration
+              ? "You are an expert Nigerian commerce assistant helping registered market traders create concise, accurate, appealing 1-2 sentence product descriptions for their stall listings. Focus on authenticity, quality, weight/packaging, and freshness. Do not output conversational filler or preamble—output only the description."
+              : "You are Meta Muse Spark for SmartMove. Extract shopping items (name, quantity, unit, estimated_unit_price, brand_or_grade), quantities, budget, and deadline errands into strict JSON. When users provide concise, bundle, or category requests (e.g., 'i need to buy a set of stationaries', 'toiletries', 'soup ingredients', 'breakfast pack'), intelligently decompose the request into essential constituent items with realistic default quantities, units, and Nigerian market benchmark prices in Naira. Infer a realistic budget if none is specified. Output only valid JSON with keys: budget, shopping_items, deadline_errand.",
           },
           {
             role: "user",
@@ -216,13 +222,19 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model,
+          model: model === "meta/llama-3-70b-instruct" ? "muse-spark-1.3" : model,
           messages: chatMessages,
           temperature,
         }),
       });
 
       const result = await metaResponse.json();
+      
+      // Enrich response with top-level 'text' for easy direct consumption
+      if (metaResponse.ok && result?.choices?.[0]?.message?.content) {
+        result.text = result.choices[0].message.content.trim();
+      }
+
       return new Response(JSON.stringify(result), {
         status: metaResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

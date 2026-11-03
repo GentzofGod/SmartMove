@@ -164,12 +164,30 @@ class CommodityComparisonService {
     return 1.0;
   }
 
-  /// Determines the fundamental base unit ('kg', 'L', 'crate', 'tuber', 'piece')
+  /// Determines the fundamental base unit ('kg', 'L', 'crate', 'tuber', 'piece', 'unit', 'pack', etc.)
   static String resolveBaseUnit(String rawUnit, {String? commodityName}) {
     final u = rawUnit.trim().toLowerCase();
     final name = (commodityName ?? '').toLowerCase();
 
-    // Volume commodities
+    // 1. Explicit discrete and count units in raw unit
+    if (u.contains('piece') || u == 'pc' || u == 'pcs') return 'piece';
+    if (u.contains('unit')) return 'unit';
+    if (u.contains('pair')) return 'pair';
+    if (u.contains('pack') || u.contains('packet') || u == 'pkt') return 'pack';
+    if (u.contains('carton') || u == 'ctn') return 'carton';
+    if (u.contains('sachet')) return 'sachet';
+    if (u.contains('tin') || u.contains('can')) return 'tin';
+    if (u.contains('meter') || u.contains('metre') || u == 'm') return 'meter';
+    if (u.contains('yard') || u == 'yd') return 'yard';
+    if (u.contains('roll')) return 'roll';
+    if (u.contains('bundle')) return 'bundle';
+    if (u.contains('box')) return 'box';
+    if (u.contains('set')) return 'set';
+    if (u.contains('heap')) return 'heap';
+    if (u.contains('crate')) return 'crate';
+    if (u.contains('tuber')) return 'tuber';
+
+    // 2. Volume commodities
     if (u.contains('l') ||
         u.contains('liter') ||
         u.contains('litre') ||
@@ -177,25 +195,104 @@ class CommodityComparisonService {
         u.contains('ml') ||
         u.contains('keg') ||
         u.contains('jerrycan') ||
+        u.contains('gallon') ||
         name.contains('oil') ||
         name.contains('water') ||
         name.contains('drink') ||
-        name.contains('milk') && !name.contains('tin')) {
+        name.contains('beverage') ||
+        name.contains('juice') ||
+        (name.contains('milk') && !name.contains('tin'))) {
       return 'L';
     }
 
-    // Poultry / Egg crates
-    if (name.contains('egg') || u.contains('crate')) {
+    if (u.contains('bottle') || u == 'btl') return 'bottle';
+
+    // 3. Poultry / Egg crates
+    if (name.contains('egg')) {
       return 'crate';
     }
 
-    // Produce count
-    if (name.contains('yam') || u.contains('tuber')) {
+    // 4. Produce count
+    if (name.contains('yam')) {
       return 'tuber';
     }
 
-    // Standard solids and grains
-    return 'kg';
+    // 5. Electronics, appliances, gadgets, hardware, stationery, fashion, personal care, pharmaceuticals
+    if (name.contains('cooker') ||
+        name.contains('tv') ||
+        name.contains('television') ||
+        name.contains('phone') ||
+        name.contains('laptop') ||
+        name.contains('charger') ||
+        name.contains('cable') ||
+        name.contains('fan') ||
+        name.contains('iron') ||
+        name.contains('blender') ||
+        name.contains('kettle') ||
+        name.contains('generator') ||
+        name.contains('inverter') ||
+        name.contains('battery') ||
+        name.contains('fridge') ||
+        name.contains('refrigerator') ||
+        name.contains('bulb') ||
+        name.contains('screen') ||
+        name.contains('speaker') ||
+        name.contains('shoe') ||
+        name.contains('shirt') ||
+        name.contains('trouser') ||
+        name.contains('dress') ||
+        name.contains('cloth') ||
+        name.contains('jeans') ||
+        name.contains('watch') ||
+        name.contains('soap') ||
+        name.contains('cream') ||
+        name.contains('lotion') ||
+        name.contains('paracetamol') ||
+        name.contains('panadol') ||
+        name.contains('drug') ||
+        name.contains('medicine') ||
+        name.contains('tablet') ||
+        name.contains('capsule') ||
+        name.contains('syrup') ||
+        name.contains('tool') ||
+        name.contains('drill') ||
+        name.contains('hammer') ||
+        name.contains('pen') ||
+        name.contains('book') ||
+        name.contains('stationer') ||
+        name.contains('bread') ||
+        name.contains('loaf')) {
+      return 'unit';
+    }
+
+    // 6. Bulk solid foodstuffs and weight measures
+    if (u.contains('kg') ||
+        u.contains('gram') ||
+        u.contains('bag') ||
+        u.contains('derica') ||
+        u.contains('congo') ||
+        u.contains('rubber') ||
+        u.contains('paint') ||
+        name.contains('rice') ||
+        name.contains('bean') ||
+        name.contains('garri') ||
+        name.contains('flour') ||
+        name.contains('sugar') ||
+        name.contains('salt') ||
+        name.contains('meat') ||
+        name.contains('fish') ||
+        name.contains('semo') ||
+        name.contains('wheat') ||
+        name.contains('maize') ||
+        name.contains('corn') ||
+        name.contains('tomato') ||
+        name.contains('pepper') ||
+        name.contains('onion')) {
+      return 'kg';
+    }
+
+    // 7. General non-food default
+    return 'unit';
   }
 
   /// Calculates the standardized unit price (₦ per base unit)

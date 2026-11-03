@@ -697,15 +697,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Divider(height: 1, indent: 56, color: AppColors.divider),
                 ],
-
-                _buildMenuItem(
-                  key: const ValueKey('menu_market_location'),
-                  icon: Icons.location_on_outlined,
-                  title: 'Market Hub & Location',
-                  trailingText: currentLocation.displayLocation,
-                  onTap: () => LocationPickerSheet.show(context),
-                ),
-                const Divider(height: 1, indent: 56, color: AppColors.divider),
                 ListTile(
                   key: const ValueKey('menu_notifications_tile'),
                   onTap: () => _showNotificationPreferencesSheet(context),

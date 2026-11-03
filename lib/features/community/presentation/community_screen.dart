@@ -315,8 +315,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     TextField(
                       controller: sellerController,
                       decoration: InputDecoration(
-                        labelText: 'Market / Store Name',
-                        hintText: 'e.g. Bodija Market Stall 14, Jumia, Dugbe Mart',
+                        labelText: 'Market Area or Stall Landmark (Optional)',
+                        hintText: 'e.g. Bodija Market open section, Dugbe, or leave blank',
+                        helperText: 'Optional: Open market anonymous vendor sightings welcome',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -518,7 +519,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                                   productName: productController.text.trim(),
                                   sellerName: sellerController.text.trim().isNotEmpty
                                       ? sellerController.text.trim()
-                                      : 'Local Market',
+                                      : 'Open Market Vendor',
                                   price: price,
                                   unit: unitController.text.trim(),
                                   submitterName: posterName,

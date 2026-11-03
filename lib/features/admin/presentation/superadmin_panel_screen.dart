@@ -2190,6 +2190,8 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
     );
 
     if (confirmed == true && context.mounted) {
+      await SupabaseDataService.purgeDemoSeedProducts();
+      await ref.read(productsProvider.notifier).fetchLive();
       await ref.read(sellerApplicationsProvider.notifier).refreshFromCloud(purgeLocalMock: true);
       await ref.read(sellerApplicationsProvider.notifier).purgeDemoApplications();
       await ref.read(storeEditRequestsProvider.notifier).purgeDemoRequests();
