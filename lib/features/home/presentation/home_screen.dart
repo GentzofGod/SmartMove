@@ -304,7 +304,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
 
-              // Meta AI Scenario Rehearsal Card (1-Tap Simulation)
+              // AI Shopping Assistant Scenario Rehearsal Card (1-Tap Simulation)
               const MetaAiScenarioCard(),
               const SizedBox(height: 18),
 

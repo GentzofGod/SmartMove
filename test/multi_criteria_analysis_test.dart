@@ -182,8 +182,8 @@ void main() {
     });
   });
 
-  group('ProductDetailSheet Multi-Criteria UI Widget Tests', () {
-    testWidgets('6. Expands options matrix and allows switching decision priority chips', (tester) async {
+  group('ProductDetailSheet Real Seller Grounding UI Widget Tests', () {
+    testWidgets('6. Displays real verified seller quotes and alternative sellers without synthetic multi-criteria cards', (tester) async {
       tester.view.physicalSize = const Size(800, 1600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -206,46 +206,16 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Find the Meta AI Multi-Criteria Header
-      final headerFinder = find.text('Meta AI Multi-Criteria Options Matrix');
-      expect(headerFinder, findsOneWidget);
+      // Verify the synthetic "Meta AI Multi-Criteria Options Matrix" section has been removed completely
+      expect(find.text('Meta AI Multi-Criteria Options Matrix'), findsNothing);
+      expect(find.text('AI Shopping Assistant Multi-Criteria Options Matrix'), findsNothing);
 
-      // Tap header to expand
-      await tester.tap(headerFinder);
-      await tester.pumpAndSettle();
+      // Verify real seller quote card is rendered with real seller details
+      expect(find.text('Alhaji Danladi Grains'), findsWidgets);
+      expect(find.text('Rice (50kg Bag)'), findsWidgets);
 
-      // Verify Priority chips are visible
-      expect(find.text('Balanced Value'), findsOneWidget);
-      expect(find.text('Lowest Outlay'), findsOneWidget);
-      expect(find.text('Doorstep & Speed'), findsOneWidget);
-      expect(find.text('Quality & Trust'), findsOneWidget);
-
-      // Verify recommendation badge and Landed Outlay label
-      expect(find.text('Landed Outlay'), findsOneWidget);
-      expect(find.text('AI Assistant Recommendation'), findsOneWidget);
-
-      // Tap 'Lowest Outlay' chip
-      await tester.tap(find.text('Lowest Outlay'));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Minimizes total cash expenditure'), findsOneWidget);
-
-      // Drag to scroll the sheet down
-      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -500));
-      await tester.pumpAndSettle();
-
-      // Tap comparison matrix toggle
-      final toggleFinder = find.textContaining('Compare All');
-      expect(toggleFinder, findsOneWidget);
-      await tester.tap(toggleFinder);
-      await tester.pumpAndSettle();
-
-      // Drag a little further down to view options cards
-      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -300));
-      await tester.pumpAndSettle();
-
-      // Verify comparison cards appear
-      expect(find.textContaining('Total Landed'), findsWidgets);
+      // Verify real interactive actions are present
+      expect(find.text('Chat & Buy'), findsWidgets);
     });
   });
 }

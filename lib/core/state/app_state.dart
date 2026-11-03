@@ -430,7 +430,7 @@ class DecisionLabNotifier extends Notifier<DecisionLabState> {
       errands: errands,
     );
 
-    // Meta AI generates proactive optimization tips to ease user planning
+    // AI Shopping Assistant generates proactive optimization tips to ease user planning
     const aiService = MetaAiService();
     final tips = aiService.generateOptimizationTips(
       currentPlans: candidatePlans,
@@ -1410,41 +1410,7 @@ class NotificationsNotifier extends Notifier<List<NotificationItem>> {
   }
 
   static List<NotificationItem> _defaultNotifications() {
-    final now = DateTime.now();
-    return [
-      NotificationItem(
-        id: 'notif-1',
-        title: 'Price drop alert',
-        subtitle: 'Tomatoes at Market C dropped to ₦1,100/kg',
-        timestamp: now.subtract(const Duration(hours: 1)),
-        type: 'Prices',
-        isRead: false,
-      ),
-      NotificationItem(
-        id: 'notif-2',
-        title: 'Wholesale deal unlocked',
-        subtitle: 'Mama Bello Grain Store offers 5% discount on bulk rice',
-        timestamp: now.subtract(const Duration(hours: 3)),
-        type: 'Deals',
-        isRead: false,
-      ),
-      NotificationItem(
-        id: 'notif-3',
-        title: 'New price report',
-        subtitle: 'Rice observation verified by Trader Mama Bello',
-        timestamp: now.subtract(const Duration(hours: 4)),
-        type: 'Prices',
-        isRead: true,
-      ),
-      NotificationItem(
-        id: 'notif-4',
-        title: 'Weekly savings summary',
-        subtitle: 'You saved ₦2,350 by comparing commodities across sellers this week',
-        timestamp: now.subtract(const Duration(days: 1)),
-        type: 'System',
-        isRead: true,
-      ),
-    ];
+    return const [];
   }
 
   Future<void> _loadFromCache() async {
@@ -1453,11 +1419,11 @@ class NotificationsNotifier extends Notifier<List<NotificationItem>> {
       final raw = prefs.getString(_notifCacheKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw) as List<dynamic>;
-        if (decoded.isNotEmpty) {
-          state = decoded
-              .map((j) => NotificationItem.fromJson(j as Map<String, dynamic>))
-              .toList();
-        }
+        final loaded = decoded
+            .map((j) => NotificationItem.fromJson(j as Map<String, dynamic>))
+            .where((n) => !n.id.startsWith('notif-'))
+            .toList();
+        state = loaded;
       }
     } catch (_) {}
   }
@@ -1465,7 +1431,8 @@ class NotificationsNotifier extends Notifier<List<NotificationItem>> {
   Future<void> _persist(List<NotificationItem> items) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final encodable = items.map((i) => i.toJson()).toList();
+      final cleanItems = items.where((n) => !n.id.startsWith('notif-')).toList();
+      final encodable = cleanItems.map((i) => i.toJson()).toList();
       await prefs.setString(_notifCacheKey, jsonEncode(encodable));
     } catch (_) {}
   }

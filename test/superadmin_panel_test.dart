@@ -291,7 +291,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Modal bottom sheet opens with audit details
-      expect(find.text('Meta AI Price Anomaly Audit'), findsOneWidget);
+      expect(find.text('AI Shopping Assistant Price Anomaly Audit'), findsOneWidget);
     });
 
     testWidgets('9. Switches to Categories & Hubs tab and verifies governance controls', (tester) async {

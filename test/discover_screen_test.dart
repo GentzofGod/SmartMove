@@ -28,11 +28,11 @@ void main() {
     expect(find.text('Electronics'), findsOneWidget);
     expect(find.text('Pharmacy'), findsOneWidget);
 
-    // Verify Meta AI Commodity Price Research chip is rendered
-    expect(find.text('Meta AI Commodity Price Research'), findsOneWidget);
+    // Verify AI Shopping Assistant Commodity Price Research chip is rendered
+    expect(find.text('AI Shopping Assistant Price Research'), findsOneWidget);
   });
 
-  testWidgets('Tapping Meta AI research chip with empty search opens research prompt dialog (no hardcoded rice)', (tester) async {
+  testWidgets('Tapping AI Shopping Assistant research chip with empty search opens research prompt dialog (no hardcoded rice)', (tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -50,12 +50,12 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Tap Meta AI research chip
-    await tester.tap(find.text('Meta AI Commodity Price Research'));
+    // Tap AI Shopping Assistant research chip
+    await tester.tap(find.text('AI Shopping Assistant Price Research'));
     await tester.pumpAndSettle();
 
     // Verify the commodity prompt dialog opens
-    expect(find.text('Meta AI Price Research'), findsOneWidget);
+    expect(find.text('AI Shopping Assistant Price Research'), findsAtLeastNWidgets(1));
     expect(
       find.text('Enter a commodity or product to research current prices across open markets, neighborhood stores, and online platforms.'),
       findsOneWidget,
@@ -70,12 +70,12 @@ void main() {
     await tester.tap(find.text('Research Prices'));
     await tester.pumpAndSettle();
 
-    // Verify Meta AI live multi-vendor comparison modal opens with discovered vendors
+    // Verify AI Shopping Assistant live multi-vendor comparison modal opens with discovered vendors
     expect(find.text('Beans'), findsOneWidget);
     expect(find.text('Online Search Results'), findsAtLeastNWidgets(1));
   });
 
-  testWidgets('Meta AI research chip dynamically adapts to search bar input', (tester) async {
+  testWidgets('AI Shopping Assistant research chip dynamically adapts to search bar input', (tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -98,10 +98,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify chip updates to reflect the active search query
-    expect(find.text('Research "Palm Oil" with Meta AI'), findsOneWidget);
+    expect(find.text('Research "Palm Oil" with AI Shopping Assistant'), findsOneWidget);
 
     // Tap the chip directly
-    await tester.tap(find.text('Research "Palm Oil" with Meta AI'));
+    await tester.tap(find.text('Research "Palm Oil" with AI Shopping Assistant'));
     await tester.pumpAndSettle();
 
     // Verify Meta AI live multi-vendor comparison modal opens for Palm Oil

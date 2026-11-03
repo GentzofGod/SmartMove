@@ -977,7 +977,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                         SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'AI Assistant Trade-Off Insight',
+                            'AI Shopping Assistant Trade-Off Insight',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
@@ -1034,7 +1034,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
 
         const SizedBox(height: 16),
 
-        // Interactive "Ask AI Assistant" Follow-Up Section
+        // Interactive "Ask AI Shopping Assistant" Follow-Up Section
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1051,7 +1051,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                       color: AppColors.primary, size: 18),
                   SizedBox(width: 8),
                   Text(
-                    'Ask AI Assistant to Refine Options',
+                    'Ask AI Shopping Assistant to Refine Options',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -1146,7 +1146,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                     ),
                     SizedBox(width: 8),
                     Text(
-                      'AI Assistant is analyzing seller catalog trade-offs...',
+                      'AI Shopping Assistant is analyzing seller catalog trade-offs...',
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
                     ),
                   ],
@@ -1176,7 +1176,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                                 SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'AI Assistant Recommendation',
+                                    'AI Shopping Assistant Recommendation',
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 12,
@@ -1588,7 +1588,7 @@ class _DecisionLabScreenState extends ConsumerState<DecisionLabScreen>
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'AI Assistant is discovering live vendor alternatives for ${source.commodityName}...',
+                                        'AI Shopping Assistant is discovering live vendor alternatives for ${source.commodityName}...',
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),

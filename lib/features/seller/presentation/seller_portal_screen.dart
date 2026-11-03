@@ -583,7 +583,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         modalErrorMessage = null;
                                       } else {
                                         modalErrorMessage =
-                                            'AI Generation Failed: ${res.errorMessage ?? "Could not reach Meta AI"}';
+                                            'AI Generation Failed: ${res.errorMessage ?? "Could not reach AI Shopping Assistant"}';
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             backgroundColor: const Color(0xFFC62828),
@@ -1178,7 +1178,7 @@ class _SellerPortalScreenState extends ConsumerState<SellerPortalScreen> {
                                         modalErrorMessage = null;
                                       } else {
                                         modalErrorMessage =
-                                            'AI Generation Failed: ${res.errorMessage ?? "Could not reach Meta AI"}';
+                                            'AI Generation Failed: ${res.errorMessage ?? "Could not reach AI Shopping Assistant"}';
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             backgroundColor: const Color(0xFFC62828),

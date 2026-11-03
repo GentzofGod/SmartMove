@@ -79,7 +79,7 @@ class SafeOutletLauncher {
                                 ),
                                 child: Text(
                                   comparison.metaSearchUsed
-                                      ? 'Meta AI Search'
+                                      ? 'AI Shopping Assistant Search'
                                       : 'Live Web Search',
                                   style: const TextStyle(
                                     fontSize: 10,
@@ -455,7 +455,7 @@ class SafeOutletLauncher {
                     const SizedBox(height: 10),
                     Center(
                       child: Text(
-                        'Live web grounding powered by SmartMove AI Assistant & web search indexing',
+                        'Live web grounding powered by SmartMove AI Shopping Assistant & web search indexing',
                         style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.8)),
                       ),
                     ),

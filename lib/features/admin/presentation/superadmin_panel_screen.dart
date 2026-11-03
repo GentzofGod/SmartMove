@@ -1068,7 +1068,7 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
   }
 
   // --------------------------------------------------------------------------
-  // Tab 2: Price Quotes Moderation & Meta AI Audit
+  // Tab 2: Price Quotes Moderation & AI Shopping Assistant Audit
   // --------------------------------------------------------------------------
   Widget _buildPriceQuotesModerationTab(
     List<PriceObservation> observations,
@@ -1087,7 +1087,7 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Meta AI Governance Action Bar
+        // AI Shopping Assistant Governance Action Bar
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -2008,7 +2008,7 @@ class _SuperAdminPanelScreenState extends ConsumerState<SuperAdminPanelScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Meta AI Price Anomaly Audit',
+                          'AI Shopping Assistant Price Anomaly Audit',
                           style: TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 16),
                         ),

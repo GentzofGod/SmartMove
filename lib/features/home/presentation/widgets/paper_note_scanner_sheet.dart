@@ -264,7 +264,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Take a photo of your handwritten paper shopping list or select an image to extract commodities with Meta AI.',
+                      'Take a photo of your handwritten paper shopping list or select an image to extract commodities with AI Shopping Assistant.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 11.5,
@@ -308,7 +308,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            _isAnalyzing ? 'Extracting commodities with Meta AI...' : 'Photo loaded',
+                            _isAnalyzing ? 'Extracting commodities with AI Shopping Assistant...' : 'Photo loaded',
                             style: TextStyle(
                               fontSize: 11,
                               color: _isAnalyzing ? AppColors.primary : AppColors.textSecondary,
@@ -356,7 +356,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                         Expanded(
                           child: Text(
                             _scanResult!.errorMessage ??
-                                'Meta AI vision is currently unavailable. Please enter your commodities manually in the box below.',
+                                'AI Shopping Assistant vision is currently unavailable. Please enter your commodities manually in the box below.',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.errorText,
@@ -376,7 +376,7 @@ class _PaperNoteScannerSheetState extends State<PaperNoteScannerSheet> {
                         },
                         icon: const Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.primary),
                         label: const Text(
-                          'Open Price Lab Directly',
+                          'Open Inference Lab Directly',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,

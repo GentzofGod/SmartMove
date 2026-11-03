@@ -107,7 +107,7 @@ void main() {
       expect(comparison.commodityName, equals('Electric Cooker'));
       expect(comparison.vendors, isNotEmpty);
       expect(comparison.priceSpreadDisplay, isNotEmpty);
-      expect(comparison.aiRecommendation, contains('Meta AI'));
+      expect(comparison.aiRecommendation, contains('AI Shopping Assistant'));
       expect(comparison.summary, contains('vendor alternatives'));
     });
 

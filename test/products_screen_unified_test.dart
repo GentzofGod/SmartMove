@@ -29,7 +29,7 @@ void main() {
       expect(navBar.items.length, equals(3));
       expect(navBar.items[0].label, equals('Home'));
       expect(navBar.items[1].label, equals('Products'));
-      expect(navBar.items[2].label, equals('Price Lab'));
+      expect(navBar.items[2].label, equals('Inference Lab'));
     });
 
     testWidgets('2. ProductsScreen deduplicates multiple observations for same commodity into 1 master card', (tester) async {
@@ -97,8 +97,8 @@ void main() {
       expect(find.widgetWithText(ChoiceChip, 'Food'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'Electronics'), findsOneWidget);
 
-      // Meta AI research banner is present
-      expect(find.text('Meta AI Commodity Price Research'), findsOneWidget);
+      // AI Shopping Assistant research banner is present
+      expect(find.text('AI Shopping Assistant Price Research'), findsOneWidget);
 
       // Report Price Floating Action Button is present
       expect(find.byKey(const ValueKey('btn_add_product_observation')), findsOneWidget);

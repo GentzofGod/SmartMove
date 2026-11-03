@@ -65,7 +65,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           children: const [
             Icon(Icons.auto_awesome, color: AppColors.primary, size: 22),
             SizedBox(width: 8),
-            Text('Meta AI Price Research', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            Text('AI Shopping Assistant Price Research', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           ],
         ),
         content: Column(
@@ -145,7 +145,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Meta AI is researching live web vendors for "$query"...',
+                'AI Shopping Assistant is researching live web vendors for "$query"...',
                 style: const TextStyle(fontSize: 12),
               ),
             ),
@@ -170,7 +170,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     if (plan == null) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No response from Meta AI for "$query". Live AI research is unavailable.'),
+          content: Text('No response from AI Shopping Assistant for "$query". Live AI research is unavailable.'),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -348,7 +348,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                             size: 20,
                             color: AppColors.primary,
                           ),
-                          tooltip: 'Scan Handwritten Paper Note (Meta AI Vision)',
+                          tooltip: 'Scan Handwritten Paper Note (AI Shopping Assistant Vision)',
                           onPressed: () => _openPaperNoteScannerSheet(context),
                         ),
                   border: InputBorder.none,
@@ -361,7 +361,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             ),
           ),
 
-          // Meta AI Quick Research Chip Row
+          // AI Shopping Assistant Quick Research Chip Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 2.0),
             child: SingleChildScrollView(
@@ -374,8 +374,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                     side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
                     label: Text(
                       _searchController.text.isNotEmpty
-                          ? 'Research "${_searchController.text.trim()}" with Meta AI'
-                          : 'Meta AI Commodity Price Research',
+                          ? 'Research "${_searchController.text.trim()}" with AI Shopping Assistant'
+                          : 'AI Shopping Assistant Price Research',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,

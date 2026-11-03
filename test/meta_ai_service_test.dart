@@ -36,7 +36,7 @@ void main() {
         'I have ₦15,000. I need 2kg rice, 1 crate of eggs, 2kg tomatoes, 1L cooking oil. Collect package before 2 PM.',
       );
 
-      expect(proposal.modelName, 'SmartMove AI Assistant');
+      expect(proposal.modelName, 'SmartMove AI Shopping Assistant');
       expect(proposal.budget, 15000.0);
       expect(proposal.shoppingItems.length, 4);
 
@@ -147,13 +147,13 @@ void main() {
         mockLiveJson,
         'Live request',
         isFallback: false,
-        executionStatus: 'Meta AI Live Cloud: Success',
+        executionStatus: 'AI Shopping Assistant Live Cloud: Success',
       );
 
       expect(liveProposal, isNotNull);
       expect(liveProposal!.isFallback, isFalse);
       expect(liveProposal.isLiveCloud, isTrue);
-      expect(liveProposal.executionStatus, 'Meta AI Live Cloud: Success');
+      expect(liveProposal.executionStatus, 'AI Shopping Assistant Live Cloud: Success');
       expect(liveProposal.fallbackReason, isNull);
     });
 

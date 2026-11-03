@@ -65,7 +65,7 @@ void main() {
       // Starts in English
       expect(find.text('Home'), findsOneWidget);
       expect(find.text('Products'), findsOneWidget);
-      expect(find.text('Price Lab'), findsOneWidget);
+      expect(find.text('Inference Lab'), findsOneWidget);
 
       // Programmatically trigger language switch to Yorùbá
       final element = tester.element(find.byType(MainScaffold));

@@ -214,7 +214,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify header
-      expect(find.text('Meta AI Assistant'), findsOneWidget);
+      expect(find.text('AI Shopping Assistant'), findsOneWidget);
       expect(find.text('Voice & Vision'), findsOneWidget);
 
       // Verify Scan Paper Note button exists

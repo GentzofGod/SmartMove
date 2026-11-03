@@ -131,7 +131,7 @@ class ItineraryScreen extends ConsumerWidget {
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: () => context.go('/decision-lab'),
-                            child: const Text('Go to Price Lab'),
+                            child: const Text('Go to Inference Lab'),
                           ),
                         ],
                       ),

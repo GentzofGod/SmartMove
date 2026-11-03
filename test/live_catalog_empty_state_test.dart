@@ -207,8 +207,8 @@ void main() {
       expect(find.text('Weekly Basket'), findsNothing);
       expect(find.text('Breakfast List'), findsNothing);
 
-      // Ensure clean prompt box comes first in Meta AI Assistant card with Voice and Scan
-      expect(find.text('Meta AI Assistant'), findsOneWidget);
+      // Ensure clean prompt box comes first in AI Shopping Assistant card with Voice and Scan
+      expect(find.text('AI Shopping Assistant'), findsOneWidget);
       expect(find.byType(TextField), findsWidgets);
       expect(find.text('Voice Note'), findsOneWidget);
       expect(find.text('Scan Note'), findsOneWidget);

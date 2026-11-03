@@ -126,7 +126,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               Icon(Icons.auto_awesome, color: AppColors.primary, size: 22),
               SizedBox(width: 8),
               Text(
-                'Meta AI Price Research',
+                'AI Shopping Assistant Price Research',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
             ],
@@ -226,7 +226,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     if (plan == null) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No response from Meta AI for "$query". Live AI research is unavailable.'),
+          content: Text('No response from AI Shopping Assistant for "$query". Live AI research is unavailable.'),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -915,7 +915,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             ),
           ),
 
-          // 2. Meta AI Commodity Price Research Action Banner
+          // 2. AI Shopping Assistant Commodity Price Research Action Banner
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
             child: InkWell(
@@ -939,7 +939,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Meta AI Commodity Price Research',
+                        'AI Shopping Assistant Price Research',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,

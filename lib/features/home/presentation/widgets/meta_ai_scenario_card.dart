@@ -53,14 +53,14 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                 Expanded(
                   child: Text(
                     proposal.errorMessage ??
-                        'AI Assistant could not process your request. Please enter items directly in Price Lab.',
+                        'AI Shopping Assistant could not process your request. Please enter items directly in Inference Lab.',
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
                   ),
                 ),
               ],
             ),
             action: SnackBarAction(
-              label: 'Price Lab',
+              label: 'Inference Lab',
               textColor: Colors.white,
               onPressed: () => context.push('/decision-lab'),
             ),
@@ -124,7 +124,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
       SnackBar(
         backgroundColor: AppColors.primary,
         content: Text(
-          'Confirmed: ${items.length} commodities loaded into Price Lab (Budget: ₦${budget.toStringAsFixed(0)})',
+          'Confirmed: ${items.length} commodities loaded into Inference Lab (Budget: ₦${budget.toStringAsFixed(0)})',
         ),
       ),
     );
@@ -223,7 +223,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                     const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
-                        'Meta AI Assistant',
+                        'AI Shopping Assistant',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 15,
@@ -284,7 +284,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                     maxLines: 5,
                     keyboardType: TextInputType.multiline,
                     decoration: const InputDecoration(
-                      hintText: 'Ask AI Assistant (e.g. 5kg rice, 2L oil in Bodija)...',
+                      hintText: 'Ask AI Shopping Assistant (e.g. 5kg rice, 2L oil in Bodija)...',
                       hintStyle: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                       border: InputBorder.none,
                       isDense: true,
@@ -301,12 +301,7 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                     ),
                   )
-                else ...[
-                  IconButton(
-                    icon: const Icon(Icons.mic_rounded, color: AppColors.primary, size: 20),
-                    tooltip: 'Record Voice Note (Meta Transcribe)',
-                    onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
-                  ),
+                else
                   IconButton(
                     icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary, size: 20),
                     tooltip: 'Send prompt to AI Planner',
@@ -317,7 +312,6 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
                       }
                     },
                   ),
-                ],
               ],
             ),
           ),
@@ -330,25 +324,28 @@ class _MetaAiScenarioCardState extends ConsumerState<MetaAiScenarioCard> {
               Expanded(
                 child: SizedBox(
                   height: 38,
-                  child: ElevatedButton.icon(
-                    key: const ValueKey('btn_voice_transcribe'),
-                    onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  child: Tooltip(
+                    message: 'Record Voice Note (Meta Transcribe)',
+                    child: ElevatedButton.icon(
+                      key: const ValueKey('btn_voice_transcribe'),
+                      onPressed: _isProcessing ? null : _openVoiceTranscribeSheet,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                    ),
-                    icon: const Icon(Icons.mic_rounded, color: Colors.white, size: 16),
-                    label: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Voice Note',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      icon: const Icon(Icons.mic_rounded, color: Colors.white, size: 16),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Voice Note',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

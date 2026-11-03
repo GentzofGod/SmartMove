@@ -1071,7 +1071,7 @@ class MetaAiService {
           : '';
       return VoiceTranscriptionResult.error(
         message:
-            'Meta AI voice transcription is currently unavailable$diagnosticSuffix. Please check your network connection or enter commodities manually.',
+            'AI Shopping Assistant voice transcription is currently unavailable$diagnosticSuffix. Please check your network connection or enter commodities manually.',
         detectedDialect: dialect,
       );
     }
@@ -1095,7 +1095,7 @@ class MetaAiService {
       confidence: 0.98,
       modelName: 'SmartMove Voice AI',
       isFallback: true,
-      note: 'Meta AI Fallback Active (${resolvedDialect.label}): $reason',
+      note: 'AI Shopping Assistant Fallback Active (${resolvedDialect.label}): $reason',
       detectedDialect: resolvedDialect,
       englishTranslation: translation,
       isDialectTranslated: translation != null && translation.isNotEmpty,
@@ -1564,7 +1564,7 @@ class MetaAiService {
       if (proposal.hasError || proposal.shoppingItems.isEmpty) {
         return PaperNoteScanResult.error(
           message: proposal.errorMessage ??
-              'Could not identify any shopping commodities from the transcribed text. Please add items manually in Price Lab.',
+              'Could not identify any shopping commodities from the transcribed text. Please add items manually in Inference Lab.',
           imageBytes: imageBytes,
           imagePath: imagePath,
           noteTitle: 'Custom Paper Note',
@@ -1612,7 +1612,7 @@ class MetaAiService {
 
     return PaperNoteScanResult.error(
       message:
-          'Meta AI vision service is currently unavailable. Please check your network connection or enter your commodities manually in Price Lab.',
+          'AI Shopping Assistant vision service is currently unavailable. Please check your network connection or enter your commodities manually in Inference Lab.',
       imageBytes: imageBytes,
       imagePath: imagePath,
       noteTitle: 'Photographed Shopping Note',
@@ -2018,7 +2018,7 @@ class MetaAiService {
               parsedJson,
               sanitizedPrompt,
               isFallback: false,
-              executionStatus: 'Meta AI Live Cloud: Success',
+              executionStatus: 'AI Shopping Assistant Live Cloud: Success',
               fallbackReason: null,
             );
             if (validated != null) {
@@ -2026,28 +2026,28 @@ class MetaAiService {
             } else {
               return AiPlanProposal.error(
                 message:
-                    'Meta AI cloud service returned an unparseable response. Please enter your commodities manually in Price Lab.',
+                    'AI Shopping Assistant cloud service returned an unparseable response. Please enter your commodities manually in Inference Lab.',
                 rawInput: sanitizedPrompt,
               );
             }
           } else {
             return AiPlanProposal.error(
               message:
-                  'Meta AI cloud service returned an empty response. Please enter your commodities manually in Price Lab.',
+                  'AI Shopping Assistant cloud service returned an empty response. Please enter your commodities manually in Inference Lab.',
               rawInput: sanitizedPrompt,
             );
           }
         } else {
           return AiPlanProposal.error(
             message:
-                'Meta AI cloud service returned an error (HTTP ${statusCode ?? 'unavailable'}). Please enter your commodities manually in Price Lab.',
+                'AI Shopping Assistant cloud service returned an error (HTTP ${statusCode ?? 'unavailable'}). Please enter your commodities manually in Inference Lab.',
             rawInput: sanitizedPrompt,
           );
         }
       } catch (err) {
         return AiPlanProposal.error(
           message:
-              'Meta AI cloud connection timed out or is unreachable. Please check your network connection or enter your commodities manually in Price Lab.',
+              'AI Shopping Assistant cloud connection timed out or is unreachable. Please check your network connection or enter your commodities manually in Inference Lab.',
           rawInput: sanitizedPrompt,
         );
       }
@@ -2338,7 +2338,7 @@ class MetaAiService {
                 parsedJson,
                 rawPrompt,
                 isFallback: false,
-                executionStatus: 'Meta AI Live Cloud: Multi-Store Grounded',
+                executionStatus: 'AI Shopping Assistant Live Cloud: Multi-Store Grounded',
               );
               if (validated != null && !validated.hasError && validated.shoppingItems.isNotEmpty) {
                 return validated.copyWith(
@@ -2437,10 +2437,10 @@ class MetaAiService {
       liveWebVendors: allDiscoveredVendors,
       webSearchSummary: summary,
       executionStatus: baseProposal.executionStatus.contains('Live Cloud')
-          ? 'Meta AI Grounded: Multi-Store Search Verified'
+          ? 'AI Shopping Assistant Grounded: Multi-Store Search Verified'
           : (baseProposal.isFallback
-              ? 'Meta AI: Resilient Fallback Active (Web Search Grounded)'
-              : 'Meta AI: Live Web Search Grounded'),
+              ? 'AI Shopping Assistant: Resilient Fallback Active (Web Search Grounded)'
+              : 'AI Shopping Assistant: Live Web Search Grounded'),
     );
   }
 
@@ -2462,7 +2462,7 @@ class MetaAiService {
     dynamic json,
     String rawInput, {
     bool isFallback = false,
-    String executionStatus = 'Meta AI Live Cloud: Success',
+    String executionStatus = 'AI Shopping Assistant Live Cloud: Success',
     String? fallbackReason,
   }) {
     try {
@@ -2570,7 +2570,7 @@ class MetaAiService {
       if (validatedItems.isEmpty) {
         return AiPlanProposal.error(
           message:
-              'Meta AI could not identify any shopping commodities in the model response. Please enter them manually in Price Lab.',
+              'AI Shopping Assistant could not identify any shopping commodities in the model response. Please enter them manually in Inference Lab.',
           rawInput: rawInput,
         );
       }
@@ -2593,7 +2593,7 @@ class MetaAiService {
         shoppingItems: validatedItems,
         deadlineErrand: errand,
         rawInput: rawInput,
-        modelName: 'SmartMove AI Assistant',
+        modelName: 'SmartMove AI Shopping Assistant',
         clarificationQuestions: ambiguities,
         hasAmbiguity: ambiguities.isNotEmpty,
         isFallback: isFallback,
@@ -3897,7 +3897,7 @@ class MetaAiService {
     if (items.isEmpty) {
       return AiPlanProposal.error(
         message:
-            'Meta AI could not identify any shopping commodities in your request. Please specify commodities and quantities (e.g. "2kg rice, 1 crate eggs"), or enter them directly in Price Lab.',
+            'AI Shopping Assistant could not identify any shopping commodities in your request. Please specify commodities and quantities (e.g. "2kg rice, 1 crate eggs"), or enter them directly in Inference Lab.',
         rawInput: prompt,
       );
     }
@@ -3909,14 +3909,14 @@ class MetaAiService {
       shoppingItems: items,
       deadlineErrand: nonShoppingErrand,
       rawInput: prompt,
-      modelName: 'SmartMove AI Assistant',
+      modelName: 'SmartMove AI Shopping Assistant',
       detectedPreference: preference,
       clarificationQuestions: ambiguities,
       hasAmbiguity: ambiguities.isNotEmpty,
       isFallback: true,
       executionStatus: detectedBundleName != null
-          ? 'Meta AI: Bundle Expansion ($detectedBundleName)'
-          : 'Meta AI: Resilient Fallback Active',
+          ? 'AI Shopping Assistant: Bundle Expansion ($detectedBundleName)'
+          : 'AI Shopping Assistant: Resilient Fallback Active',
       fallbackReason: fallbackReason ??
           (detectedBundleName != null
               ? 'Intelligent category decomposition: $detectedBundleName'
@@ -4015,7 +4015,7 @@ class MetaAiService {
           id: 'tip-budget-safety',
           title: 'Budget Safety Alert',
           message:
-              'Option A exceeds your budget by ₦${deficit.toStringAsFixed(0)}. Meta AI recommends switching to Option D (${planD.formattedTotalCost}) to postpone non-urgent items and comfortably stay within budget.',
+              'Option A exceeds your budget by ₦${deficit.toStringAsFixed(0)}. AI Shopping Assistant recommends switching to Option D (${planD.formattedTotalCost}) to postpone non-urgent items and comfortably stay within budget.',
           iconType: 'budget',
           potentialSavings: planA.totalCost - planD.totalCost,
           actionLabel: 'Switch to Option D',
@@ -4090,13 +4090,13 @@ class MetaAiService {
         final newItem = extracted.shoppingItems.first;
         return AiCommandExecutionResult(
           feedbackMessage:
-              'Meta AI added "${newItem.productName}" (${newItem.quantity.toInt()} ${newItem.unit}) at ~₦${newItem.estimatedUnitPrice.toStringAsFixed(0)} to your basket.',
+              'AI Shopping Assistant added "${newItem.productName}" (${newItem.quantity.toInt()} ${newItem.unit}) at ~₦${newItem.estimatedUnitPrice.toStringAsFixed(0)} to your basket.',
           addedItem: newItem,
         );
       }
       return AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI could not recognize the commodity "$itemSub". Please specify quantity and item name (e.g. "Add 2kg rice").',
+            'AI Shopping Assistant could not recognize the commodity "$itemSub". Please specify quantity and item name (e.g. "Add 2kg rice").',
       );
     }
 
@@ -4110,7 +4110,7 @@ class MetaAiService {
           newBudget *= 1000;
         }
         return AiCommandExecutionResult(
-          feedbackMessage: 'Meta AI updated your spending budget to ₦${newBudget.toStringAsFixed(0)}.',
+          feedbackMessage: 'AI Shopping Assistant updated your spending budget to ₦${newBudget.toStringAsFixed(0)}.',
           updatedBudget: newBudget,
         );
       }
@@ -4120,7 +4120,7 @@ class MetaAiService {
     if (lower.contains('hurry') || lower.contains('faster') || lower.contains('express') || lower.contains('quickest')) {
       return const AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI switched to Option C (Express Walk-in) to prioritize rapid convenience and immediate acquisition.',
+            'AI Shopping Assistant switched to Option C (Express Walk-in) to prioritize rapid convenience and immediate acquisition.',
         selectedPlanId: 'plan-c',
         updatedTimeHours: 1.5,
       );
@@ -4130,7 +4130,7 @@ class MetaAiService {
     if (lower.contains('less transport') || lower.contains('cut transport') || lower.contains('fewer stops') || lower.contains('cheaper travel')) {
       return const AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI applied Option B (Consolidated Sourcing) to minimize transport fares and transit legs.',
+            'AI Shopping Assistant applied Option B (Consolidated Sourcing) to minimize transport fares and transit legs.',
         selectedPlanId: 'plan-b',
         updatedMaxStops: 2,
       );
@@ -4140,7 +4140,7 @@ class MetaAiService {
     if (lower.contains('delay') || lower.contains('non-essential') || lower.contains('postpone') || lower.contains('tight budget')) {
       return const AiCommandExecutionResult(
         feedbackMessage:
-            'Meta AI configured Option D to postpone non-urgent items and protect your immediate cashflow.',
+            'AI Shopping Assistant configured Option D to postpone non-urgent items and protect your immediate cashflow.',
         selectedPlanId: 'plan-d',
         updatedDelayNonUrgent: true,
       );
@@ -4149,25 +4149,25 @@ class MetaAiService {
     // Command 6: Select specific plan/option
     if (lower.contains('option a') || lower.contains('plan a')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Option A (Lowest Total Product Cost).',
+        feedbackMessage: 'AI Shopping Assistant selected Option A (Lowest Total Product Cost).',
         selectedPlanId: 'plan-a',
       );
     }
     if (lower.contains('option b') || lower.contains('plan b')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Option B (Consolidated Single Hub).',
+        feedbackMessage: 'AI Shopping Assistant selected Option B (Consolidated Single Hub).',
         selectedPlanId: 'plan-b',
       );
     }
     if (lower.contains('option c') || lower.contains('plan c')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Option C (Express Walk-In).',
+        feedbackMessage: 'AI Shopping Assistant selected Option C (Express Walk-In).',
         selectedPlanId: 'plan-c',
       );
     }
     if (lower.contains('option d') || lower.contains('plan d')) {
       return const AiCommandExecutionResult(
-        feedbackMessage: 'Meta AI selected Option D (Cashflow & Non-Urgent Delay).',
+        feedbackMessage: 'AI Shopping Assistant selected Option D (Cashflow & Non-Urgent Delay).',
         selectedPlanId: 'plan-d',
       );
     }
@@ -4175,7 +4175,7 @@ class MetaAiService {
     // Rather than returning a fake coded fallback response, report an informative message
     return const AiCommandExecutionResult(
       feedbackMessage:
-          'Meta AI could not recognize this command. You can type commands like "Add 2kg rice", "Set budget to ₦20,000", or "Select Option A".',
+          'AI Shopping Assistant could not recognize this command. You can type commands like "Add 2kg rice", "Set budget to ₦20,000", or "Select Option A".',
     );
   }
 
@@ -4219,7 +4219,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'AI Assistant interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating sourcing into a single verified trader hub, absorbing a small $diffText grocery difference.',
+            'AI Shopping Assistant interpreted your preference: Prioritize transit savings. ${lowestTransportPlan.name} cuts your transport cost to ${lowestTransportPlan.formattedTransportCost} by consolidating sourcing into a single verified trader hub, absorbing a small $diffText grocery difference.',
         targetPlanId: lowestTransportPlan.id,
         suggestedTransport: lowestTransportPlan.transportCost,
         suggestedMaxStops: lowestTransportPlan.stopCount,
@@ -4240,7 +4240,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'AI Assistant interpreted your preference: Express convenience. ${fastestPlan.name} provides direct walk-in neighborhood retail sourcing for rapid acquisition.',
+            'AI Shopping Assistant interpreted your preference: Express convenience. ${fastestPlan.name} provides direct walk-in neighborhood retail sourcing for rapid acquisition.',
         targetPlanId: fastestPlan.id,
         suggestedMaxHours: fastestPlan.estimatedHours,
       );
@@ -4263,7 +4263,7 @@ class MetaAiService {
       return FollowUpInterpretation(
         userMessage: userFollowUp,
         interpretationExplanation:
-            'AI Assistant interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while acquiring high-priority essential staples within a strict budget.',
+            'AI Shopping Assistant interpreted your preference: Cashflow protection. ${cashflowPlan.name} (${cashflowPlan.formattedTotalCost}) postpones non-urgent commodity purchases while acquiring high-priority essential staples within a strict budget.',
         targetPlanId: cashflowPlan.id,
         suggestedDelayNonUrgent: true,
       );
@@ -4437,7 +4437,7 @@ class MetaAiService {
           if (text != null && text.toString().isNotEmpty) {
             return FollowUpInterpretation(
               userMessage: userQuery,
-              interpretationExplanation: 'AI Assistant Advice: $text',
+              interpretationExplanation: 'AI Shopping Assistant Advice: $text',
               targetPlanId: text.toString().toLowerCase().contains('option b')
                   ? 'plan-b'
                   : (text.toString().toLowerCase().contains('option d')
@@ -4455,7 +4455,7 @@ class MetaAiService {
     return FollowUpInterpretation(
       userMessage: userQuery,
       interpretationExplanation:
-          'AI Assistant Analysis: For your current basket ($totalCount items), Option A (${planA.formattedTotalCost}) provides local seller pickup with $traderCount verified platform listings. Option B (${planB.formattedTotalCost}) provides full online e-commerce ordering with doorstep delivery. Select the option that best matches your schedule and transport preference.',
+          'AI Shopping Assistant Analysis: For your current basket ($totalCount items), Option A (${planA.formattedTotalCost}) provides local seller pickup with $traderCount verified platform listings. Option B (${planB.formattedTotalCost}) provides full online e-commerce ordering with doorstep delivery. Select the option that best matches your schedule and transport preference.',
       targetPlanId: traderCount > 0 ? 'plan-a' : 'plan-b',
     );
   }
@@ -4561,13 +4561,13 @@ class MetaAiService {
     } else if (groundedVendors.isNotEmpty) {
       final top = groundedVendors.first;
       recommendation =
-          'Meta AI search returned ${groundedVendors.length} online result(s), including ${top.vendorName}. Confirm the displayed price and availability on the retailer listing.';
+          'AI Shopping Assistant search returned ${groundedVendors.length} online result(s), including ${top.vendorName}. Confirm the displayed price and availability on the retailer listing.';
     } else if (webVendors.isNotEmpty) {
       recommendation =
-          'Meta AI Market Intelligence: Online listings are live search results and may not show a current price. Confirm price, availability, and delivery with the store before buying.';
+          'AI Shopping Assistant Market Intelligence: Online listings are live search results and may not show a current price. Confirm price, availability, and delivery with the store before buying.';
     } else {
       recommendation =
-          'Meta AI Intelligence: No live online listings were returned. Check your connection or try the comparison again. App catalog quotes, when present, are shown separately.';
+          'AI Shopping Assistant Intelligence: No live online listings were returned. Check your connection or try the comparison again. App catalog quotes, when present, are shown separately.';
     }
 
     return LiveAiMultiVendorComparison(
@@ -5365,7 +5365,7 @@ class MetaAiService {
     }
 
     final explanation = anomalous.isNotEmpty
-        ? 'Meta AI identified ${anomalous.length} price outlier(s) exceeding normal variance (>50% deviation from ₦${avg.toStringAsFixed(0)} baseline).'
+        ? 'AI Shopping Assistant identified ${anomalous.length} price outlier(s) exceeding normal variance (>50% deviation from ₦${avg.toStringAsFixed(0)} baseline).'
         : 'All current prices fall within normal market variance.';
 
     return PriceAnomalyAuditResult(
@@ -5729,11 +5729,11 @@ class MetaAiService {
           }
         }
         return AiDescriptionResult.failure(
-          'Meta AI returned an empty response. Please check prompt details.',
+          'AI Shopping Assistant returned an empty response. Please check prompt details.',
         );
       }
 
-      String errorMsg = 'Meta AI Edge Proxy responded with HTTP ${res.statusCode}.';
+      String errorMsg = 'AI Shopping Assistant Edge Proxy responded with HTTP ${res.statusCode}.';
       if (res.errorMessage != null && res.errorMessage!.isNotEmpty) {
         errorMsg = res.errorMessage!;
       } else if (res.data is Map && res.data['error'] != null) {

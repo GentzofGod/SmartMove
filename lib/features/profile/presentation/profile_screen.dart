@@ -2040,7 +2040,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           Padding(
                             padding: EdgeInsets.only(bottom: 10),
                             child: Text(
-                              'SmartMove combines real-time physical market stalls (Bodija, Mile 12, Wuse) with verified e-commerce platforms (Jumia, Konga, Supermart.ng). SmartMove AI Assistant normalizes units to compare true landed cost including transport.',
+                              'SmartMove combines real-time physical market stalls (Bodija, Mile 12, Wuse) with verified e-commerce platforms (Jumia, Konga, Supermart.ng). SmartMove AI Shopping Assistant normalizes units to compare true landed cost including transport.',
                               style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
                             ),
                           ),
@@ -2190,7 +2190,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    'AI Architecture: SmartMove AI Assistant',
+                    'AI Architecture: SmartMove AI Shopping Assistant',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF512DA8)),
                   ),
                 ),
