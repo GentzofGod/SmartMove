@@ -65,12 +65,42 @@ if [ -f "android/gradlew" ]; then
   chmod +x android/gradlew
 fi
 
+MODE="${1:---split}"
+
+# Fast path: zip existing v8a APK without rebuilding
+if [ "$MODE" = "--zip-v8a" ] || [ "$MODE" = "--zip-only" ]; then
+  OUTPUT_DIR="build/app/outputs/flutter-apk"
+  V8A_APK=$(ls "$OUTPUT_DIR"/app-arm64-v8a-*.apk 2>/dev/null | head -n 1 || true)
+  if [ -n "$V8A_APK" ] && [ -f "$V8A_APK" ]; then
+    ZIP_NAME="${OUTPUT_DIR}/smartmove-arm64-v8a.zip"
+    echo -e "\n${BLUE}--> Compressing existing arm64-v8a APK to minimize download size...${NC}"
+    python3 -c "
+import zipfile, os, sys
+apk = sys.argv[1]
+out = sys.argv[2]
+with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+    zf.write(apk, arcname=os.path.basename(apk))
+orig_size = os.path.getsize(apk) / (1024 * 1024)
+zip_size = os.path.getsize(out) / (1024 * 1024)
+saved = (1.0 - zip_size / orig_size) * 100.0
+print(f'   [✓] Zipped v8a: {orig_size:.1f} MB -> {zip_size:.1f} MB (Saved {saved:.0f}% download size)')
+" "$V8A_APK" "$ZIP_NAME"
+    echo -e "\n${GREEN}====================================================${NC}"
+    echo -e "${GREEN}        arm64-v8a Compressed Successfully!          ${NC}"
+    echo -e "${GREEN}====================================================${NC}"
+    ls -lh "$ZIP_NAME" "$V8A_APK"
+    exit 0
+  else
+    echo -e "${RED}[!] No arm64-v8a APK found in $OUTPUT_DIR. Run ./build_apk.sh --split first.${NC}"
+    exit 1
+  fi
+fi
+
 # Fetch dependencies
 echo -e "\n${BLUE}--> Fetching dependencies (flutter pub get)...${NC}"
 /data/workspace/flutter/bin/flutter pub get
 
 # Build APK
-MODE="${1:---split}"
 echo -e "\n${BLUE}--> Starting build (${MODE}) with Dart Define environment...${NC}"
 echo -e "${YELLOW}[Note] Building and assembling Gradle tasks...${NC}"
 
@@ -91,11 +121,31 @@ esac
 
 OUTPUT_DIR="build/app/outputs/flutter-apk"
 
+# Automatically create high-compression zip of arm64-v8a APK
+if [ -d "$OUTPUT_DIR" ]; then
+  V8A_APK=$(ls "$OUTPUT_DIR"/app-arm64-v8a-*.apk 2>/dev/null | head -n 1 || true)
+  if [ -n "$V8A_APK" ] && [ -f "$V8A_APK" ]; then
+    echo -e "\n${BLUE}--> Compressing arm64-v8a APK to minimize download size...${NC}"
+    ZIP_NAME="${OUTPUT_DIR}/smartmove-arm64-v8a.zip"
+    python3 -c "
+import zipfile, os, sys
+apk = sys.argv[1]
+out = sys.argv[2]
+with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+    zf.write(apk, arcname=os.path.basename(apk))
+orig_size = os.path.getsize(apk) / (1024 * 1024)
+zip_size = os.path.getsize(out) / (1024 * 1024)
+saved = (1.0 - zip_size / orig_size) * 100.0
+print(f'   [✓] Zipped v8a: {orig_size:.1f} MB -> {zip_size:.1f} MB (Saved {saved:.0f}% download bandwidth)')
+" "$V8A_APK" "$ZIP_NAME"
+  fi
+fi
+
 echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN}             Build Finished!                       ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
 if [ -d "$OUTPUT_DIR" ]; then
-  echo -e "Generated APK(s):"
-  ls -lh "$OUTPUT_DIR"/*.apk 2>/dev/null || echo "No APK files found."
+  echo -e "Generated Artifacts (APKs & Compressed Bundles):"
+  ls -lh "$OUTPUT_DIR"/*.apk "$OUTPUT_DIR"/*.zip 2>/dev/null || echo "No files found."
 fi

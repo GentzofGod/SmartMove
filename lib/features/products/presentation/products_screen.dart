@@ -1211,7 +1211,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                     fontSize: 15,
                                     color: AppColors.textPrimary,
                                   ),
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -1257,7 +1257,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                       ? '${item.bestSellerLocation} • ${item.distanceKm.toStringAsFixed(1)} km'
                                       : item.bestSellerLocation,
                                   style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),

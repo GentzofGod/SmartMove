@@ -523,11 +523,12 @@ class HomeScreen extends ConsumerWidget {
                           border: Border.all(color: AppColors.cardBorder),
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CommodityImageWidget(
                               commodityName: obs.productName,
                               imageUrl: obs.imageUrl,
-                              size: 40,
+                              size: 42,
                               borderRadius: 10,
                             ),
                             const SizedBox(width: 12),
@@ -535,32 +536,43 @@ class HomeScreen extends ConsumerWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Text(
+                                    obs.productName,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.5,
+                                      color: AppColors.textPrimary,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
                                   Row(
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          obs.productName,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                      ),
                                       Text(
-                                        '${obs.formattedPrice} / ${obs.unit}',
+                                        obs.formattedPrice,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 13.5,
                                           color: AppColors.primary,
                                         ),
                                       ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '/ ${obs.unit}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11.5,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                   Text(
                                     '${obs.sellerName} • ${obs.marketLocation}',
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 11.5,
@@ -606,61 +618,73 @@ class HomeScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            if (isVerified)
-                              IconButton(
-                                icon: const Icon(Icons.location_on_outlined, size: 20, color: AppColors.primary),
-                                tooltip: 'Locate on Map',
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () {
-                                  SellerLocationMapSheet.show(
-                                    context,
-                                    sellerName: obs.sellerName,
-                                    marketLocation: obs.marketLocation,
-                                    stallLocation: obs.notes,
-                                    productName: obs.productName,
-                                    price: obs.price,
-                                    unit: obs.unit,
-                                    brandOrGrade: obs.brandOrGrade,
-                                    inStock: obs.inStock,
-                                    observation: obs,
-                                    sellerLat: obs.latitude,
-                                    sellerLng: obs.longitude,
-                                  );
-                                },
-                              )
-                            else
-                              IconButton(
-                                icon: const Icon(Icons.help_outline_rounded, size: 20, color: Color(0xFFE65100)),
-                                tooltip: 'Get Direction Help',
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () {
-                                  CommunityAssistanceSheet.show(context, observation: obs);
-                                },
-                              ),
-                            IconButton(
-                              key: ValueKey('home_add_basket_${obs.id}'),
-                              icon: const Icon(Icons.add_shopping_cart, size: 19, color: AppColors.primary),
-                              tooltip: 'Add to Basket',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: () {
-                                final item = ShoppingItem(
-                                  id: 'item-${obs.productId.isNotEmpty ? obs.productId : obs.id}-${DateTime.now().millisecondsSinceEpoch}',
-                                  productId: obs.productId,
-                                  productName: obs.productName,
-                                  quantity: 1,
-                                  unit: obs.unit,
-                                  estimatedUnitPrice: obs.price,
-                                  priority: CommodityPriority.essential,
-                                );
-                                ref.read(decisionLabProvider.notifier).addShoppingItem(item);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Added ${obs.productName} to basket!'),
-                                    backgroundColor: AppColors.primary,
-                                    duration: const Duration(seconds: 2),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isVerified)
+                                  IconButton(
+                                    icon: const Icon(Icons.location_on_outlined, size: 20, color: AppColors.primary),
+                                    tooltip: 'Locate on Map',
+                                    constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                    padding: const EdgeInsets.all(6),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      SellerLocationMapSheet.show(
+                                        context,
+                                        sellerName: obs.sellerName,
+                                        marketLocation: obs.marketLocation,
+                                        stallLocation: obs.notes,
+                                        productName: obs.productName,
+                                        price: obs.price,
+                                        unit: obs.unit,
+                                        brandOrGrade: obs.brandOrGrade,
+                                        inStock: obs.inStock,
+                                        observation: obs,
+                                        sellerLat: obs.latitude,
+                                        sellerLng: obs.longitude,
+                                      );
+                                    },
+                                  )
+                                else
+                                  IconButton(
+                                    icon: const Icon(Icons.help_outline_rounded, size: 20, color: Color(0xFFE65100)),
+                                    tooltip: 'Get Direction Help',
+                                    constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                    padding: const EdgeInsets.all(6),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      CommunityAssistanceSheet.show(context, observation: obs);
+                                    },
                                   ),
-                                );
-                              },
+                                const SizedBox(height: 2),
+                                IconButton(
+                                  key: ValueKey('home_add_basket_${obs.id}'),
+                                  icon: const Icon(Icons.add_shopping_cart, size: 20, color: AppColors.primary),
+                                  tooltip: 'Add to Basket',
+                                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                  padding: const EdgeInsets.all(6),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    final item = ShoppingItem(
+                                      id: 'item-${obs.productId.isNotEmpty ? obs.productId : obs.id}-${DateTime.now().millisecondsSinceEpoch}',
+                                      productId: obs.productId,
+                                      productName: obs.productName,
+                                      quantity: 1,
+                                      unit: obs.unit,
+                                      estimatedUnitPrice: obs.price,
+                                      priority: CommodityPriority.essential,
+                                    );
+                                    ref.read(decisionLabProvider.notifier).addShoppingItem(item);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Added ${obs.productName} to basket!'),
+                                        backgroundColor: AppColors.primary,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -740,11 +764,13 @@ class HomeScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     p.name,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                                      fontSize: 14.5,
                                       color: AppColors.textPrimary,
+                                      height: 1.25,
                                     ),
                                   ),
                                   const SizedBox(height: 2),

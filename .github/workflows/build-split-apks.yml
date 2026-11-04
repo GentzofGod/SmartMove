@@ -108,7 +108,21 @@ EOF
             flutter build apk --release --split-per-abi "${DART_DEFINE_ARGS[@]}"
           fi
 
-      - name: Inspect Generated APKs
+      - name: Compress arm64-v8a APK for Reduced Download Size
+        run: |
+          python3 -c "
+          import zipfile, os, glob
+          v8a_files = glob.glob('build/app/outputs/flutter-apk/app-arm64-v8a-*.apk')
+          for apk in v8a_files:
+              out = 'build/app/outputs/flutter-apk/smartmove-arm64-v8a.zip'
+              with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+                  zf.write(apk, arcname=os.path.basename(apk))
+              orig_mb = os.path.getsize(apk)/(1024*1024)
+              zip_mb = os.path.getsize(out)/(1024*1024)
+              print(f'Zipped {apk}: {orig_mb:.1f} MB -> {zip_mb:.1f} MB ({(1 - zip_mb/orig_mb)*100:.0f}% reduction)')
+          "
+
+      - name: Inspect Generated APKs & Compressed Bundles
         run: |
           ls -lh build/app/outputs/flutter-apk/
 
@@ -118,6 +132,14 @@ EOF
           name: smartmove-arm64-v8a
           path: build/app/outputs/flutter-apk/app-arm64-v8a-*.apk
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload arm64-v8a Compressed ZIP (Smallest Download Size)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartmove-arm64-v8a-zip
+          path: build/app/outputs/flutter-apk/smartmove-arm64-v8a.zip
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload armeabi-v7a APK (Older 32-bit Phones)
@@ -148,7 +170,9 @@ EOF
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/*.apk
+          files: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/flutter-apk/*.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
